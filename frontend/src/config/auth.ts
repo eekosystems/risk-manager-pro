@@ -15,11 +15,9 @@ export const msalConfig: Configuration = {
   },
   system: {
     loggerOptions: {
-      logLevel: LogLevel.Warning,
-      loggerCallback: (level, message) => {
-        if (level === LogLevel.Error) {
-          console.error(message);
-        }
+      logLevel: LogLevel.Verbose,
+      loggerCallback: (_level, message) => {
+        console.log(message);
       },
     },
   },
