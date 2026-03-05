@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useOrganizationContext } from "@/context/organization-context";
 import type { FunctionType } from "@/types/api";
 
+import { HeaderBar } from "./header-bar";
 import { LeftSidebar } from "./left-sidebar";
 import { RightPanel } from "./right-panel";
 
@@ -44,6 +45,7 @@ export function AppLayout({ children }: AppLayoutProps) {
 
       {/* Main Content */}
       <main aria-label="Chat workspace" className="flex flex-1 flex-col overflow-hidden">
+        <HeaderBar />
         {children({ activeFunction, conversationId, setConversationId })}
       </main>
 

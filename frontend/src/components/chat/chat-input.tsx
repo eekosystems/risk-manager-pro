@@ -96,7 +96,7 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ask about aviation safety, risks, or regulations..."
+            placeholder="Describe system changes, ask about regulations..."
             className="max-h-32 min-h-[24px] flex-1 resize-none bg-transparent text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none"
             rows={1}
             disabled={disabled}
@@ -116,7 +116,11 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
         </div>
 
         <p className="mt-2 text-center text-[11px] text-gray-400">
-          AI responses require human review. Always validate safety-critical information.
+          Press Enter to send
+          <span className="mx-1.5 text-gray-300">&#183;</span>
+          Attach files
+          <span className="mx-1.5 text-gray-300">&#183;</span>
+          AI-powered analysis
         </p>
       </div>
     </div>
