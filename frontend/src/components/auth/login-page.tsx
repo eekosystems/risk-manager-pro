@@ -1,9 +1,16 @@
+import { useIsAuthenticated } from "@azure/msal-react";
 import { Shield } from "lucide-react";
+import { Navigate } from "react-router-dom";
 
 import { useAuth } from "@/hooks/use-auth";
 
 export function LoginPage() {
   const { login } = useAuth();
+  const isAuthenticated = useIsAuthenticated();
+
+  if (isAuthenticated) {
+    return <Navigate to="/" replace />;
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-gray-50 to-brand-50">
