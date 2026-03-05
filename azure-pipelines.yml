@@ -1,0 +1,166 @@
+# Azure Pipelines — Risk Manager Pro CI
+# Triggers on PRs and pushes to main
+
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    exclude:
+      - docs/**
+      - "*.md"
+
+pr:
+  branches:
+    include:
+      - main
+
+variables:
+  pythonVersion: "3.12"
+  nodeVersion: "20.x"
+
+stages:
+  # ──────────────────────────────────────────────
+  # Backend — Python FastAPI
+  # ──────────────────────────────────────────────
+  - stage: Backend
+    displayName: "Backend CI"
+    jobs:
+      - job: LintAndTypeCheck
+        displayName: "Lint & Type Check"
+        pool:
+          vmImage: "ubuntu-latest"
+        steps:
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: $(pythonVersion)
+
+          - script: |
+              cd backend
+              pip install --upgrade pip
+              pip install -e ".[dev]"
+            displayName: "Install dependencies"
+
+          - script: |
+              cd backend
+              ruff check app/ tests/
+            displayName: "Ruff lint"
+
+          - script: |
+              cd backend
+              ruff format --check app/ tests/
+            displayName: "Ruff format check"
+
+          - script: |
+              cd backend
+              mypy app/
+            displayName: "Mypy type check"
+
+      - job: Test
+        displayName: "Unit Tests"
+        pool:
+          vmImage: "ubuntu-latest"
+        steps:
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: $(pythonVersion)
+
+          - script: |
+              cd backend
+              pip install --upgrade pip
+              pip install -e ".[dev]"
+            displayName: "Install dependencies"
+
+          - script: |
+              cd backend
+              pytest tests/ \
+                --cov=app \
+                --cov-report=xml:coverage.xml \
+                --cov-report=term-missing \
+                --junitxml=test-results.xml
+            displayName: "Run tests"
+
+          - task: PublishTestResults@2
+            condition: succeededOrFailed()
+            inputs:
+              testResultsFormat: "JUnit"
+              testResultsFiles: "backend/test-results.xml"
+              testRunTitle: "Backend Tests"
+
+          - task: PublishCodeCoverageResults@2
+            condition: succeededOrFailed()
+            inputs:
+              summaryFileLocation: "backend/coverage.xml"
+
+      - job: DockerBuild
+        displayName: "Docker Build"
+        dependsOn:
+          - LintAndTypeCheck
+          - Test
+        pool:
+          vmImage: "ubuntu-latest"
+        steps:
+          - task: Docker@2
+            displayName: "Build backend image"
+            inputs:
+              command: build
+              Dockerfile: backend/Dockerfile
+              buildContext: backend
+              tags: |
+                $(Build.BuildId)
+                latest
+
+  # ──────────────────────────────────────────────
+  # Frontend — React + TypeScript
+  # ──────────────────────────────────────────────
+  - stage: Frontend
+    displayName: "Frontend CI"
+    dependsOn: [] # Run in parallel with Backend
+    jobs:
+      - job: LintAndTypeCheck
+        displayName: "Lint & Type Check"
+        pool:
+          vmImage: "ubuntu-latest"
+        steps:
+          - task: NodeTool@0
+            inputs:
+              versionSpec: $(nodeVersion)
+
+          - script: |
+              cd frontend
+              npm ci
+            displayName: "Install dependencies"
+
+          - script: |
+              cd frontend
+              npm run lint
+            displayName: "ESLint"
+
+          - script: |
+              cd frontend
+              npm run type-check
+            displayName: "TypeScript type check"
+
+      - job: Build
+        displayName: "Build"
+        dependsOn: LintAndTypeCheck
+        pool:
+          vmImage: "ubuntu-latest"
+        steps:
+          - task: NodeTool@0
+            inputs:
+              versionSpec: $(nodeVersion)
+
+          - script: |
+              cd frontend
+              npm ci
+            displayName: "Install dependencies"
+
+          - script: |
+              cd frontend
+              npm run build
+            displayName: "Build production bundle"
+
+          - publish: frontend/dist
+            artifact: frontend-build
+            displayName: "Publish build artifact"
