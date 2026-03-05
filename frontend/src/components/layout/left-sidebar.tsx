@@ -41,14 +41,9 @@ export function LeftSidebar({
       >
         <div className="flex min-w-[300px] flex-col h-full">
           {/* Logo */}
-          <div className="flex items-center gap-3 border-b border-gray-100 px-5 py-4">
-            <img src="/logo.webp" alt="Faith Group" className="h-9 w-9" />
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-lg font-bold text-gray-900">
-                Faith Group
-              </span>
-            </div>
-            <span className="ml-auto rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-500">
+          <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+            <img src="/logo.webp" alt="Faith Group" className="h-auto w-[200px]" />
+            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-500">
               v2.1
             </span>
           </div>
