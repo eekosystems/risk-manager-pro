@@ -19,7 +19,7 @@ export function LoginPage() {
           <img
             src="/logo.webp"
             alt="Risk Manager Pro"
-            className="mb-4 h-16 w-16"
+            className="mb-4 h-auto w-[200px]"
           />
           <h1 className="text-2xl font-bold text-gray-900">
             Risk Manager <span className="text-brand-500">Pro</span>
