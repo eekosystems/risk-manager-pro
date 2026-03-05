@@ -1,0 +1,51 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
+  }
+}
+
+@layer components {
+  .nav-item-hover {
+    @apply transition-all duration-200;
+  }
+
+  .nav-item-hover:hover {
+    background: linear-gradient(
+      135deg,
+      rgba(74, 155, 165, 0.08) 0%,
+      rgba(95, 186, 198, 0.04) 100%
+    );
+    transform: translateX(4px);
+  }
+
+  .citation-chip {
+    @apply transition-all duration-200 cursor-pointer;
+  }
+
+  .citation-chip:hover {
+    background: linear-gradient(135deg, #4a9ba5 0%, #5fbac6 100%);
+    color: white;
+    transform: scale(1.02);
+  }
+
+  .gradient-brand {
+    background: linear-gradient(135deg, #4a9ba5 0%, #5fbac6 100%);
+  }
+}

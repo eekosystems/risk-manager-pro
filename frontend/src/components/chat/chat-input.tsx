@@ -1,0 +1,124 @@
+import { Paperclip, Send, X } from "lucide-react";
+import { useCallback, useRef, useState, type KeyboardEvent } from "react";
+
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { useFileUpload } from "@/hooks/use-file-upload";
+
+interface ChatInputProps {
+  onSend: (message: string, files: File[]) => void;
+  disabled: boolean;
+}
+
+export function ChatInput({ onSend, disabled }: ChatInputProps) {
+  const [input, setInput] = useState("");
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { files, addFiles, removeFile, clearFiles } = useFileUpload();
+
+  const handleSend = useCallback(() => {
+    if (!input.trim() && files.length === 0) return;
+    onSend(
+      input.trim(),
+      files.map((f) => f.file),
+    );
+    setInput("");
+    clearFiles();
+  }, [input, files, onSend, clearFiles]);
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
+  return (
+    <div className="border-t border-gray-200 bg-white px-6 py-4">
+      <div className="mx-auto max-w-3xl">
+        {files.length > 0 && (
+          <div className="mb-2 flex flex-wrap gap-2">
+            {files.map((f) => (
+              <div
+                key={f.id}
+                className="flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-1.5 text-sm"
+              >
+                <span className="max-w-[120px] truncate text-gray-700">
+                  {f.name}
+                </span>
+                <span className="text-[11px] text-gray-400">{f.size}</span>
+                <button
+                  onClick={() => removeFile(f.id)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div
+          className={`flex items-end gap-3 rounded-2xl border bg-white px-4 py-3 shadow-sm transition-all ${
+            isDragging
+              ? "border-brand-400 bg-brand-50"
+              : "border-gray-200 focus-within:border-brand-300 focus-within:shadow-md focus-within:shadow-brand-500/5"
+          }`}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setIsDragging(true);
+          }}
+          onDragLeave={() => setIsDragging(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setIsDragging(false);
+            if (e.dataTransfer.files.length > 0) {
+              addFiles(e.dataTransfer.files);
+            }
+          }}
+        >
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="mb-0.5 rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+          >
+            <Paperclip size={18} />
+          </button>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept=".pdf,.docx,.txt"
+            className="hidden"
+            onChange={(e) => e.target.files && addFiles(e.target.files)}
+          />
+
+          <textarea
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Ask about aviation safety, risks, or regulations..."
+            className="max-h-32 min-h-[24px] flex-1 resize-none bg-transparent text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none"
+            rows={1}
+            disabled={disabled}
+          />
+
+          <button
+            onClick={handleSend}
+            disabled={disabled || (!input.trim() && files.length === 0)}
+            className="mb-0.5 flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-r from-brand-500 to-brand-400 text-white shadow-md shadow-brand-500/25 transition-all hover:scale-105 hover:shadow-lg disabled:opacity-50 disabled:shadow-none"
+          >
+            {disabled ? (
+              <LoadingSpinner size="sm" className="border-white/30 border-t-white" />
+            ) : (
+              <Send size={16} />
+            )}
+          </button>
+        </div>
+
+        <p className="mt-2 text-center text-[11px] text-gray-400">
+          AI responses require human review. Always validate safety-critical information.
+        </p>
+      </div>
+    </div>
+  );
+}

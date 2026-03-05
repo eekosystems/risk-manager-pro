@@ -1,0 +1,87 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+*.egg
+dist/
+build/
+.eggs/
+*.whl
+.venv/
+venv/
+env/
+pip-wheel-metadata/
+
+# Node
+node_modules/
+.pnp.*
+.yarn/
+
+# Build artifacts
+frontend/dist/
+frontend/build/
+backend/dist/
+*.tsbuildinfo
+
+# Environment / Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.cert
+credentials.json
+secrets.json
+
+# Terraform
+infra/.terraform/
+infra/*.tfstate
+infra/*.tfstate.*
+infra/*.tfplan
+infra/.terraform.lock.hcl
+*.tfvars
+!infra/environments/*.tfvars
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.settings/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+ehthumbs.db
+
+# Testing / Coverage
+htmlcov/
+.coverage
+.coverage.*
+coverage/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Docker
+docker-compose.override.yml
+*.log
+
+# Azure
+.azure/
+azurite/
+__azurite_db_*
+__blobstorage__/
+__queuestorage__/
+__tablestorage__/
+
+# Misc
+*.bak
+*.tmp
+*.temp
+.claude/
