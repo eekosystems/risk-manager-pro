@@ -46,7 +46,8 @@ export function OrganizationProvider({ children }: OrganizationProviderProps) {
     if (saved) {
       setActiveOrganization(saved);
     } else {
-      setActiveOrganization(organizations[0]);
+      const first = organizations[0];
+      if (first) setActiveOrganization(first);
     }
   }, [organizations, activeOrganization, setActiveOrganization]);
 
