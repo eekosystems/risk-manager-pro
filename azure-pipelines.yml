@@ -1,4 +1,4 @@
-# Azure Pipelines — Risk Manager Pro CI
+# Azure Pipelines — Risk Manager Pro CI/CD
 # Triggers on PRs and pushes to main
 
 trigger:
@@ -18,13 +18,70 @@ pr:
 variables:
   pythonVersion: "3.12"
   nodeVersion: "20.x"
+  azureServiceConnection: "azure-rmp-connection"
 
 stages:
+  # ──────────────────────────────────────────────
+  # Infrastructure — Terraform
+  # ──────────────────────────────────────────────
+  - stage: Infrastructure
+    displayName: "Infrastructure (Terraform)"
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      - job: TerraformApply
+        displayName: "Terraform Plan & Apply"
+        pool:
+          vmImage: "ubuntu-latest"
+        steps:
+          - task: TerraformInstaller@1
+            displayName: "Install Terraform"
+            inputs:
+              terraformVersion: "latest"
+
+          - task: TerraformTaskV4@4
+            displayName: "Terraform Init"
+            inputs:
+              provider: "azurerm"
+              command: "init"
+              workingDirectory: "$(System.DefaultWorkingDirectory)/infra"
+              backendServiceArm: $(azureServiceConnection)
+              backendAzureRmResourceGroupName: "rmp-terraform-state"
+              backendAzureRmStorageAccountName: "rmptfstate"
+              backendAzureRmContainerName: "tfstate"
+              backendAzureRmKey: "riskmanagerpro.terraform.tfstate"
+
+          - task: TerraformTaskV4@4
+            displayName: "Terraform Plan"
+            inputs:
+              provider: "azurerm"
+              command: "plan"
+              workingDirectory: "$(System.DefaultWorkingDirectory)/infra"
+              commandOptions: >-
+                -var-file=environments/dev.tfvars
+                -var="azure_ad_tenant_id=$(AZURE_AD_TENANT_ID)"
+                -var="azure_ad_client_id=$(AZURE_AD_CLIENT_ID)"
+                -var="db_admin_password=$(DB_ADMIN_PASSWORD)"
+              environmentServiceNameAzureRM: $(azureServiceConnection)
+
+          - task: TerraformTaskV4@4
+            displayName: "Terraform Apply"
+            inputs:
+              provider: "azurerm"
+              command: "apply"
+              workingDirectory: "$(System.DefaultWorkingDirectory)/infra"
+              commandOptions: >-
+                -var-file=environments/dev.tfvars
+                -var="azure_ad_tenant_id=$(AZURE_AD_TENANT_ID)"
+                -var="azure_ad_client_id=$(AZURE_AD_CLIENT_ID)"
+                -var="db_admin_password=$(DB_ADMIN_PASSWORD)"
+              environmentServiceNameAzureRM: $(azureServiceConnection)
+
   # ──────────────────────────────────────────────
   # Backend — Python FastAPI
   # ──────────────────────────────────────────────
   - stage: Backend
     displayName: "Backend CI"
+    dependsOn: [] # Run in parallel with Infrastructure
     jobs:
       - job: LintAndTypeCheck
         displayName: "Lint & Type Check"

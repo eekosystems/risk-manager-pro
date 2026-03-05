@@ -1,7 +1,4 @@
 environment        = "dev"
 location           = "eastus2"
 project_name       = "rmp"
-azure_ad_tenant_id = ""
-azure_ad_client_id = ""
 db_admin_username  = "rmpadmin"
-db_admin_password  = ""
