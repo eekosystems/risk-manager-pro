@@ -2,6 +2,7 @@ import { clsx } from "clsx";
 import { ChevronRight } from "lucide-react";
 
 import { AiStatusCard } from "@/components/layout/panel/ai-status-card";
+import { IndexedSources } from "@/components/layout/panel/indexed-sources";
 import { QuickStartTemplates } from "@/components/layout/panel/quick-start-templates";
 import { RecentDocuments } from "@/components/layout/panel/recent-documents";
 import type { FunctionType } from "@/types/api";
@@ -48,7 +49,10 @@ export function RightPanel({
             onFunctionSelect={onFunctionSelect}
           />
           <RecentDocuments />
-          <AiStatusCard />
+          <IndexedSources />
+          <div className="mt-auto">
+            <AiStatusCard />
+          </div>
         </div>
       </aside>
     </>

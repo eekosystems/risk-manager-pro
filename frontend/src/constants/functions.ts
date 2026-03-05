@@ -25,7 +25,7 @@ export const FUNCTIONS: FunctionDefinition[] = [
     name: "Safety Risk Assessment",
     shortName: "SRA",
     title: "Risk Assessment",
-    description: "Evaluate and mitigate safety risks",
+    description: "Comprehensive risk evaluation and mitigation",
     icon: Shield,
   },
   {
