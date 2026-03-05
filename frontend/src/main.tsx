@@ -40,7 +40,7 @@ async function bootstrap(): Promise<void> {
   if (!msalInstance.getActiveAccount()) {
     const accounts = msalInstance.getAllAccounts();
     if (accounts.length > 0) {
-      msalInstance.setActiveAccount(accounts[0]);
+      msalInstance.setActiveAccount(accounts[0] ?? null);
     }
   }
 
