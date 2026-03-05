@@ -31,6 +31,11 @@ export function MessageList({ messages, isTyping }: MessageListProps) {
             )}
           >
             <div className="flex max-w-[85%] flex-col">
+              {msg.role === "assistant" && (
+                <div className="mb-1 ml-1">
+                  <div className="h-2 w-2 rounded-full bg-green-500" />
+                </div>
+              )}
               <div
                 className={clsx(
                   "rounded-2xl px-5 py-3.5",
@@ -95,15 +100,12 @@ function MessageTimestamp({ createdAt, isUser }: MessageTimestampProps) {
   return (
     <div
       className={clsx(
-        "mt-1 flex items-center gap-1 px-1",
-        isUser ? "justify-end" : "justify-start",
+        "mt-1 px-1",
+        isUser ? "text-right" : "text-left",
       )}
     >
-      {!isUser && (
-        <div className="h-1.5 w-1.5 rounded-full bg-green-500" />
-      )}
       <span className="text-[11px] text-gray-400">
-        {format(new Date(createdAt), "h:mm a")}
+        {format(new Date(createdAt), "hh:mm a").toUpperCase()}
       </span>
     </div>
   );

@@ -50,7 +50,9 @@ export function RightPanel({
           />
           <RecentDocuments />
           <IndexedSources />
-          <AiStatusCard />
+          <div className="mt-auto">
+            <AiStatusCard />
+          </div>
         </div>
       </aside>
     </>

@@ -1,4 +1,4 @@
-import { AlertTriangle, BarChart3, ChevronRight, FileSearch, Shield } from "lucide-react";
+import { AlertTriangle, BarChart3, ChevronRight, FileSearch, Shield, Zap } from "lucide-react";
 
 import type { FunctionType } from "@/types/api";
 
@@ -41,7 +41,8 @@ export function QuickStartTemplates({
 }: QuickStartTemplatesProps) {
   return (
     <>
-      <h3 className="mb-3 text-[11px] font-bold uppercase tracking-wider text-gray-400">
+      <h3 className="mb-3 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-gray-400">
+        <Zap size={12} />
         Quick Templates
       </h3>
       <div className="mb-6 flex flex-col gap-1.5">
