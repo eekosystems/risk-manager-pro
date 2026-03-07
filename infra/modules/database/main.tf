@@ -8,7 +8,7 @@ resource "azurerm_postgresql_flexible_server" "main" {
   administrator_login           = var.admin_username
   administrator_password        = var.admin_password
   storage_mb                    = 32768
-  sku_name                      = "GP_Standard_D2s_v3"
+  sku_name                      = "B_Standard_B1ms"
   zone                          = "1"
   public_network_access_enabled = false
   tags                          = var.tags

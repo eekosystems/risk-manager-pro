@@ -52,7 +52,7 @@ resource "azurerm_search_service" "main" {
   name                = "search-${var.name_prefix}"
   resource_group_name = var.resource_group_name
   location            = var.location
-  sku                 = "basic"
+  sku                 = "free"
   replica_count       = 1
   partition_count     = 1
   tags                = var.tags
