@@ -1,10 +1,11 @@
 import { clsx } from "clsx";
+import { ChevronRight, MessageSquare, User } from "lucide-react";
 
 import { ConversationHistory } from "@/components/layout/sidebar/conversation-history";
 import { CoreFunctionsNav } from "@/components/layout/sidebar/core-functions-nav";
 import { OrganizationSwitcher } from "@/components/layout/sidebar/organization-switcher";
-import { SidebarToggle } from "@/components/layout/sidebar/sidebar-toggle";
 import { UserCard } from "@/components/layout/sidebar/user-card";
+import { FUNCTIONS } from "@/constants/functions";
 import type { FunctionType, OrganizationSummary } from "@/types/api";
 
 interface LeftSidebarProps {
@@ -29,23 +30,25 @@ export function LeftSidebar({
   onOrganizationSelect,
 }: LeftSidebarProps) {
   return (
-    <>
-      <SidebarToggle isOpen={isOpen} onToggle={onToggle} />
-
-      <aside
-        aria-label="Main navigation"
-        className={clsx(
-          "relative flex flex-col border-r border-gray-200 bg-white transition-all duration-300",
-          isOpen ? "w-[300px] min-w-[300px]" : "w-0 min-w-0 overflow-hidden",
-        )}
-      >
+    <aside
+      aria-label="Main navigation"
+      className={clsx(
+        "relative flex flex-col border-r border-gray-200 bg-white transition-all duration-300",
+        isOpen ? "w-[300px] min-w-[300px]" : "w-[60px] min-w-[60px]",
+      )}
+    >
+      {isOpen ? (
         <div className="flex min-w-[300px] flex-col h-full">
           {/* Logo */}
           <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
             <img src="/logo.webp" alt="Faith Group" className="h-auto w-[200px]" />
-            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-500">
-              v2.1
-            </span>
+            <button
+              onClick={onToggle}
+              aria-label="Collapse sidebar"
+              className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-brand-50 hover:text-brand-500"
+            >
+              <ChevronRight size={16} className="rotate-180" />
+            </button>
           </div>
 
           {activeOrganization && (
@@ -66,7 +69,62 @@ export function LeftSidebar({
 
           <UserCard />
         </div>
-      </aside>
-    </>
+      ) : (
+        <div className="flex flex-col items-center h-full py-3">
+          {/* Collapsed toggle */}
+          <button
+            onClick={onToggle}
+            aria-label="Expand sidebar"
+            className="mb-4 rounded-lg p-2 text-gray-400 transition-colors hover:bg-brand-50 hover:text-brand-500"
+          >
+            <ChevronRight size={18} />
+          </button>
+
+          {/* Collapsed nav icons */}
+          <nav aria-label="Core functions" className="flex flex-col items-center gap-1">
+            {FUNCTIONS.map((fn) => (
+              <button
+                key={fn.id}
+                onClick={() => onFunctionSelect(fn.id)}
+                aria-label={fn.name}
+                title={fn.name}
+                className={clsx(
+                  "flex h-10 w-10 items-center justify-center rounded-lg transition-all",
+                  activeFunction === fn.id
+                    ? "gradient-brand text-white shadow-md shadow-brand-500/30"
+                    : "text-gray-400 hover:bg-brand-50 hover:text-brand-500",
+                )}
+              >
+                <fn.icon size={20} />
+              </button>
+            ))}
+          </nav>
+
+          <div className="mx-3 my-3 h-px w-8 bg-gray-200" />
+
+          {/* History icon */}
+          <button
+            onClick={onToggle}
+            aria-label="View conversation history"
+            title="Conversation history"
+            className="flex h-10 w-10 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-brand-50 hover:text-brand-500"
+          >
+            <MessageSquare size={20} />
+          </button>
+
+          {/* User icon at bottom */}
+          <div className="mt-auto">
+            <button
+              onClick={onToggle}
+              aria-label="User profile"
+              title="User profile"
+              className="flex h-10 w-10 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-brand-50 hover:text-brand-500"
+            >
+              <User size={20} />
+            </button>
+          </div>
+        </div>
+      )}
+    </aside>
   );
 }
