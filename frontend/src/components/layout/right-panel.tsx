@@ -1,5 +1,5 @@
 import { clsx } from "clsx";
-import { ChevronRight } from "lucide-react";
+import { Bot, ChevronRight, FileText, FolderSearch, Rocket } from "lucide-react";
 
 import { AiStatusCard } from "@/components/layout/panel/ai-status-card";
 import { IndexedSources } from "@/components/layout/panel/indexed-sources";
@@ -21,29 +21,25 @@ export function RightPanel({
   onFunctionSelect,
 }: RightPanelProps) {
   return (
-    <>
-      <button
-        onClick={onToggle}
-        aria-label={isOpen ? "Collapse panel" : "Expand panel"}
-        className={clsx(
-          "fixed top-1/2 z-30 -translate-y-1/2 rounded-l-lg border border-r-0 border-gray-200 bg-white p-1.5 text-gray-400 shadow-sm transition-all hover:bg-brand-50 hover:text-brand-500",
-          isOpen ? "right-[299px]" : "right-0",
-        )}
-      >
-        <ChevronRight
-          size={16}
-          className={clsx("transition-transform", !isOpen && "rotate-180")}
-        />
-      </button>
-
-      <aside
-        aria-label="Quick start and status"
-        className={clsx(
-          "flex flex-col border-l border-gray-200 bg-white transition-all duration-300",
-          isOpen ? "w-[300px] min-w-[300px]" : "w-0 min-w-0 overflow-hidden",
-        )}
-      >
+    <aside
+      aria-label="Quick start and status"
+      className={clsx(
+        "flex flex-col border-l border-gray-200 bg-white transition-all duration-300",
+        isOpen ? "w-[300px] min-w-[300px]" : "w-[60px] min-w-[60px]",
+      )}
+    >
+      {isOpen ? (
         <div className="flex min-w-[300px] flex-col h-full overflow-y-auto px-5 py-5">
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-sm font-semibold text-gray-500">Quick Start</span>
+            <button
+              onClick={onToggle}
+              aria-label="Collapse panel"
+              className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-brand-50 hover:text-brand-500"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
           <QuickStartTemplates
             activeFunction={activeFunction}
             onFunctionSelect={onFunctionSelect}
@@ -54,7 +50,58 @@ export function RightPanel({
             <AiStatusCard />
           </div>
         </div>
-      </aside>
-    </>
+      ) : (
+        <div className="flex flex-col items-center h-full py-3">
+          {/* Collapsed toggle */}
+          <button
+            onClick={onToggle}
+            aria-label="Expand panel"
+            className="mb-4 rounded-lg p-2 text-gray-400 transition-colors hover:bg-brand-50 hover:text-brand-500"
+          >
+            <ChevronRight size={18} className="rotate-180" />
+          </button>
+
+          {/* Collapsed section icons */}
+          <nav className="flex flex-col items-center gap-1">
+            <button
+              onClick={onToggle}
+              aria-label="Quick start templates"
+              title="Quick start templates"
+              className="flex h-10 w-10 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-brand-50 hover:text-brand-500"
+            >
+              <Rocket size={20} />
+            </button>
+            <button
+              onClick={onToggle}
+              aria-label="Recent documents"
+              title="Recent documents"
+              className="flex h-10 w-10 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-brand-50 hover:text-brand-500"
+            >
+              <FileText size={20} />
+            </button>
+            <button
+              onClick={onToggle}
+              aria-label="Indexed sources"
+              title="Indexed sources"
+              className="flex h-10 w-10 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-brand-50 hover:text-brand-500"
+            >
+              <FolderSearch size={20} />
+            </button>
+          </nav>
+
+          {/* AI status at bottom */}
+          <div className="mt-auto">
+            <button
+              onClick={onToggle}
+              aria-label="AI status"
+              title="AI status"
+              className="flex h-10 w-10 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-brand-50 hover:text-brand-500"
+            >
+              <Bot size={20} />
+            </button>
+          </div>
+        </div>
+      )}
+    </aside>
   );
 }
