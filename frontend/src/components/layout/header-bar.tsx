@@ -1,6 +1,10 @@
 import { Search, Settings } from "lucide-react";
 
-export function HeaderBar() {
+interface HeaderBarProps {
+  onSettingsClick?: () => void;
+}
+
+export function HeaderBar({ onSettingsClick }: HeaderBarProps) {
   return (
     <div className="flex items-center justify-between border-b border-gray-200 bg-white px-8 py-4">
       <div className="flex flex-col">
@@ -21,6 +25,7 @@ export function HeaderBar() {
           </kbd>
         </div>
         <button
+          onClick={onSettingsClick}
           className="rounded-xl border border-gray-200 p-2.5 text-gray-400 transition-colors hover:bg-gray-50 hover:text-gray-600"
           aria-label="Settings"
         >
