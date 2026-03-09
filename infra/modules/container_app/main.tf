@@ -19,14 +19,14 @@ resource "azurerm_container_app" "backend" {
   }
 
   template {
-    min_replicas = 1
-    max_replicas = 5
+    min_replicas = 0
+    max_replicas = 2
 
     container {
       name   = "api"
       image  = "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest" # Placeholder
-      cpu    = 1.0
-      memory = "2Gi"
+      cpu    = 0.25
+      memory = "0.5Gi"
 
       env {
         name  = "APP_ENV"
