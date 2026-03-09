@@ -4,7 +4,7 @@ import uuid
 from unittest.mock import patch
 
 import pytest
-from jose import jwt
+import jwt
 
 from app.core.auth import EntraIDAuth, TokenPayload
 from app.core.exceptions import UnauthorizedError
@@ -114,8 +114,8 @@ async def test_expired_token_raises_unauthorized() -> None:
         token = _make_token(expired=True)
 
         with patch("app.core.auth.jwt.decode") as mock_decode:
-            from jose import JWTError
-            mock_decode.side_effect = JWTError("Token expired")
+            from jwt.exceptions import PyJWTError
+            mock_decode.side_effect = PyJWTError("Token expired")
 
             with pytest.raises(UnauthorizedError):
                 await auth.validate_token(token)
@@ -132,8 +132,8 @@ async def test_wrong_audience_raises_unauthorized() -> None:
         token = _make_token()
 
         with patch("app.core.auth.jwt.decode") as mock_decode:
-            from jose import JWTError
-            mock_decode.side_effect = JWTError("Invalid audience")
+            from jwt.exceptions import PyJWTError
+            mock_decode.side_effect = PyJWTError("Invalid audience")
 
             with pytest.raises(UnauthorizedError):
                 await auth.validate_token(token)

@@ -2,7 +2,8 @@ import time
 
 import httpx
 import structlog
-from jose import JWTError, jwt
+import jwt
+from jwt.exceptions import PyJWTError
 from pydantic import BaseModel
 
 from app.core.config import settings
@@ -67,14 +68,14 @@ class EntraIDAuth:
                     )
                     raise UnauthorizedError("Token signing key not found")
 
-            key = self._jwks[kid]
+            jwk_data = self._jwks[kid]
+            public_key = jwt.algorithms.RSAAlgorithm.from_jwk(jwk_data)
             payload = jwt.decode(
                 token,
-                key,
+                public_key,
                 algorithms=["RS256"],
                 audience=settings.azure_ad_client_id,
                 issuer=settings.azure_ad_issuer,
-                options={"verify_at_hash": False},
             )
 
             return TokenPayload(
@@ -85,7 +86,7 @@ class EntraIDAuth:
                 name=payload.get("name"),
                 roles=payload.get("roles", []),
             )
-        except JWTError as e:
+        except PyJWTError as e:
             logger.warning(
                 "auth_failure",
                 reason="token_validation_failed",

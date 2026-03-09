@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from app.models.conversation import Conversation
 
 
-class MessageRole(str, enum.Enum):
+class MessageRole(enum.StrEnum):
     USER = "user"
     ASSISTANT = "assistant"
     SYSTEM = "system"

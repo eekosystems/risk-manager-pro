@@ -15,14 +15,14 @@ if TYPE_CHECKING:
     from app.models.message import Message
 
 
-class FunctionType(str, enum.Enum):
+class FunctionType(enum.StrEnum):
     PHL = "phl"
     SRA = "sra"
     SYSTEM_ANALYSIS = "system"
     GENERAL = "general"
 
 
-class ConversationStatus(str, enum.Enum):
+class ConversationStatus(enum.StrEnum):
     ACTIVE = "active"
     ARCHIVED = "archived"
 

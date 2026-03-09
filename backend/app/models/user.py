@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from app.models.organization_membership import OrganizationMembership
 
 
-class InvitationStatus(str, enum.Enum):
+class InvitationStatus(enum.StrEnum):
     ACTIVE = "active"
     INVITED = "invited"
     PROVISIONED = "provisioned"

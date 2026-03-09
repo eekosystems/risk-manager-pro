@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from app.models.organization_membership import OrganizationMembership
 
 
-class OrganizationStatus(str, enum.Enum):
+class OrganizationStatus(enum.StrEnum):
     ACTIVE = "active"
     SUSPENDED = "suspended"
     ARCHIVED = "archived"

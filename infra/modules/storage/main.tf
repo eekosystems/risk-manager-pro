@@ -57,8 +57,8 @@ resource "azurerm_storage_container_immutability_policy" "audit_logs" {
 }
 
 resource "azurerm_storage_account_network_rules" "main" {
-  storage_account_id = azurerm_storage_account.main.id
-  default_action     = "Deny"
-  bypass             = ["AzureServices"]
+  storage_account_id         = azurerm_storage_account.main.id
+  default_action             = "Deny"
+  bypass                     = ["AzureServices"]
   virtual_network_subnet_ids = [var.subnet_id]
 }

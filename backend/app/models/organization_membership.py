@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from app.models.user import User
 
 
-class MembershipRole(str, enum.Enum):
+class MembershipRole(enum.StrEnum):
     ORG_ADMIN = "org_admin"
     ANALYST = "analyst"
     VIEWER = "viewer"
