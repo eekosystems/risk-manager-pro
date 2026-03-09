@@ -24,21 +24,26 @@ export function RightPanel({
     <aside
       aria-label="Quick start and status"
       className={clsx(
-        "flex flex-col border-l border-gray-200 bg-white transition-all duration-300",
+        "relative flex flex-col border-l border-gray-200 bg-white transition-all duration-300",
         isOpen ? "w-[300px] min-w-[300px]" : "w-[60px] min-w-[60px]",
       )}
     >
+      {/* Edge-centered toggle */}
+      <button
+        onClick={onToggle}
+        aria-label={isOpen ? "Collapse panel" : "Expand panel"}
+        className="absolute left-0 top-1/2 z-30 -translate-x-1/2 -translate-y-1/2 rounded-lg border border-gray-200 bg-white px-0.5 py-4 text-gray-400 shadow-md transition-colors hover:bg-brand-50 hover:text-brand-500"
+      >
+        <ChevronRight
+          size={16}
+          className={clsx("transition-transform", !isOpen && "rotate-180")}
+        />
+      </button>
+
       {isOpen ? (
         <div className="flex min-w-[300px] flex-col h-full overflow-y-auto px-5 py-5">
-          <div className="flex items-center justify-between mb-4">
+          <div className="mb-4">
             <span className="text-sm font-semibold text-gray-500">Quick Start</span>
-            <button
-              onClick={onToggle}
-              aria-label="Collapse panel"
-              className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-brand-50 hover:text-brand-500"
-            >
-              <ChevronRight size={16} />
-            </button>
           </div>
           <QuickStartTemplates
             activeFunction={activeFunction}
@@ -52,15 +57,6 @@ export function RightPanel({
         </div>
       ) : (
         <div className="flex flex-col items-center h-full py-3">
-          {/* Collapsed toggle */}
-          <button
-            onClick={onToggle}
-            aria-label="Expand panel"
-            className="mb-4 rounded-lg p-2 text-gray-400 transition-colors hover:bg-brand-50 hover:text-brand-500"
-          >
-            <ChevronRight size={18} className="rotate-180" />
-          </button>
-
           {/* Collapsed section icons */}
           <nav className="flex flex-col items-center gap-1">
             <button
