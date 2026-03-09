@@ -36,7 +36,6 @@ export function AppLayout({ children }: AppLayoutProps) {
           setActiveFunction(fn);
           setConversationId(null);
         }}
-        onConversationSelect={setConversationId}
         activeOrganization={activeOrganization}
         organizations={organizations}
         onOrganizationSelect={(org) => {
@@ -55,11 +54,7 @@ export function AppLayout({ children }: AppLayoutProps) {
       <RightPanel
         isOpen={rightOpen}
         onToggle={() => setRightOpen(!rightOpen)}
-        activeFunction={activeFunction}
-        onFunctionSelect={(fn) => {
-          setActiveFunction(fn);
-          setConversationId(null);
-        }}
+        onConversationSelect={setConversationId}
       />
 
       {/* Settings Modal */}

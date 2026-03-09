@@ -1,7 +1,8 @@
 import { clsx } from "clsx";
-import { ChevronRight, MessageSquare, User } from "lucide-react";
+import { ChevronRight, FileText, FolderSearch, User } from "lucide-react";
 
-import { ConversationHistory } from "@/components/layout/sidebar/conversation-history";
+import { IndexedSources } from "@/components/layout/panel/indexed-sources";
+import { RecentDocuments } from "@/components/layout/panel/recent-documents";
 import { CoreFunctionsNav } from "@/components/layout/sidebar/core-functions-nav";
 import { OrganizationSwitcher } from "@/components/layout/sidebar/organization-switcher";
 import { UserCard } from "@/components/layout/sidebar/user-card";
@@ -13,7 +14,6 @@ interface LeftSidebarProps {
   onToggle: () => void;
   activeFunction: FunctionType;
   onFunctionSelect: (fn: FunctionType) => void;
-  onConversationSelect: (id: string) => void;
   activeOrganization: OrganizationSummary | null;
   organizations: OrganizationSummary[];
   onOrganizationSelect: (org: OrganizationSummary) => void;
@@ -24,7 +24,6 @@ export function LeftSidebar({
   onToggle,
   activeFunction,
   onFunctionSelect,
-  onConversationSelect,
   activeOrganization,
   organizations,
   onOrganizationSelect,
@@ -69,7 +68,8 @@ export function LeftSidebar({
               activeFunction={activeFunction}
               onFunctionSelect={onFunctionSelect}
             />
-            <ConversationHistory onConversationSelect={onConversationSelect} />
+            <RecentDocuments />
+            <IndexedSources />
           </nav>
 
           <UserCard />
@@ -98,14 +98,24 @@ export function LeftSidebar({
 
           <div className="mx-3 my-3 h-px w-8 bg-gray-200" />
 
-          {/* History icon */}
+          {/* Documents icon */}
           <button
             onClick={onToggle}
-            aria-label="View conversation history"
-            title="Conversation history"
+            aria-label="Recent documents"
+            title="Recent documents"
             className="flex h-10 w-10 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-brand-50 hover:text-brand-500"
           >
-            <MessageSquare size={20} />
+            <FileText size={20} />
+          </button>
+
+          {/* Sources icon */}
+          <button
+            onClick={onToggle}
+            aria-label="Indexed sources"
+            title="Indexed sources"
+            className="flex h-10 w-10 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-brand-50 hover:text-brand-500"
+          >
+            <FolderSearch size={20} />
           </button>
 
           {/* User icon at bottom */}
