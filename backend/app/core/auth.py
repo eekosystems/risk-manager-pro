@@ -1,4 +1,5 @@
 import time
+from typing import TYPE_CHECKING, cast
 
 import httpx
 import jwt
@@ -8,6 +9,9 @@ from pydantic import BaseModel
 
 from app.core.config import settings
 from app.core.exceptions import UnauthorizedError
+
+if TYPE_CHECKING:
+    from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
 
 logger = structlog.get_logger(__name__)
 
@@ -69,7 +73,7 @@ class EntraIDAuth:
                     raise UnauthorizedError("Token signing key not found")
 
             jwk_data = self._jwks[kid]
-            public_key = jwt.algorithms.RSAAlgorithm.from_jwk(jwk_data)
+            public_key = cast("RSAPublicKey", jwt.algorithms.RSAAlgorithm.from_jwk(jwk_data))
             payload = jwt.decode(
                 token,
                 public_key,

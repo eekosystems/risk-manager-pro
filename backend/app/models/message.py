@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import enum
 import uuid
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import Enum, ForeignKey, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
@@ -32,7 +32,7 @@ class Message(Base):
     role: Mapped[MessageRole] = mapped_column(Enum(MessageRole))
     content: Mapped[str] = mapped_column(Text)
     citations: Mapped[list[dict[str, str]] | None] = mapped_column(JSONB, default=None)
-    metadata_json: Mapped[dict | None] = mapped_column(JSONB, default=None)
+    metadata_json: Mapped[dict[str, Any] | None] = mapped_column(JSONB, default=None)
     created_at: Mapped[datetime] = mapped_column(default=func.now())
 
     conversation: Mapped[Conversation] = relationship(back_populates="messages")

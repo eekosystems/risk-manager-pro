@@ -59,13 +59,14 @@ class RAGService:
         tenant_filter = f"tenant_id eq '{sanitized_org_id}'"
 
         results: list[SearchResult] = []
-        async for result in client.search(  # type: ignore[union-attr]
+        search_results = await client.search(
             search_text=query,
             vector_queries=[vector_query],
             filter=tenant_filter,
             top=top_k,
             select=["content", "source", "section", "chunk_id"],
-        ):
+        )
+        async for result in search_results:
             results.append(
                 SearchResult(
                     content=result["content"],

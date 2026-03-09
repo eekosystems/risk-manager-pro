@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import enum
 import uuid
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import Boolean, Enum, ForeignKey, String, func
 from sqlalchemy.dialects.postgresql import JSONB
@@ -32,7 +32,7 @@ class Organization(Base):
         Enum(OrganizationStatus), default=OrganizationStatus.ACTIVE
     )
     is_platform: Mapped[bool] = mapped_column(Boolean, default=False)
-    settings_json: Mapped[dict | None] = mapped_column(JSONB, default=None)
+    settings_json: Mapped[dict[str, Any] | None] = mapped_column(JSONB, default=None)
     created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), default=None)
     created_at: Mapped[datetime] = mapped_column(default=func.now())
     updated_at: Mapped[datetime] = mapped_column(default=func.now(), onupdate=func.now())

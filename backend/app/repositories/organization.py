@@ -1,4 +1,5 @@
 import uuid
+from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -74,7 +75,7 @@ class OrganizationRepository:
         org_id: uuid.UUID,
         name: str | None = None,
         status: OrganizationStatus | None = None,
-        settings_json: dict | None = None,
+        settings_json: dict[str, Any] | None = None,
     ) -> Organization | None:
         org = await self.get_by_id(org_id)
         if not org:

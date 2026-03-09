@@ -98,7 +98,7 @@ async def get_current_user(
         logger.info("user_auto_provisioned", user_id=str(user.id), org_id=str(org.id))
 
         # Audit log for auto-provisioning
-        audit = await get_audit_logger(request, db)
+        audit = await get_audit_logger(request)
         await audit.log(
             action="user.auto_provisioned",
             user=user,

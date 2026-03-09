@@ -68,11 +68,12 @@ class SearchIndexer:
 
     async def delete_by_document(self, document_id: uuid.UUID) -> None:
         client = await self._get_client()
-        async for result in client.search(
+        search_results = await client.search(
             search_text="*",
             filter=f"document_id eq '{document_id}'",
             select=["chunk_id"],
-        ):
+        )
+        async for result in search_results:
             await client.delete_documents(documents=[{"chunk_id": result["chunk_id"]}])
 
         logger.info("chunks_deleted", document_id=str(document_id))
