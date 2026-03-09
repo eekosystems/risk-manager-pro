@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { clsx } from "clsx";
 import {
   Brain,
@@ -69,75 +69,105 @@ interface SettingsPageProps {
 
 export function SettingsPage({ onClose }: SettingsPageProps) {
   const [activeTab, setActiveTab] = useState<SettingsTab>("rag");
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    // Trigger enter animation
+    requestAnimationFrame(() => setIsVisible(true));
+  }, []);
+
+  function handleClose() {
+    setIsVisible(false);
+    setTimeout(onClose, 200);
+  }
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-gray-50">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-gray-200 bg-white px-8 py-5">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl gradient-brand">
-            <Settings size={20} className="text-white" />
+    <>
+      {/* Backdrop */}
+      <div
+        className={clsx(
+          "fixed inset-0 z-40 bg-black/40 backdrop-blur-sm transition-opacity duration-200",
+          isVisible ? "opacity-100" : "opacity-0",
+        )}
+        onClick={handleClose}
+      />
+
+      {/* Modal */}
+      <div
+        className={clsx(
+          "fixed inset-4 z-50 flex flex-col overflow-hidden rounded-2xl border border-gray-200 bg-gray-50 shadow-2xl transition-all duration-200",
+          isVisible
+            ? "scale-100 opacity-100"
+            : "scale-95 opacity-0",
+        )}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-gray-200 bg-white px-8 py-5">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl gradient-brand">
+              <Settings size={20} className="text-white" />
+            </div>
+            <div>
+              <h1 className="text-lg font-bold text-slate-900">Settings</h1>
+              <p className="text-[13px] text-slate-500">
+                Configure your risk management platform
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-lg font-bold text-slate-900">Settings</h1>
-            <p className="text-[13px] text-slate-500">
-              Configure your risk management platform
-            </p>
+          <button
+            onClick={handleClose}
+            className="rounded-xl border border-gray-200 p-2.5 text-gray-400 transition-colors hover:bg-gray-50 hover:text-gray-600"
+            aria-label="Close settings"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="flex flex-1 overflow-hidden">
+          {/* Tab sidebar */}
+          <nav className="w-[260px] min-w-[260px] border-r border-gray-200 bg-white p-4">
+            <div className="flex flex-col gap-1">
+              {TABS.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={clsx(
+                    "flex items-center gap-3 rounded-xl px-4 py-3 text-left transition-all",
+                    activeTab === tab.id
+                      ? "gradient-brand text-white shadow-md shadow-brand-500/20"
+                      : "text-gray-600 hover:bg-gray-50",
+                  )}
+                >
+                  <tab.icon size={18} />
+                  <div className="flex flex-col">
+                    <span className="text-sm font-semibold">{tab.label}</span>
+                    <span
+                      className={clsx(
+                        "text-[11px]",
+                        activeTab === tab.id
+                          ? "text-white/70"
+                          : "text-gray-400",
+                      )}
+                    >
+                      {tab.description}
+                    </span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </nav>
+
+          {/* Tab content */}
+          <div className="flex-1 overflow-y-auto p-8">
+            {activeTab === "rag" && <RagSettingsTab />}
+            {activeTab === "model" && <ModelPreferencesTab />}
+            {activeTab === "indexed-files" && <IndexedFilesTab />}
+            {activeTab === "prompts" && <PromptsTab />}
+            {activeTab === "users" && <UsersRolesTab />}
           </div>
         </div>
-        <button
-          onClick={onClose}
-          className="rounded-xl border border-gray-200 p-2.5 text-gray-400 transition-colors hover:bg-gray-50 hover:text-gray-600"
-          aria-label="Close settings"
-        >
-          <X size={18} />
-        </button>
       </div>
-
-      {/* Content */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Tab sidebar */}
-        <nav className="w-[260px] min-w-[260px] border-r border-gray-200 bg-white p-4">
-          <div className="flex flex-col gap-1">
-            {TABS.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={clsx(
-                  "flex items-center gap-3 rounded-xl px-4 py-3 text-left transition-all",
-                  activeTab === tab.id
-                    ? "gradient-brand text-white shadow-md shadow-brand-500/20"
-                    : "text-gray-600 hover:bg-gray-50",
-                )}
-              >
-                <tab.icon size={18} />
-                <div className="flex flex-col">
-                  <span className="text-sm font-semibold">{tab.label}</span>
-                  <span
-                    className={clsx(
-                      "text-[11px]",
-                      activeTab === tab.id
-                        ? "text-white/70"
-                        : "text-gray-400",
-                    )}
-                  >
-                    {tab.description}
-                  </span>
-                </div>
-              </button>
-            ))}
-          </div>
-        </nav>
-
-        {/* Tab content */}
-        <div className="flex-1 overflow-y-auto p-8">
-          {activeTab === "rag" && <RagSettingsTab />}
-          {activeTab === "model" && <ModelPreferencesTab />}
-          {activeTab === "indexed-files" && <IndexedFilesTab />}
-          {activeTab === "prompts" && <PromptsTab />}
-          {activeTab === "users" && <UsersRolesTab />}
-        </div>
-      </div>
-    </div>
+    </>
   );
 }

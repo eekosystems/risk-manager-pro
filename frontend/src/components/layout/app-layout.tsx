@@ -25,14 +25,6 @@ export function AppLayout({ children }: AppLayoutProps) {
   const { activeOrganization, organizations, setActiveOrganization } =
     useOrganizationContext();
 
-  if (showSettings) {
-    return (
-      <div className="flex h-screen overflow-hidden bg-gray-50 font-sans">
-        <SettingsPage onClose={() => setShowSettings(false)} />
-      </div>
-    );
-  }
-
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50 font-sans">
       {/* Left Sidebar */}
@@ -69,6 +61,11 @@ export function AppLayout({ children }: AppLayoutProps) {
           setConversationId(null);
         }}
       />
+
+      {/* Settings Modal */}
+      {showSettings && (
+        <SettingsPage onClose={() => setShowSettings(false)} />
+      )}
     </div>
   );
 }
