@@ -8,11 +8,14 @@ from app.models.message import MessageRole
 from app.models.user import User
 from app.repositories.conversation import ConversationRepository
 from app.schemas.chat import ChatRequest, ChatResponse, CitationSchema, MessageResponse
+from app.schemas.settings import PromptsPayload
 from app.services.openai_client import AzureOpenAIClient
 from app.services.rag import RAGService, SearchResult
+from app.services.settings import SettingsService
 
 logger = structlog.get_logger(__name__)
 
+# Fallback prompts used when no org-level settings exist
 SYSTEM_PROMPTS: dict[FunctionType, str] = {
     FunctionType.PHL: (
         "You are an aviation safety AI assistant specializing in Preliminary Hazard Lists (PHL). "
@@ -41,6 +44,22 @@ SYSTEM_PROMPTS: dict[FunctionType, str] = {
         "the provided context. If the context does not contain relevant information, say so."
     ),
 }
+
+
+def _resolve_prompt(
+    function_type: FunctionType, prompts: PromptsPayload | None
+) -> str:
+    """Get the prompt for a function type from org settings, falling back to hardcoded defaults."""
+    if prompts is None:
+        return SYSTEM_PROMPTS[function_type]
+
+    prompt_map: dict[FunctionType, str] = {
+        FunctionType.PHL: prompts.phl_prompt,
+        FunctionType.SRA: prompts.sra_prompt,
+        FunctionType.SYSTEM_ANALYSIS: prompts.system_analysis_prompt,
+        FunctionType.GENERAL: prompts.system_prompt,
+    }
+    return prompt_map[function_type]
 
 
 def _build_context_block(results: list[SearchResult]) -> str:
@@ -77,10 +96,12 @@ class ChatService:
         db: AsyncSession,
         openai_client: AzureOpenAIClient,
         rag_service: RAGService,
+        settings_service: SettingsService | None = None,
     ) -> None:
         self._db = db
         self._openai = openai_client
         self._rag = rag_service
+        self._settings = settings_service or SettingsService(db)
         self._repo = ConversationRepository(db)
 
     async def process_message(
@@ -112,10 +133,20 @@ class ChatService:
             content=request.message,
         )
 
+        # Load org-level settings
+        rag_config = await self._settings.get_effective_rag_config(organization_id)
+        model_config = await self._settings.get_effective_model_config(organization_id)
+        try:
+            prompts_config = await self._settings.get_effective_prompts(organization_id)
+        except Exception:
+            prompts_config = None
+
         search_results: list[SearchResult] = []
         try:
             search_results = await self._rag.hybrid_search(
-                request.message, organization_id=organization_id, top_k=5
+                request.message,
+                organization_id=organization_id,
+                top_k=rag_config.top_k,
             )
         except Exception:
             logger.error(
@@ -125,7 +156,7 @@ class ChatService:
             )
 
         context_block = _build_context_block(search_results)
-        system_prompt = SYSTEM_PROMPTS[request.function_type]
+        system_prompt = _resolve_prompt(request.function_type, prompts_config)
 
         history = await self._repo.get_messages(conversation.id, organization_id, limit=20)
         messages: list[dict[str, str]] = [
@@ -138,7 +169,11 @@ class ChatService:
         for msg in history:
             messages.append({"role": msg.role.value, "content": msg.content})
 
-        assistant_content = await self._openai.chat_completion(messages)
+        assistant_content = await self._openai.chat_completion(
+            messages,
+            temperature=model_config.temperature,
+            max_tokens=model_config.max_output_tokens,
+        )
         citations = _extract_citations(search_results) if search_results else None
 
         assistant_msg = await self._repo.add_message(

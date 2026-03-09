@@ -4,6 +4,7 @@ from app.models.document import Document
 from app.models.message import Message
 from app.models.organization import Organization
 from app.models.organization_membership import OrganizationMembership
+from app.models.settings import OrganizationSettings
 from app.models.user import User
 
 __all__ = [
@@ -13,5 +14,6 @@ __all__ = [
     "Message",
     "Organization",
     "OrganizationMembership",
+    "OrganizationSettings",
     "User",
 ]

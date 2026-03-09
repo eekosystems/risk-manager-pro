@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -10,111 +11,8 @@ import {
   Upload,
 } from "lucide-react";
 
-type FileStatus = "indexed" | "processing" | "failed";
-
-interface IndexedFile {
-  id: string;
-  filename: string;
-  contentType: string;
-  sizeBytes: number;
-  status: FileStatus;
-  chunkCount: number;
-  indexedAt: string;
-  category: string;
-}
-
-const DEMO_FILES: IndexedFile[] = [
-  {
-    id: "1",
-    filename: "FAA-AC-120-92B-SMS-Advisory.pdf",
-    contentType: "application/pdf",
-    sizeBytes: 2_450_000,
-    status: "indexed",
-    chunkCount: 87,
-    indexedAt: "2026-03-05T10:30:00Z",
-    category: "FAA Regulations",
-  },
-  {
-    id: "2",
-    filename: "ICAO-Annex-19-Safety-Management.pdf",
-    contentType: "application/pdf",
-    sizeBytes: 5_100_000,
-    status: "indexed",
-    chunkCount: 156,
-    indexedAt: "2026-03-04T14:22:00Z",
-    category: "ICAO Standards",
-  },
-  {
-    id: "3",
-    filename: "Faith-Group-SRA-Template-2026.docx",
-    contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    sizeBytes: 890_000,
-    status: "indexed",
-    chunkCount: 34,
-    indexedAt: "2026-03-03T09:15:00Z",
-    category: "Safety Risk Assessments",
-  },
-  {
-    id: "4",
-    filename: "PHL-Operational-Checklist-v3.pdf",
-    contentType: "application/pdf",
-    sizeBytes: 1_200_000,
-    status: "indexed",
-    chunkCount: 45,
-    indexedAt: "2026-03-02T16:45:00Z",
-    category: "Safety Risk Assessments",
-  },
-  {
-    id: "5",
-    filename: "FAR-Part-91-Operations.pdf",
-    contentType: "application/pdf",
-    sizeBytes: 3_800_000,
-    status: "indexed",
-    chunkCount: 112,
-    indexedAt: "2026-03-01T11:00:00Z",
-    category: "FAA Regulations",
-  },
-  {
-    id: "6",
-    filename: "Risk-Matrix-Best-Practices-Guide.pdf",
-    contentType: "application/pdf",
-    sizeBytes: 670_000,
-    status: "indexed",
-    chunkCount: 28,
-    indexedAt: "2026-02-28T13:30:00Z",
-    category: "Best Practice Guides",
-  },
-  {
-    id: "7",
-    filename: "SMS-Implementation-Handbook.pdf",
-    contentType: "application/pdf",
-    sizeBytes: 4_200_000,
-    status: "indexed",
-    chunkCount: 134,
-    indexedAt: "2026-02-27T09:45:00Z",
-    category: "Best Practice Guides",
-  },
-  {
-    id: "8",
-    filename: "Quarterly-Safety-Report-Q4-2025.pdf",
-    contentType: "application/pdf",
-    sizeBytes: 1_800_000,
-    status: "processing",
-    chunkCount: 0,
-    indexedAt: "2026-03-08T22:10:00Z",
-    category: "Safety Risk Assessments",
-  },
-  {
-    id: "9",
-    filename: "Corrupted-Upload-Test.pdf",
-    contentType: "application/pdf",
-    sizeBytes: 45_000,
-    status: "failed",
-    chunkCount: 0,
-    indexedAt: "2026-03-07T08:00:00Z",
-    category: "Other",
-  },
-];
+import { deleteDocument, getDocuments, uploadDocument } from "@/api/documents";
+import type { DocumentItem, DocumentStatus } from "@/types/api";
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -133,7 +31,7 @@ function formatDate(iso: string): string {
 }
 
 const STATUS_CONFIG: Record<
-  FileStatus,
+  DocumentStatus,
   { icon: typeof CheckCircle2; label: string; className: string }
 > = {
   indexed: {
@@ -146,6 +44,11 @@ const STATUS_CONFIG: Record<
     label: "Processing",
     className: "text-amber-500 bg-amber-50",
   },
+  uploaded: {
+    icon: Clock,
+    label: "Uploaded",
+    className: "text-blue-500 bg-blue-50",
+  },
   failed: {
     icon: AlertTriangle,
     label: "Failed",
@@ -154,34 +57,71 @@ const STATUS_CONFIG: Record<
 };
 
 export function IndexedFilesTab() {
-  const [files, setFiles] = useState<IndexedFile[]>(DEMO_FILES);
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterCategory, setFilterCategory] = useState<string>("all");
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
-  const categories = ["all", ...new Set(DEMO_FILES.map((f) => f.category))];
-
-  const filteredFiles = files.filter((file) => {
-    const matchesSearch = file.filename
-      .toLowerCase()
-      .includes(searchQuery.toLowerCase());
-    const matchesCategory =
-      filterCategory === "all" || file.category === filterCategory;
-    return matchesSearch && matchesCategory;
+  const { data: files = [], isLoading } = useQuery({
+    queryKey: ["documents"],
+    queryFn: getDocuments,
+    refetchInterval: 10_000,
   });
 
-  const totalChunks = files
-    .filter((f) => f.status === "indexed")
-    .reduce((sum, f) => sum + f.chunkCount, 0);
+  const deleteMutation = useMutation({
+    mutationFn: deleteDocument,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["documents"] });
+      setDeleteConfirm(null);
+    },
+  });
+
+  const uploadMutation = useMutation({
+    mutationFn: uploadDocument,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["documents"] });
+    },
+  });
+
+  function handleFileUpload() {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".pdf,.docx,.doc,.txt";
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) {
+        uploadMutation.mutate(file);
+      }
+    };
+    input.click();
+  }
+
+  const filteredFiles = files.filter((file: DocumentItem) =>
+    file.filename.toLowerCase().includes(searchQuery.toLowerCase()),
+  );
+
+  const indexedCount = files.filter(
+    (f: DocumentItem) => f.status === "indexed",
+  ).length;
+  const totalSize = files.reduce(
+    (sum: number, f: DocumentItem) => sum + f.size_bytes,
+    0,
+  );
 
   function handleDelete(id: string) {
     if (deleteConfirm === id) {
-      setFiles((prev) => prev.filter((f) => f.id !== id));
-      setDeleteConfirm(null);
+      deleteMutation.mutate(id);
     } else {
       setDeleteConfirm(id);
       setTimeout(() => setDeleteConfirm(null), 3000);
     }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 size={24} className="animate-spin text-brand-500" />
+      </div>
+    );
   }
 
   return (
@@ -196,29 +136,33 @@ export function IndexedFilesTab() {
       {/* Stats */}
       <div className="mb-6 grid grid-cols-3 gap-4">
         <div className="rounded-2xl border border-gray-200 bg-white p-4">
-          <div className="text-2xl font-bold text-brand-500">
-            {files.filter((f) => f.status === "indexed").length}
-          </div>
+          <div className="text-2xl font-bold text-brand-500">{indexedCount}</div>
           <div className="text-[12px] text-slate-500">Indexed Documents</div>
         </div>
         <div className="rounded-2xl border border-gray-200 bg-white p-4">
-          <div className="text-2xl font-bold text-brand-500">{totalChunks}</div>
-          <div className="text-[12px] text-slate-500">Total Chunks</div>
+          <div className="text-2xl font-bold text-brand-500">{files.length}</div>
+          <div className="text-[12px] text-slate-500">Total Documents</div>
         </div>
         <div className="rounded-2xl border border-gray-200 bg-white p-4">
           <div className="text-2xl font-bold text-brand-500">
-            {formatBytes(
-              files.reduce((sum, f) => sum + f.sizeBytes, 0),
-            )}
+            {formatBytes(totalSize)}
           </div>
           <div className="text-[12px] text-slate-500">Total Size</div>
         </div>
       </div>
 
-      {/* Upload button + Search bar */}
+      {/* Upload + Search */}
       <div className="mb-4 flex items-center gap-3">
-        <button className="flex items-center gap-2 rounded-xl gradient-brand px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-brand-500/20 transition-all hover:shadow-lg hover:shadow-brand-500/30">
-          <Upload size={16} />
+        <button
+          onClick={handleFileUpload}
+          disabled={uploadMutation.isPending}
+          className="flex items-center gap-2 rounded-xl gradient-brand px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-brand-500/20 transition-all hover:shadow-lg hover:shadow-brand-500/30 disabled:opacity-50"
+        >
+          {uploadMutation.isPending ? (
+            <Loader2 size={16} className="animate-spin" />
+          ) : (
+            <Upload size={16} />
+          )}
           Upload Document
         </button>
         <div className="relative flex-1">
@@ -234,27 +178,18 @@ export function IndexedFilesTab() {
             className="w-full rounded-xl border border-gray-200 py-2.5 pl-10 pr-4 text-sm text-slate-800 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
           />
         </div>
-        <select
-          value={filterCategory}
-          onChange={(e) => setFilterCategory(e.target.value)}
-          className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-slate-600 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-        >
-          {categories.map((cat) => (
-            <option key={cat} value={cat}>
-              {cat === "all" ? "All Categories" : cat}
-            </option>
-          ))}
-        </select>
       </div>
 
       {/* File list */}
       <div className="rounded-2xl border border-gray-200 bg-white">
         {filteredFiles.length === 0 ? (
           <div className="p-8 text-center text-sm text-slate-400">
-            No files found matching your search.
+            {files.length === 0
+              ? "No documents uploaded yet. Upload your first document to get started."
+              : "No files found matching your search."}
           </div>
         ) : (
-          filteredFiles.map((file, index) => {
+          filteredFiles.map((file: DocumentItem, index: number) => {
             const statusConfig = STATUS_CONFIG[file.status];
             const StatusIcon = statusConfig.icon;
             return (
@@ -269,7 +204,7 @@ export function IndexedFilesTab() {
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50">
                   <FileText size={18} className="text-brand-500" />
                 </div>
-                <div className="flex-1 min-w-0">
+                <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span className="truncate text-sm font-semibold text-slate-800">
                       {file.filename}
@@ -287,19 +222,17 @@ export function IndexedFilesTab() {
                     </span>
                   </div>
                   <div className="flex items-center gap-3 text-[12px] text-slate-400">
-                    <span>{formatBytes(file.sizeBytes)}</span>
-                    <span>{file.category}</span>
-                    {file.chunkCount > 0 && (
-                      <span>{file.chunkCount} chunks</span>
-                    )}
+                    <span>{formatBytes(file.size_bytes)}</span>
+                    <span>{file.content_type}</span>
                     <span className="flex items-center gap-1">
                       <Clock size={10} />
-                      {formatDate(file.indexedAt)}
+                      {formatDate(file.created_at)}
                     </span>
                   </div>
                 </div>
                 <button
                   onClick={() => handleDelete(file.id)}
+                  disabled={deleteMutation.isPending}
                   className={`rounded-lg p-2 transition-colors ${
                     deleteConfirm === file.id
                       ? "bg-red-50 text-red-500 hover:bg-red-100"

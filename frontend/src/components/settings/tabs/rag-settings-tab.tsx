@@ -1,40 +1,56 @@
-import { useState } from "react";
-import { Database, Info, Save } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Database, Info, Loader2, Save } from "lucide-react";
 
-interface RagConfig {
-  chunkSize: number;
-  chunkOverlap: number;
-  topK: number;
-  scoreThreshold: number;
-  searchType: "hybrid" | "vector" | "keyword";
-  embeddingModel: string;
-  rerankEnabled: boolean;
-  maxContextTokens: number;
-}
+import {
+  getSettingsByCategory,
+  updateRagSettings,
+  type RagSettings,
+} from "@/api/settings";
 
-const DEFAULT_CONFIG: RagConfig = {
-  chunkSize: 512,
-  chunkOverlap: 50,
-  topK: 5,
-  scoreThreshold: 0.7,
-  searchType: "hybrid",
-  embeddingModel: "text-embedding-3-small",
-  rerankEnabled: true,
-  maxContextTokens: 4096,
+const DEFAULT_CONFIG: RagSettings = {
+  chunk_size: 512,
+  chunk_overlap: 50,
+  top_k: 5,
+  score_threshold: 0.7,
+  search_type: "hybrid",
+  embedding_model: "text-embedding-3-small",
+  rerank_enabled: true,
+  max_context_tokens: 4096,
 };
 
 export function RagSettingsTab() {
-  const [config, setConfig] = useState<RagConfig>(DEFAULT_CONFIG);
-  const [saved, setSaved] = useState(false);
+  const queryClient = useQueryClient();
+  const [config, setConfig] = useState<RagSettings>(DEFAULT_CONFIG);
 
-  function handleSave() {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  const { data, isLoading } = useQuery({
+    queryKey: ["settings", "rag"],
+    queryFn: () => getSettingsByCategory("rag"),
+  });
+
+  useEffect(() => {
+    if (data?.settings) {
+      setConfig(data.settings as unknown as RagSettings);
+    }
+  }, [data]);
+
+  const mutation = useMutation({
+    mutationFn: updateRagSettings,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["settings", "rag"] });
+    },
+  });
+
+  function updateConfig<K extends keyof RagSettings>(key: K, value: RagSettings[K]) {
+    setConfig((prev) => ({ ...prev, [key]: value }));
   }
 
-  function updateConfig<K extends keyof RagConfig>(key: K, value: RagConfig[K]) {
-    setConfig((prev) => ({ ...prev, [key]: value }));
-    setSaved(false);
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 size={24} className="animate-spin text-brand-500" />
+      </div>
+    );
   }
 
   return (
@@ -63,9 +79,9 @@ export function RagSettingsTab() {
               {(["hybrid", "vector", "keyword"] as const).map((type) => (
                 <button
                   key={type}
-                  onClick={() => updateConfig("searchType", type)}
+                  onClick={() => updateConfig("search_type", type)}
                   className={`rounded-xl px-4 py-2 text-sm font-medium transition-all ${
-                    config.searchType === type
+                    config.search_type === type
                       ? "gradient-brand text-white shadow-md shadow-brand-500/20"
                       : "border border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
                   }`}
@@ -89,13 +105,13 @@ export function RagSettingsTab() {
               type="range"
               min={1}
               max={20}
-              value={config.topK}
-              onChange={(e) => updateConfig("topK", Number(e.target.value))}
+              value={config.top_k}
+              onChange={(e) => updateConfig("top_k", Number(e.target.value))}
               className="w-full accent-brand-500"
             />
             <div className="flex justify-between text-[12px] text-slate-400">
               <span>1</span>
-              <span className="font-semibold text-brand-500">{config.topK} documents</span>
+              <span className="font-semibold text-brand-500">{config.top_k} documents</span>
               <span>20</span>
             </div>
           </div>
@@ -109,16 +125,16 @@ export function RagSettingsTab() {
               type="range"
               min={0}
               max={100}
-              value={config.scoreThreshold * 100}
+              value={config.score_threshold * 100}
               onChange={(e) =>
-                updateConfig("scoreThreshold", Number(e.target.value) / 100)
+                updateConfig("score_threshold", Number(e.target.value) / 100)
               }
               className="w-full accent-brand-500"
             />
             <div className="flex justify-between text-[12px] text-slate-400">
               <span>0%</span>
               <span className="font-semibold text-brand-500">
-                {Math.round(config.scoreThreshold * 100)}%
+                {Math.round(config.score_threshold * 100)}%
               </span>
               <span>100%</span>
             </div>
@@ -131,9 +147,9 @@ export function RagSettingsTab() {
             </label>
             <input
               type="number"
-              value={config.maxContextTokens}
+              value={config.max_context_tokens}
               onChange={(e) =>
-                updateConfig("maxContextTokens", Number(e.target.value))
+                updateConfig("max_context_tokens", Number(e.target.value))
               }
               className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-slate-800 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
             />
@@ -149,42 +165,39 @@ export function RagSettingsTab() {
         <h3 className="mb-5 text-sm font-bold text-slate-800">Document Processing</h3>
 
         <div className="space-y-5">
-          {/* Chunk Size */}
           <div>
             <label className="mb-1.5 block text-[13px] font-semibold text-slate-700">
               Chunk Size (tokens)
             </label>
             <input
               type="number"
-              value={config.chunkSize}
-              onChange={(e) => updateConfig("chunkSize", Number(e.target.value))}
+              value={config.chunk_size}
+              onChange={(e) => updateConfig("chunk_size", Number(e.target.value))}
               className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-slate-800 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
             />
           </div>
 
-          {/* Chunk Overlap */}
           <div>
             <label className="mb-1.5 block text-[13px] font-semibold text-slate-700">
               Chunk Overlap (tokens)
             </label>
             <input
               type="number"
-              value={config.chunkOverlap}
+              value={config.chunk_overlap}
               onChange={(e) =>
-                updateConfig("chunkOverlap", Number(e.target.value))
+                updateConfig("chunk_overlap", Number(e.target.value))
               }
               className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-slate-800 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
             />
           </div>
 
-          {/* Embedding Model */}
           <div>
             <label className="mb-1.5 block text-[13px] font-semibold text-slate-700">
               Embedding Model
             </label>
             <select
-              value={config.embeddingModel}
-              onChange={(e) => updateConfig("embeddingModel", e.target.value)}
+              value={config.embedding_model}
+              onChange={(e) => updateConfig("embedding_model", e.target.value)}
               className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-slate-800 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
             >
               <option value="text-embedding-3-small">text-embedding-3-small (1536 dims)</option>
@@ -193,7 +206,6 @@ export function RagSettingsTab() {
             </select>
           </div>
 
-          {/* Reranking */}
           <div className="flex items-center justify-between">
             <div>
               <span className="text-[13px] font-semibold text-slate-700">
@@ -204,14 +216,14 @@ export function RagSettingsTab() {
               </p>
             </div>
             <button
-              onClick={() => updateConfig("rerankEnabled", !config.rerankEnabled)}
+              onClick={() => updateConfig("rerank_enabled", !config.rerank_enabled)}
               className={`relative h-6 w-11 rounded-full transition-colors ${
-                config.rerankEnabled ? "bg-brand-500" : "bg-gray-300"
+                config.rerank_enabled ? "bg-brand-500" : "bg-gray-300"
               }`}
             >
               <span
                 className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
-                  config.rerankEnabled ? "translate-x-5" : "translate-x-0"
+                  config.rerank_enabled ? "translate-x-5" : "translate-x-0"
                 }`}
               />
             </button>
@@ -221,12 +233,16 @@ export function RagSettingsTab() {
 
       {/* Save Button */}
       <button
-        onClick={handleSave}
-        className="flex items-center gap-2 rounded-xl gradient-brand px-6 py-3 text-sm font-semibold text-white shadow-md shadow-brand-500/20 transition-all hover:shadow-lg hover:shadow-brand-500/30"
+        onClick={() => mutation.mutate(config)}
+        disabled={mutation.isPending}
+        className="flex items-center gap-2 rounded-xl gradient-brand px-6 py-3 text-sm font-semibold text-white shadow-md shadow-brand-500/20 transition-all hover:shadow-lg hover:shadow-brand-500/30 disabled:opacity-50"
       >
-        <Save size={16} />
-        {saved ? "Saved!" : "Save Changes"}
+        {mutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+        {mutation.isSuccess ? "Saved!" : mutation.isPending ? "Saving..." : "Save Changes"}
       </button>
+      {mutation.isError && (
+        <p className="mt-2 text-sm text-red-500">Failed to save. Please try again.</p>
+      )}
     </div>
   );
 }
