@@ -1,23 +1,16 @@
-from __future__ import annotations
-
 import asyncio
 import json
 import uuid
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
 
 import structlog
+from fastapi import Request  # noqa: TCH002
 
 from app.core.database import async_session_factory
-
-if TYPE_CHECKING:
-    from fastapi import Request
-
-    from app.models.user import User
-    from app.services.storage import BlobStorageService
-
 from app.core.tasks import track_task
 from app.models.audit import AuditEntry
+from app.models.user import User  # noqa: TCH001
+from app.services.storage import BlobStorageService  # noqa: TCH001
 
 logger = structlog.get_logger(__name__)
 

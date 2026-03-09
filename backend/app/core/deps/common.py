@@ -1,11 +1,6 @@
-from __future__ import annotations
+from fastapi import Request  # noqa: TCH002
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from fastapi import Request
-
-    from app.services.audit import AuditLogger
+from app.services.audit import AuditLogger  # noqa: TCH001
 
 
 async def get_correlation_id(request: Request) -> str:

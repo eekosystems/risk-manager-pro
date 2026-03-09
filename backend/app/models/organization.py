@@ -1,7 +1,6 @@
-from __future__ import annotations
-
 import enum
 import uuid
+from datetime import datetime  # noqa: TCH003
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import Boolean, Enum, ForeignKey, String, func
@@ -11,8 +10,6 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 
 if TYPE_CHECKING:
-    from datetime import datetime
-
     from app.models.organization_membership import OrganizationMembership
 
 
@@ -37,6 +34,6 @@ class Organization(Base):
     created_at: Mapped[datetime] = mapped_column(default=func.now())
     updated_at: Mapped[datetime] = mapped_column(default=func.now(), onupdate=func.now())
 
-    memberships: Mapped[list[OrganizationMembership]] = relationship(
+    memberships: Mapped[list["OrganizationMembership"]] = relationship(
         back_populates="organization",
     )

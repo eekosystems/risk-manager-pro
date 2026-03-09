@@ -1,7 +1,6 @@
-from __future__ import annotations
-
 import enum
 import uuid
+from datetime import datetime  # noqa: TCH003
 from typing import TYPE_CHECKING
 
 from sqlalchemy import Enum, ForeignKey, String, func
@@ -10,8 +9,6 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 
 if TYPE_CHECKING:
-    from datetime import datetime
-
     from app.models.message import Message
 
 
@@ -43,4 +40,4 @@ class Conversation(Base):
     created_at: Mapped[datetime] = mapped_column(default=func.now())
     updated_at: Mapped[datetime] = mapped_column(default=func.now(), onupdate=func.now())
 
-    messages: Mapped[list[Message]] = relationship(back_populates="conversation")
+    messages: Mapped[list["Message"]] = relationship(back_populates="conversation")
