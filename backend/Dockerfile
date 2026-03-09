@@ -19,8 +19,9 @@ COPY --from=builder /install /usr/local
 COPY app/ app/
 COPY alembic/ alembic/
 COPY alembic.ini .
+COPY start.sh .
 
-RUN chown -R appuser:appuser /app
+RUN chmod +x start.sh && chown -R appuser:appuser /app
 
 USER appuser
 
@@ -29,4 +30,4 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
+CMD ["./start.sh"]
