@@ -32,10 +32,10 @@ export function RightPanel({
       <button
         onClick={onToggle}
         aria-label={isOpen ? "Collapse panel" : "Expand panel"}
-        className="absolute -left-3 top-1/2 z-30 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-400 shadow-sm transition-colors hover:bg-brand-50 hover:text-brand-500"
+        className="absolute -left-5 top-1/2 z-30 flex h-10 w-5 -translate-y-1/2 items-center justify-center rounded-l-lg border border-r-0 border-gray-200 bg-white text-gray-400 shadow-sm transition-colors hover:bg-brand-50 hover:text-brand-500"
       >
         <ChevronRight
-          size={14}
+          size={16}
           className={clsx("transition-transform", !isOpen && "rotate-180")}
         />
       </button>

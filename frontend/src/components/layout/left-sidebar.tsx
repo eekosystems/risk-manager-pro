@@ -41,10 +41,10 @@ export function LeftSidebar({
       <button
         onClick={onToggle}
         aria-label={isOpen ? "Collapse sidebar" : "Expand sidebar"}
-        className="absolute -right-3 top-1/2 z-30 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-400 shadow-sm transition-colors hover:bg-brand-50 hover:text-brand-500"
+        className="absolute -right-5 top-1/2 z-30 flex h-10 w-5 -translate-y-1/2 items-center justify-center rounded-r-lg border border-l-0 border-gray-200 bg-white text-gray-400 shadow-sm transition-colors hover:bg-brand-50 hover:text-brand-500"
       >
         <ChevronRight
-          size={14}
+          size={16}
           className={clsx("transition-transform", isOpen && "rotate-180")}
         />
       </button>
