@@ -2,6 +2,7 @@ export type FunctionType = "phl" | "sra" | "system" | "general";
 export type MessageRole = "user" | "assistant" | "system";
 export type DocumentStatus = "uploaded" | "processing" | "indexed" | "failed";
 export type MembershipRole = "org_admin" | "analyst" | "viewer";
+export type InvitationStatus = "active" | "invited" | "provisioned";
 export type OrganizationStatus = "active" | "suspended" | "archived";
 
 export interface Citation {
@@ -33,6 +34,7 @@ export interface OrganizationMember {
   is_active: boolean;
   email: string;
   display_name: string;
+  invitation_status: InvitationStatus;
   created_at: string;
 }
 

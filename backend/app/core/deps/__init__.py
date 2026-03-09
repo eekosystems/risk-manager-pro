@@ -12,6 +12,7 @@ from app.core.deps.organization import (
     require_platform_admin,
 )
 from app.core.deps.services import (
+    get_graph_service,
     get_openai_client,
     get_rag_service,
     get_search_indexer,
@@ -24,6 +25,7 @@ __all__ = [
     "get_correlation_id",
     "get_current_organization",
     "get_current_user",
+    "get_graph_service",
     "get_openai_client",
     "get_rag_service",
     "get_search_indexer",

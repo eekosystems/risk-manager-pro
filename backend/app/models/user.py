@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import enum
 import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
@@ -13,6 +14,12 @@ if TYPE_CHECKING:
     from app.models.organization_membership import OrganizationMembership
 
 
+class InvitationStatus(str, enum.Enum):
+    ACTIVE = "active"
+    INVITED = "invited"
+    PROVISIONED = "provisioned"
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -22,6 +29,9 @@ class User(Base):
     display_name: Mapped[str] = mapped_column(String(255))
     is_platform_admin: Mapped[bool] = mapped_column(Boolean, default=False)
     is_active: Mapped[bool] = mapped_column(default=True)
+    invitation_status: Mapped[str] = mapped_column(
+        String(20), default=InvitationStatus.ACTIVE.value
+    )
     created_at: Mapped[datetime] = mapped_column(default=func.now())
     last_login: Mapped[datetime | None] = mapped_column(default=None)
     last_activity: Mapped[datetime | None] = mapped_column(default=None)

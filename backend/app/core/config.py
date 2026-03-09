@@ -50,6 +50,9 @@ class Settings(BaseSettings):
     azure_ad_client_id: str = ""
     azure_ad_authority: str = ""
 
+    # Microsoft Graph API
+    invitation_redirect_url: str = ""
+
     @model_validator(mode="after")
     def _validate_database_url(self) -> "Settings":
         if not self.database_url:

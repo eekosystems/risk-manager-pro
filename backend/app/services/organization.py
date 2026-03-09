@@ -6,10 +6,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import ConflictError, ForbiddenError, NotFoundError, ValidationError
 from app.models.organization import Organization, OrganizationStatus
 from app.models.organization_membership import MembershipRole, OrganizationMembership
-from app.models.user import User
+from app.models.user import InvitationStatus, User
 from app.repositories.membership import MembershipRepository
 from app.repositories.organization import OrganizationRepository
 from app.schemas.organization import MemberResponse
+from app.services.microsoft_graph import MicrosoftGraphService
 
 logger = structlog.get_logger(__name__)
 
@@ -23,12 +24,18 @@ def _membership_to_response(membership: OrganizationMembership) -> MemberRespons
         is_active=membership.is_active,
         email=membership.user.email if membership.user else "",
         display_name=membership.user.display_name if membership.user else "",
+        invitation_status=(
+            membership.user.invitation_status
+            if membership.user
+            else InvitationStatus.ACTIVE.value
+        ),
         created_at=membership.created_at,
     )
 
 
 class OrganizationService:
     def __init__(self, db: AsyncSession) -> None:
+        self._db = db
         self._org_repo = OrganizationRepository(db)
         self._membership_repo = MembershipRepository(db)
 
@@ -108,14 +115,59 @@ class OrganizationService:
         invited_by: uuid.UUID,
         user_id: uuid.UUID | None = None,
         email: str | None = None,
+        graph_service: MicrosoftGraphService | None = None,
     ) -> OrganizationMembership:
         if not user_id and not email:
             raise ValidationError("Either user_id or email is required")
 
+        invitation_status = InvitationStatus.ACTIVE
+
         if email and not user_id:
+            # Step 1: Check local DB
             user = await self._membership_repo.find_user_by_email(email)
+
+            if not user and graph_service:
+                # Step 2: Check Entra ID directory
+                graph_user = await graph_service.find_user_by_email(email)
+
+                if graph_user:
+                    # Found in directory — provision locally
+                    user = User(
+                        entra_id=graph_user.object_id,
+                        email=graph_user.email or email,
+                        display_name=graph_user.display_name,
+                        invitation_status=InvitationStatus.PROVISIONED.value,
+                    )
+                    self._db.add(user)
+                    await self._db.flush()
+                    invitation_status = InvitationStatus.PROVISIONED
+                    logger.info(
+                        "user_provisioned_from_directory",
+                        user_id=str(user.id),
+                        entra_id=graph_user.object_id,
+                    )
+                else:
+                    # Step 3: Not in directory — send B2B invitation
+                    invitation = await graph_service.send_b2b_invitation(email)
+                    user = User(
+                        entra_id=invitation.invited_user_id,
+                        email=email,
+                        display_name=email.split("@")[0],
+                        invitation_status=InvitationStatus.INVITED.value,
+                    )
+                    self._db.add(user)
+                    await self._db.flush()
+                    invitation_status = InvitationStatus.INVITED
+                    logger.info(
+                        "user_invited_via_b2b",
+                        user_id=str(user.id),
+                        entra_id=invitation.invited_user_id,
+                        invitation_status=invitation.status,
+                    )
+
             if not user:
                 raise NotFoundError("User", email)
+
             user_id = user.id
 
         if user_id is None:
@@ -141,6 +193,7 @@ class OrganizationService:
             org_id=str(organization_id),
             user_id=str(user_id),
             role=role.value,
+            invitation_status=invitation_status.value,
         )
         return membership
 
@@ -151,6 +204,7 @@ class OrganizationService:
         invited_by: uuid.UUID,
         user_id: uuid.UUID | None = None,
         email: str | None = None,
+        graph_service: MicrosoftGraphService | None = None,
     ) -> MemberResponse:
         membership = await self.add_member(
             organization_id=organization_id,
@@ -158,6 +212,7 @@ class OrganizationService:
             invited_by=invited_by,
             user_id=user_id,
             email=email,
+            graph_service=graph_service,
         )
         return _membership_to_response(membership)
 
