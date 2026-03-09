@@ -1,28 +1,23 @@
 import { clsx } from "clsx";
-import { Bot, ChevronRight, FileText, FolderSearch, Rocket } from "lucide-react";
+import { Bot, ChevronRight, MessageSquare } from "lucide-react";
 
 import { AiStatusCard } from "@/components/layout/panel/ai-status-card";
-import { IndexedSources } from "@/components/layout/panel/indexed-sources";
-import { QuickStartTemplates } from "@/components/layout/panel/quick-start-templates";
-import { RecentDocuments } from "@/components/layout/panel/recent-documents";
-import type { FunctionType } from "@/types/api";
+import { ConversationHistory } from "@/components/layout/sidebar/conversation-history";
 
 interface RightPanelProps {
   isOpen: boolean;
   onToggle: () => void;
-  activeFunction: FunctionType;
-  onFunctionSelect: (fn: FunctionType) => void;
+  onConversationSelect: (id: string) => void;
 }
 
 export function RightPanel({
   isOpen,
   onToggle,
-  activeFunction,
-  onFunctionSelect,
+  onConversationSelect,
 }: RightPanelProps) {
   return (
     <aside
-      aria-label="Quick start and status"
+      aria-label="Recent sessions and status"
       className={clsx(
         "relative flex flex-col border-l border-gray-200 bg-white transition-all duration-300",
         isOpen ? "w-[300px] min-w-[300px]" : "w-[60px] min-w-[60px]",
@@ -41,17 +36,9 @@ export function RightPanel({
       </button>
 
       {isOpen ? (
-        <div className="flex min-w-[300px] flex-col h-full overflow-y-auto px-5 py-5">
-          <div className="mb-4">
-            <span className="text-sm font-semibold text-gray-500">Quick Start</span>
-          </div>
-          <QuickStartTemplates
-            activeFunction={activeFunction}
-            onFunctionSelect={onFunctionSelect}
-          />
-          <RecentDocuments />
-          <IndexedSources />
-          <div className="mt-auto">
+        <div className="flex min-w-[300px] flex-col h-full overflow-y-auto px-3 py-4">
+          <ConversationHistory onConversationSelect={onConversationSelect} />
+          <div className="mt-auto px-2 pt-4">
             <AiStatusCard />
           </div>
         </div>
@@ -61,27 +48,11 @@ export function RightPanel({
           <nav className="flex flex-col items-center gap-1">
             <button
               onClick={onToggle}
-              aria-label="Quick start templates"
-              title="Quick start templates"
+              aria-label="Recent sessions"
+              title="Recent sessions"
               className="flex h-10 w-10 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-brand-50 hover:text-brand-500"
             >
-              <Rocket size={20} />
-            </button>
-            <button
-              onClick={onToggle}
-              aria-label="Recent documents"
-              title="Recent documents"
-              className="flex h-10 w-10 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-brand-50 hover:text-brand-500"
-            >
-              <FileText size={20} />
-            </button>
-            <button
-              onClick={onToggle}
-              aria-label="Indexed sources"
-              title="Indexed sources"
-              className="flex h-10 w-10 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-brand-50 hover:text-brand-500"
-            >
-              <FolderSearch size={20} />
+              <MessageSquare size={20} />
             </button>
           </nav>
 
