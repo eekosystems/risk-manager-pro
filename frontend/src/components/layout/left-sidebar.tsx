@@ -41,7 +41,7 @@ export function LeftSidebar({
       <button
         onClick={onToggle}
         aria-label={isOpen ? "Collapse sidebar" : "Expand sidebar"}
-        className="absolute right-0 top-1/2 z-30 translate-x-1/2 -translate-y-1/2 rounded-lg border border-gray-200 bg-white px-1 py-3 text-gray-400 shadow-md transition-colors hover:bg-brand-50 hover:text-brand-500"
+        className="absolute right-0 top-1/2 z-30 translate-x-1/2 -translate-y-1/2 rounded-lg border border-gray-200 bg-white px-0.5 py-4 text-gray-400 shadow-md transition-colors hover:bg-brand-50 hover:text-brand-500"
       >
         <ChevronRight
           size={16}
