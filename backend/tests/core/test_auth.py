@@ -3,8 +3,8 @@
 import uuid
 from unittest.mock import patch
 
-import pytest
 import jwt
+import pytest
 
 from app.core.auth import EntraIDAuth, TokenPayload
 from app.core.exceptions import UnauthorizedError

@@ -1,8 +1,8 @@
 import time
 
 import httpx
-import structlog
 import jwt
+import structlog
 from jwt.exceptions import PyJWTError
 from pydantic import BaseModel
 
