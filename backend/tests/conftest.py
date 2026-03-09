@@ -5,6 +5,7 @@ Uses a real PostgreSQL database (from docker-compose) with per-test SAVEPOINT
 rollback for isolation. Azure services are mocked.
 """
 
+import os
 import uuid
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
@@ -30,7 +31,10 @@ from app.models.organization_membership import MembershipRole, OrganizationMembe
 from app.models.user import User
 from app.services.audit import AuditLogger
 
-TEST_DATABASE_URL = "postgresql+asyncpg://rmp_dev:rmp_dev_password@localhost:5432/riskmanagerpro"
+TEST_DATABASE_URL = os.environ.get(
+    "DATABASE_URL",
+    "postgresql+asyncpg://rmp_dev:rmp_dev_password@localhost:5432/riskmanagerpro",
+)
 
 test_engine = create_async_engine(TEST_DATABASE_URL, echo=False)
 TestSessionFactory = async_sessionmaker(test_engine, expire_on_commit=False)
