@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  Clock,
   Crown,
   Eye,
   Loader2,
@@ -10,6 +11,7 @@ import {
   Search,
   Shield,
   Trash2,
+  UserCheck,
   UserPlus,
   X,
 } from "lucide-react";
@@ -263,7 +265,13 @@ export function UsersRolesTab() {
           </div>
           {addMutation.isError && (
             <p className="mt-2 text-sm text-red-500">
-              Failed to add member. They may need to sign in first.
+              {(addMutation.error as Error)?.message ||
+                "Failed to invite member. Please try again."}
+            </p>
+          )}
+          {addMutation.isSuccess && (
+            <p className="mt-2 text-sm text-green-600">
+              Member added successfully.
             </p>
           )}
         </div>
@@ -310,6 +318,18 @@ export function UsersRolesTab() {
                       {!member.is_active && (
                         <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[10px] font-bold text-gray-500">
                           Inactive
+                        </span>
+                      )}
+                      {member.invitation_status === "invited" && (
+                        <span className="flex items-center gap-1 rounded-full border border-yellow-200 bg-yellow-50 px-2 py-0.5 text-[10px] font-bold text-yellow-700">
+                          <Clock size={10} />
+                          Invite Pending
+                        </span>
+                      )}
+                      {member.invitation_status === "provisioned" && (
+                        <span className="flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700">
+                          <UserCheck size={10} />
+                          From Directory
                         </span>
                       )}
                     </div>

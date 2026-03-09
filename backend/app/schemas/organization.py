@@ -66,6 +66,7 @@ class MemberResponse(BaseModel):
     is_active: bool
     email: str
     display_name: str
+    invitation_status: str = "active"
     created_at: datetime
 
     model_config = {"from_attributes": True}

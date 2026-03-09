@@ -7,6 +7,7 @@ from app.core.database import get_db
 from app.core.deps import (
     get_audit_logger,
     get_current_user,
+    get_graph_service,
     require_org_role,
     require_platform_admin,
 )
@@ -14,6 +15,7 @@ from app.core.exceptions import ForbiddenError
 from app.models.organization_membership import MembershipRole
 from app.models.user import User
 from app.schemas.common import DataResponse, MetaResponse
+from app.services.microsoft_graph import MicrosoftGraphService
 from app.schemas.organization import (
     AddMemberRequest,
     CreateOrganizationRequest,
@@ -125,6 +127,7 @@ async def add_member(
         require_org_role(MembershipRole.ORG_ADMIN)
     ),
     service: OrganizationService = Depends(_get_org_service),
+    graph: MicrosoftGraphService = Depends(get_graph_service),
     audit: AuditLogger = Depends(get_audit_logger),
 ) -> DataResponse[MemberResponse]:
     member_resp = await service.add_member_and_build_response(
@@ -133,6 +136,7 @@ async def add_member(
         invited_by=current_user.id,
         user_id=payload.user_id,
         email=payload.email,
+        graph_service=graph,
     )
     await audit.log(
         action="organization.member_added",
@@ -140,6 +144,7 @@ async def add_member(
         resource_type="membership",
         resource_id=str(member_resp.id),
         organization_id=org_id,
+        metadata={"invitation_status": member_resp.invitation_status},
     )
     return DataResponse(
         data=member_resp,

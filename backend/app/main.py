@@ -24,6 +24,7 @@ class ServiceRegistry:
     """Centralized lifecycle manager for Azure service clients."""
 
     def __init__(self) -> None:
+        from app.services.microsoft_graph import MicrosoftGraphService
         from app.services.openai_client import AzureOpenAIClient
         from app.services.rag import RAGService
         from app.services.search_indexer import SearchIndexer
@@ -33,8 +34,10 @@ class ServiceRegistry:
         self._rag_service: RAGService | None = None
         self._storage_service: BlobStorageService | None = None
         self._search_indexer: SearchIndexer | None = None
+        self._graph_service: MicrosoftGraphService | None = None
 
     async def startup(self) -> None:
+        from app.services.microsoft_graph import MicrosoftGraphService
         from app.services.openai_client import AzureOpenAIClient
         from app.services.rag import RAGService
         from app.services.search_indexer import SearchIndexer
@@ -44,9 +47,12 @@ class ServiceRegistry:
         self._rag_service = RAGService(self._openai_client)
         self._storage_service = BlobStorageService()
         self._search_indexer = SearchIndexer()
+        self._graph_service = MicrosoftGraphService()
         logger.info("service_registry_initialized")
 
     async def shutdown(self) -> None:
+        if self._graph_service:
+            await self._graph_service.close()
         if self._search_indexer:
             await self._search_indexer.close()
         if self._rag_service:
@@ -88,6 +94,14 @@ class ServiceRegistry:
         if self._search_indexer is None:
             raise RuntimeError("ServiceRegistry not initialized — call startup() first")
         return self._search_indexer
+
+    @property
+    def graph_service(self) -> "MicrosoftGraphService":
+        from app.services.microsoft_graph import MicrosoftGraphService
+
+        if self._graph_service is None:
+            raise RuntimeError("ServiceRegistry not initialized — call startup() first")
+        return self._graph_service
 
 
 service_registry = ServiceRegistry()

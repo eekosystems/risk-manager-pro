@@ -47,6 +47,15 @@ class TooManyRequestsError(AppError):
         super().__init__(code="TOO_MANY_REQUESTS", message=message, status_code=429)
 
 
+class ExternalServiceError(AppError):
+    def __init__(self, service: str, message: str) -> None:
+        super().__init__(
+            code="EXTERNAL_SERVICE_ERROR",
+            message=f"{service}: {message}",
+            status_code=502,
+        )
+
+
 async def app_error_handler(_request: Request, exc: AppError) -> JSONResponse:
     return JSONResponse(
         status_code=exc.status_code,
