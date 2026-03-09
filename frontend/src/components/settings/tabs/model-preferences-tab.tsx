@@ -1,24 +1,21 @@
-import { useState } from "react";
-import { Brain, Save, Thermometer, Zap } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Brain, Loader2, Save, Thermometer, Zap } from "lucide-react";
 
-interface ModelConfig {
-  chatModel: string;
-  temperature: number;
-  maxOutputTokens: number;
-  topP: number;
-  frequencyPenalty: number;
-  presencePenalty: number;
-  streamResponses: boolean;
-}
+import {
+  getSettingsByCategory,
+  updateModelSettings,
+  type ModelSettings,
+} from "@/api/settings";
 
-const DEFAULT_CONFIG: ModelConfig = {
-  chatModel: "gpt-4o",
+const DEFAULT_CONFIG: ModelSettings = {
+  chat_model: "gpt-4o",
   temperature: 0.3,
-  maxOutputTokens: 4096,
-  topP: 0.95,
-  frequencyPenalty: 0,
-  presencePenalty: 0,
-  streamResponses: true,
+  max_output_tokens: 4096,
+  top_p: 0.95,
+  frequency_penalty: 0,
+  presence_penalty: 0,
+  stream_responses: true,
 };
 
 const AVAILABLE_MODELS = [
@@ -43,17 +40,37 @@ const AVAILABLE_MODELS = [
 ];
 
 export function ModelPreferencesTab() {
-  const [config, setConfig] = useState<ModelConfig>(DEFAULT_CONFIG);
-  const [saved, setSaved] = useState(false);
+  const queryClient = useQueryClient();
+  const [config, setConfig] = useState<ModelSettings>(DEFAULT_CONFIG);
 
-  function handleSave() {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  const { data, isLoading } = useQuery({
+    queryKey: ["settings", "model"],
+    queryFn: () => getSettingsByCategory("model"),
+  });
+
+  useEffect(() => {
+    if (data?.settings) {
+      setConfig(data.settings as unknown as ModelSettings);
+    }
+  }, [data]);
+
+  const mutation = useMutation({
+    mutationFn: updateModelSettings,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["settings", "model"] });
+    },
+  });
+
+  function updateConfig<K extends keyof ModelSettings>(key: K, value: ModelSettings[K]) {
+    setConfig((prev) => ({ ...prev, [key]: value }));
   }
 
-  function updateConfig<K extends keyof ModelConfig>(key: K, value: ModelConfig[K]) {
-    setConfig((prev) => ({ ...prev, [key]: value }));
-    setSaved(false);
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 size={24} className="animate-spin text-brand-500" />
+      </div>
+    );
   }
 
   return (
@@ -76,9 +93,9 @@ export function ModelPreferencesTab() {
           {AVAILABLE_MODELS.map((model) => (
             <button
               key={model.id}
-              onClick={() => updateConfig("chatModel", model.id)}
+              onClick={() => updateConfig("chat_model", model.id)}
               className={`w-full rounded-xl border p-4 text-left transition-all ${
-                config.chatModel === model.id
+                config.chat_model === model.id
                   ? "border-brand-500 bg-brand-50 shadow-sm shadow-brand-500/10"
                   : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50"
               }`}
@@ -89,7 +106,7 @@ export function ModelPreferencesTab() {
                     <span className="text-sm font-bold text-slate-800">
                       {model.name}
                     </span>
-                    {config.chatModel === model.id && (
+                    {config.chat_model === model.id && (
                       <span className="rounded-full gradient-brand px-2 py-0.5 text-[10px] font-bold text-white">
                         Active
                       </span>
@@ -114,7 +131,6 @@ export function ModelPreferencesTab() {
         </div>
 
         <div className="space-y-5">
-          {/* Temperature */}
           <div>
             <label className="mb-1.5 block text-[13px] font-semibold text-slate-700">
               Temperature
@@ -141,7 +157,6 @@ export function ModelPreferencesTab() {
             </p>
           </div>
 
-          {/* Top P */}
           <div>
             <label className="mb-1.5 block text-[13px] font-semibold text-slate-700">
               Top P
@@ -150,37 +165,35 @@ export function ModelPreferencesTab() {
               type="range"
               min={0}
               max={100}
-              value={config.topP * 100}
+              value={config.top_p * 100}
               onChange={(e) =>
-                updateConfig("topP", Number(e.target.value) / 100)
+                updateConfig("top_p", Number(e.target.value) / 100)
               }
               className="w-full accent-brand-500"
             />
             <div className="flex justify-between text-[12px] text-slate-400">
               <span>0</span>
               <span className="font-semibold text-brand-500">
-                {config.topP.toFixed(2)}
+                {config.top_p.toFixed(2)}
               </span>
               <span>1.0</span>
             </div>
           </div>
 
-          {/* Max Output Tokens */}
           <div>
             <label className="mb-1.5 block text-[13px] font-semibold text-slate-700">
               Max Output Tokens
             </label>
             <input
               type="number"
-              value={config.maxOutputTokens}
+              value={config.max_output_tokens}
               onChange={(e) =>
-                updateConfig("maxOutputTokens", Number(e.target.value))
+                updateConfig("max_output_tokens", Number(e.target.value))
               }
               className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-slate-800 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
             />
           </div>
 
-          {/* Frequency Penalty */}
           <div>
             <label className="mb-1.5 block text-[13px] font-semibold text-slate-700">
               Frequency Penalty
@@ -189,22 +202,21 @@ export function ModelPreferencesTab() {
               type="range"
               min={0}
               max={200}
-              value={config.frequencyPenalty * 100}
+              value={config.frequency_penalty * 100}
               onChange={(e) =>
-                updateConfig("frequencyPenalty", Number(e.target.value) / 100)
+                updateConfig("frequency_penalty", Number(e.target.value) / 100)
               }
               className="w-full accent-brand-500"
             />
             <div className="flex justify-between text-[12px] text-slate-400">
               <span>0</span>
               <span className="font-semibold text-brand-500">
-                {config.frequencyPenalty.toFixed(2)}
+                {config.frequency_penalty.toFixed(2)}
               </span>
               <span>2.0</span>
             </div>
           </div>
 
-          {/* Presence Penalty */}
           <div>
             <label className="mb-1.5 block text-[13px] font-semibold text-slate-700">
               Presence Penalty
@@ -213,22 +225,21 @@ export function ModelPreferencesTab() {
               type="range"
               min={0}
               max={200}
-              value={config.presencePenalty * 100}
+              value={config.presence_penalty * 100}
               onChange={(e) =>
-                updateConfig("presencePenalty", Number(e.target.value) / 100)
+                updateConfig("presence_penalty", Number(e.target.value) / 100)
               }
               className="w-full accent-brand-500"
             />
             <div className="flex justify-between text-[12px] text-slate-400">
               <span>0</span>
               <span className="font-semibold text-brand-500">
-                {config.presencePenalty.toFixed(2)}
+                {config.presence_penalty.toFixed(2)}
               </span>
               <span>2.0</span>
             </div>
           </div>
 
-          {/* Stream Responses */}
           <div className="flex items-center justify-between">
             <div>
               <span className="text-[13px] font-semibold text-slate-700">
@@ -240,15 +251,15 @@ export function ModelPreferencesTab() {
             </div>
             <button
               onClick={() =>
-                updateConfig("streamResponses", !config.streamResponses)
+                updateConfig("stream_responses", !config.stream_responses)
               }
               className={`relative h-6 w-11 rounded-full transition-colors ${
-                config.streamResponses ? "bg-brand-500" : "bg-gray-300"
+                config.stream_responses ? "bg-brand-500" : "bg-gray-300"
               }`}
             >
               <span
                 className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
-                  config.streamResponses ? "translate-x-5" : "translate-x-0"
+                  config.stream_responses ? "translate-x-5" : "translate-x-0"
                 }`}
               />
             </button>
@@ -265,13 +276,13 @@ export function ModelPreferencesTab() {
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() =>
-              setConfig({
-                ...config,
+              setConfig((prev) => ({
+                ...prev,
                 temperature: 0.1,
-                topP: 0.9,
-                frequencyPenalty: 0,
-                presencePenalty: 0,
-              })
+                top_p: 0.9,
+                frequency_penalty: 0,
+                presence_penalty: 0,
+              }))
             }
             className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 transition-all hover:border-brand-500 hover:bg-brand-50 hover:text-brand-600"
           >
@@ -279,13 +290,13 @@ export function ModelPreferencesTab() {
           </button>
           <button
             onClick={() =>
-              setConfig({
-                ...config,
+              setConfig((prev) => ({
+                ...prev,
                 temperature: 0.3,
-                topP: 0.95,
-                frequencyPenalty: 0,
-                presencePenalty: 0,
-              })
+                top_p: 0.95,
+                frequency_penalty: 0,
+                presence_penalty: 0,
+              }))
             }
             className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 transition-all hover:border-brand-500 hover:bg-brand-50 hover:text-brand-600"
           >
@@ -293,13 +304,13 @@ export function ModelPreferencesTab() {
           </button>
           <button
             onClick={() =>
-              setConfig({
-                ...config,
+              setConfig((prev) => ({
+                ...prev,
                 temperature: 0.7,
-                topP: 1.0,
-                frequencyPenalty: 0.3,
-                presencePenalty: 0.3,
-              })
+                top_p: 1.0,
+                frequency_penalty: 0.3,
+                presence_penalty: 0.3,
+              }))
             }
             className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 transition-all hover:border-brand-500 hover:bg-brand-50 hover:text-brand-600"
           >
@@ -310,12 +321,16 @@ export function ModelPreferencesTab() {
 
       {/* Save Button */}
       <button
-        onClick={handleSave}
-        className="flex items-center gap-2 rounded-xl gradient-brand px-6 py-3 text-sm font-semibold text-white shadow-md shadow-brand-500/20 transition-all hover:shadow-lg hover:shadow-brand-500/30"
+        onClick={() => mutation.mutate(config)}
+        disabled={mutation.isPending}
+        className="flex items-center gap-2 rounded-xl gradient-brand px-6 py-3 text-sm font-semibold text-white shadow-md shadow-brand-500/20 transition-all hover:shadow-lg hover:shadow-brand-500/30 disabled:opacity-50"
       >
-        <Save size={16} />
-        {saved ? "Saved!" : "Save Changes"}
+        {mutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+        {mutation.isSuccess ? "Saved!" : mutation.isPending ? "Saving..." : "Save Changes"}
       </button>
+      {mutation.isError && (
+        <p className="mt-2 text-sm text-red-500">Failed to save. Please try again.</p>
+      )}
     </div>
   );
 }
