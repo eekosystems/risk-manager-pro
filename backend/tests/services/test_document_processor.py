@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from app.models.document import Document, DocumentStatus
-from app.services.document_processor import DocumentProcessor, _chunk_text, _extract_text
+from app.services.document_processor import DocumentProcessor
 
 
 @pytest.fixture
@@ -43,7 +43,9 @@ async def test_process_document_pipeline(
         status=DocumentStatus.PROCESSING,
     )
 
-    mock_storage_service.download.return_value = b"This is a safety document with important content."
+    mock_storage_service.download.return_value = (
+        b"This is a safety document with important content."
+    )
     mock_openai_client.embed_batch.return_value = [[0.1] * 1536]
     processor._repo.get_by_id_system.return_value = doc
 
@@ -111,13 +113,13 @@ async def test_process_error_sets_failed_status(
 
 
 def test_extract_text_plain() -> None:
-    text = _extract_text(b"Hello, world!", "text/plain")
+    text = DocumentProcessor._extract_text(b"Hello, world!", "text/plain")
     assert text == "Hello, world!"
 
 
 def test_chunk_text_produces_chunks() -> None:
     long_text = "word " * 2000
-    chunks = _chunk_text(long_text)
+    chunks = DocumentProcessor._chunk_text(long_text)
     assert len(chunks) > 1
     for chunk in chunks:
         assert len(chunk) > 0

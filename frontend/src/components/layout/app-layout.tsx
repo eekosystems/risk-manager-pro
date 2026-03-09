@@ -1,7 +1,7 @@
 import { useState } from "react";
 
 import { SettingsPage } from "@/components/settings/settings-page";
-import { useOrganizationContext } from "@/context/organization-context";
+import { useOrganizationContext } from "@/hooks/use-organization-context";
 import type { FunctionType } from "@/types/api";
 
 import { HeaderBar } from "./header-bar";

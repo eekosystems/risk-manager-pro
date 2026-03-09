@@ -1,11 +1,13 @@
-from fastapi import Request
+from fastapi import Request  # noqa: TCH002
+
+from app.services.audit import AuditLogger  # noqa: TCH001
 
 
 async def get_correlation_id(request: Request) -> str:
     return getattr(request.state, "correlation_id", "")
 
 
-async def get_audit_logger(request: Request) -> "AuditLogger":
+async def get_audit_logger(request: Request) -> AuditLogger:
     from app.services.audit import AuditLogger
 
     registry = getattr(request.app.state, "services", None)

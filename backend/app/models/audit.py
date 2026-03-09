@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import ForeignKey, String, func
 from sqlalchemy.dialects.postgresql import JSONB
@@ -21,7 +22,7 @@ class AuditEntry(Base):
     user_agent: Mapped[str] = mapped_column(String(500))
     correlation_id: Mapped[uuid.UUID] = mapped_column(index=True)
     outcome: Mapped[str] = mapped_column(String(20))  # success | failure | denied
-    metadata_json: Mapped[dict | None] = mapped_column(JSONB, default=None)
+    metadata_json: Mapped[dict[str, Any] | None] = mapped_column(JSONB, default=None)
     organization_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("organizations.id"), default=None, index=True
     )

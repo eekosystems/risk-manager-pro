@@ -1,22 +1,16 @@
-from __future__ import annotations
-
 import asyncio
 import json
 import uuid
-from datetime import datetime, timezone
-from typing import TYPE_CHECKING
+from datetime import UTC, datetime
 
 import structlog
-from fastapi import Request
+from fastapi import Request  # noqa: TCH002
 
 from app.core.database import async_session_factory
-
-if TYPE_CHECKING:
-    from app.services.storage import BlobStorageService
-
 from app.core.tasks import track_task
 from app.models.audit import AuditEntry
-from app.models.user import User
+from app.models.user import User  # noqa: TCH001
+from app.services.storage import BlobStorageService  # noqa: TCH001
 
 logger = structlog.get_logger(__name__)
 
@@ -148,10 +142,8 @@ async def _write_audit_blob(
 
         from app.services.storage import BlobStorageService
 
-        now = datetime.now(timezone.utc)
-        blob_path = (
-            f"audit/{now.year}/{now.month:02d}/{now.day:02d}/{correlation_id}.json"
-        )
+        now = datetime.now(UTC)
+        blob_path = f"audit/{now.year}/{now.month:02d}/{now.day:02d}/{correlation_id}.json"
 
         audit_data = {
             "timestamp": now.isoformat(),

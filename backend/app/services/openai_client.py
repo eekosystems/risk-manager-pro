@@ -2,7 +2,7 @@ from collections.abc import AsyncGenerator
 
 import structlog
 from azure.identity.aio import DefaultAzureCredential, get_bearer_token_provider
-from openai import AsyncAzureOpenAI, APIStatusError, RateLimitError
+from openai import APIStatusError, AsyncAzureOpenAI, RateLimitError
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from app.core.config import settings
@@ -78,7 +78,7 @@ class AzureOpenAIClient:
             max_tokens=max_tokens,
             stream=True,
         )
-        async for chunk in stream:
+        async for chunk in stream:  # type: ignore[union-attr]
             if chunk.choices and chunk.choices[0].delta.content:
                 yield chunk.choices[0].delta.content
 

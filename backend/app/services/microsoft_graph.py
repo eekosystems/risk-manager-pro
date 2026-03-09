@@ -101,10 +101,14 @@ class MicrosoftGraphService:
             ) from exc
 
     async def send_b2b_invitation(
-        self, email: str, redirect_url: str | None = None,
+        self,
+        email: str,
+        redirect_url: str | None = None,
     ) -> GraphInvitation:
         """Send a B2B guest invitation via Microsoft Graph."""
-        redirect = redirect_url or settings.invitation_redirect_url or "https://myapps.microsoft.com"
+        redirect = (
+            redirect_url or settings.invitation_redirect_url or "https://myapps.microsoft.com"
+        )
         try:
             client = await self._ensure_client()
             token = await self._get_token()
@@ -155,9 +159,7 @@ class MicrosoftGraphService:
             raise
         except Exception as exc:
             logger.error("graph_invitation_error", error=str(exc))
-            raise ExternalServiceError(
-                "Microsoft Graph", "Failed to send invitation"
-            ) from exc
+            raise ExternalServiceError("Microsoft Graph", "Failed to send invitation") from exc
 
     async def close(self) -> None:
         if self._client:

@@ -1,14 +1,13 @@
 """Tests for organization-related dependencies."""
 
 import uuid
-from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import datetime, timedelta
+from unittest.mock import MagicMock
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import (
-    LAST_LOGIN_THROTTLE,
     get_current_organization,
     get_current_user,
     require_org_role,
@@ -17,8 +16,7 @@ from app.core.deps import (
 from app.core.exceptions import ForbiddenError, NotFoundError
 from app.models.organization import Organization, OrganizationStatus
 from app.models.organization_membership import MembershipRole, OrganizationMembership
-from app.models.user import User
-from tests.conftest import ORGANIZATION_ID, make_test_organization, make_test_user
+from tests.conftest import make_test_organization, make_test_user
 
 
 @pytest.mark.asyncio
@@ -168,9 +166,7 @@ async def test_active_user_accepted(
     db_session.add(user)
     await db_session.flush()
 
-    result = await get_current_user(
-        request=mock_request, token=mock_token, db=db_session
-    )
+    result = await get_current_user(request=mock_request, token=mock_token, db=db_session)
     assert result.id == user.id
     assert result.is_active is True
 
@@ -187,16 +183,14 @@ async def test_last_login_updated_when_stale(
     db_session.add(org)
     await db_session.flush()
 
-    stale_time = datetime.now(timezone.utc) - timedelta(minutes=10)
+    stale_time = datetime.utcnow() - timedelta(minutes=10)
     user = make_test_user()
     user.entra_id = mock_token.oid
     user.last_login = stale_time
     db_session.add(user)
     await db_session.flush()
 
-    result = await get_current_user(
-        request=mock_request, token=mock_token, db=db_session
-    )
+    result = await get_current_user(request=mock_request, token=mock_token, db=db_session)
 
     assert result.last_login is not None
     assert result.last_login > stale_time
@@ -211,16 +205,14 @@ async def test_last_login_not_updated_when_recent(
     db_session.add(org)
     await db_session.flush()
 
-    recent_time = datetime.now(timezone.utc) - timedelta(minutes=1)
+    recent_time = datetime.utcnow() - timedelta(minutes=1)
     user = make_test_user()
     user.entra_id = mock_token.oid
     user.last_login = recent_time
     db_session.add(user)
     await db_session.flush()
 
-    result = await get_current_user(
-        request=mock_request, token=mock_token, db=db_session
-    )
+    result = await get_current_user(request=mock_request, token=mock_token, db=db_session)
 
     assert result.last_login == recent_time
 
@@ -240,9 +232,7 @@ async def test_last_login_set_when_none(
     db_session.add(user)
     await db_session.flush()
 
-    result = await get_current_user(
-        request=mock_request, token=mock_token, db=db_session
-    )
+    result = await get_current_user(request=mock_request, token=mock_token, db=db_session)
 
     assert result.last_login is not None
 

@@ -1,5 +1,5 @@
 import uuid
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 
 from fastapi import Depends, Header
 from sqlalchemy import select
@@ -59,7 +59,7 @@ async def get_current_organization(
     return membership.organization
 
 
-def require_org_role(*allowed_roles: MembershipRole) -> Callable[..., User]:
+def require_org_role(*allowed_roles: MembershipRole) -> Callable[..., Awaitable[User]]:
     async def _check_org_role(
         current_user: User = Depends(get_current_user),
         organization: Organization = Depends(get_current_organization),

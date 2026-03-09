@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 import structlog
 from fastapi import Depends, Request
@@ -98,7 +98,7 @@ async def get_current_user(
         logger.info("user_auto_provisioned", user_id=str(user.id), org_id=str(org.id))
 
         # Audit log for auto-provisioning
-        audit = await get_audit_logger(request, db)
+        audit = await get_audit_logger(request)
         await audit.log(
             action="user.auto_provisioned",
             user=user,
@@ -110,7 +110,7 @@ async def get_current_user(
     if not user.is_active:
         raise ForbiddenError("User account is deactivated")
 
-    now = datetime.now(timezone.utc)
+    now = datetime.utcnow()
 
     # Check session timeout — if last_activity is set and older than threshold, expire
     if user.last_activity is not None and (now - user.last_activity) > SESSION_TIMEOUT:
@@ -140,8 +140,10 @@ async def _get_or_create_org_for_tenant(
     if not azure_tenant_id:
         azure_tenant_id = str(uuid.uuid4())
 
-    org_id = uuid.UUID(azure_tenant_id) if len(azure_tenant_id) == 36 else uuid.uuid5(
-        uuid.NAMESPACE_URL, azure_tenant_id
+    org_id = (
+        uuid.UUID(azure_tenant_id)
+        if len(azure_tenant_id) == 36
+        else uuid.uuid5(uuid.NAMESPACE_URL, azure_tenant_id)
     )
 
     stmt = select(Organization).where(Organization.id == org_id)

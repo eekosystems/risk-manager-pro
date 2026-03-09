@@ -1,8 +1,6 @@
-from __future__ import annotations
-
 import enum
 import uuid
-from datetime import datetime
+from datetime import datetime  # noqa: TCH003
 from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, String, func
@@ -14,7 +12,7 @@ if TYPE_CHECKING:
     from app.models.organization_membership import OrganizationMembership
 
 
-class InvitationStatus(str, enum.Enum):
+class InvitationStatus(enum.StrEnum):
     ACTIVE = "active"
     INVITED = "invited"
     PROVISIONED = "provisioned"
@@ -36,7 +34,7 @@ class User(Base):
     last_login: Mapped[datetime | None] = mapped_column(default=None)
     last_activity: Mapped[datetime | None] = mapped_column(default=None)
 
-    memberships: Mapped[list[OrganizationMembership]] = relationship(
+    memberships: Mapped[list["OrganizationMembership"]] = relationship(
         back_populates="user",
         foreign_keys="OrganizationMembership.user_id",
     )

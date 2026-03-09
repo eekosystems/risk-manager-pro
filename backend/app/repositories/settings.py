@@ -11,9 +11,7 @@ class SettingsRepository:
     def __init__(self, db: AsyncSession) -> None:
         self._db = db
 
-    async def get(
-        self, organization_id: uuid.UUID, category: str
-    ) -> OrganizationSettings | None:
+    async def get(self, organization_id: uuid.UUID, category: str) -> OrganizationSettings | None:
         stmt = select(OrganizationSettings).where(
             OrganizationSettings.organization_id == organization_id,
             OrganizationSettings.category == category,
@@ -21,9 +19,7 @@ class SettingsRepository:
         result = await self._db.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def get_all(
-        self, organization_id: uuid.UUID
-    ) -> list[OrganizationSettings]:
+    async def get_all(self, organization_id: uuid.UUID) -> list[OrganizationSettings]:
         stmt = select(OrganizationSettings).where(
             OrganizationSettings.organization_id == organization_id,
         )

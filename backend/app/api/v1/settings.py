@@ -1,5 +1,3 @@
-import uuid
-
 import structlog
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -77,9 +75,7 @@ async def update_rag_settings(
     audit: AuditLogger = Depends(get_audit_logger),
 ) -> DataResponse[SettingsResponse]:
     """Update RAG pipeline settings. Requires org_admin role."""
-    result = await service.update_rag_settings(
-        organization.id, payload, current_user.id
-    )
+    result = await service.update_rag_settings(organization.id, payload, current_user.id)
     await audit.log(
         action="settings.rag.updated",
         user=current_user,
@@ -103,9 +99,7 @@ async def update_model_settings(
     audit: AuditLogger = Depends(get_audit_logger),
 ) -> DataResponse[SettingsResponse]:
     """Update AI model preferences. Requires org_admin role."""
-    result = await service.update_model_settings(
-        organization.id, payload, current_user.id
-    )
+    result = await service.update_model_settings(organization.id, payload, current_user.id)
     await audit.log(
         action="settings.model.updated",
         user=current_user,
@@ -129,9 +123,7 @@ async def update_prompts(
     audit: AuditLogger = Depends(get_audit_logger),
 ) -> DataResponse[SettingsResponse]:
     """Update system and function-specific prompts. Requires org_admin role."""
-    result = await service.update_prompts(
-        organization.id, payload, current_user.id
-    )
+    result = await service.update_prompts(organization.id, payload, current_user.id)
     await audit.log(
         action="settings.prompts.updated",
         user=current_user,

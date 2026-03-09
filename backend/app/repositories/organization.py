@@ -1,4 +1,5 @@
 import uuid
+from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -42,19 +43,12 @@ class OrganizationRepository:
         result = await self._db.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def list_all(
-        self, skip: int = 0, limit: int = 50
-    ) -> tuple[list[Organization], int]:
+    async def list_all(self, skip: int = 0, limit: int = 50) -> tuple[list[Organization], int]:
         count_stmt = select(func.count()).select_from(Organization)
         count_result = await self._db.execute(count_stmt)
         total = count_result.scalar_one()
 
-        stmt = (
-            select(Organization)
-            .order_by(Organization.name)
-            .offset(skip)
-            .limit(limit)
-        )
+        stmt = select(Organization).order_by(Organization.name).offset(skip).limit(limit)
         result = await self._db.execute(stmt)
         return list(result.scalars().all()), total
 
@@ -81,7 +75,7 @@ class OrganizationRepository:
         org_id: uuid.UUID,
         name: str | None = None,
         status: OrganizationStatus | None = None,
-        settings_json: dict | None = None,
+        settings_json: dict[str, Any] | None = None,
     ) -> Organization | None:
         org = await self.get_by_id(org_id)
         if not org:
@@ -93,4 +87,5 @@ class OrganizationRepository:
         if settings_json is not None:
             org.settings_json = settings_json
         await self._db.flush()
+        await self._db.refresh(org)
         return org

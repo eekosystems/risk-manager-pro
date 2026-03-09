@@ -108,9 +108,7 @@ class ConversationRepository:
         result = await self._db.execute(stmt)
         return list(result.scalars().all())
 
-    async def archive(
-        self, conversation_id: uuid.UUID, organization_id: uuid.UUID
-    ) -> bool:
+    async def archive(self, conversation_id: uuid.UUID, organization_id: uuid.UUID) -> bool:
         conversation = await self.get_by_id(conversation_id, organization_id)
         if not conversation:
             return False

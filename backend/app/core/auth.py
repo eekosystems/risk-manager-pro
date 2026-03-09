@@ -1,12 +1,17 @@
 import time
+from typing import TYPE_CHECKING, cast
 
 import httpx
+import jwt
 import structlog
-from jose import JWTError, jwt
+from jwt.exceptions import PyJWTError
 from pydantic import BaseModel
 
 from app.core.config import settings
 from app.core.exceptions import UnauthorizedError
+
+if TYPE_CHECKING:
+    from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
 
 logger = structlog.get_logger(__name__)
 
@@ -67,14 +72,14 @@ class EntraIDAuth:
                     )
                     raise UnauthorizedError("Token signing key not found")
 
-            key = self._jwks[kid]
+            jwk_data = self._jwks[kid]
+            public_key = cast("RSAPublicKey", jwt.algorithms.RSAAlgorithm.from_jwk(jwk_data))
             payload = jwt.decode(
                 token,
-                key,
+                public_key,
                 algorithms=["RS256"],
                 audience=settings.azure_ad_client_id,
                 issuer=settings.azure_ad_issuer,
-                options={"verify_at_hash": False},
             )
 
             return TokenPayload(
@@ -85,7 +90,7 @@ class EntraIDAuth:
                 name=payload.get("name"),
                 roles=payload.get("roles", []),
             )
-        except JWTError as e:
+        except PyJWTError as e:
             logger.warning(
                 "auth_failure",
                 reason="token_validation_failed",

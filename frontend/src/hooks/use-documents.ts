@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { deleteDocument, getDocuments, uploadDocument } from "@/api/documents";
-import { useOrganizationContext } from "@/context/organization-context";
+import { useOrganizationContext } from "@/hooks/use-organization-context";
 
 export function useDocuments() {
   const { activeOrganization } = useOrganizationContext();

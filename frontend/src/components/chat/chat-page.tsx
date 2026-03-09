@@ -4,7 +4,7 @@ import { useConversation, useSendMessage } from "@/hooks/use-chat";
 import { useUploadDocument } from "@/hooks/use-documents";
 import type { ChatMessage, FunctionType } from "@/types/api";
 
-import { useToast } from "@/components/ui/toast";
+import { useToast } from "@/hooks/use-toast";
 import { ChatInput } from "./chat-input";
 import { MessageList } from "./message-list";
 

@@ -6,8 +6,8 @@ After exceeding the threshold, the IP is locked out for the configured duration.
 Phase 1: in-memory dict (single-instance). Swap to Redis for multi-instance.
 """
 
-import time
 import threading
+import time
 
 from app.core.config import settings
 

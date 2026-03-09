@@ -44,9 +44,9 @@ variable "tags" {
   description = "Common tags applied to all resources"
   type        = map(string)
   default = {
-    project     = "risk-manager-pro"
-    managed_by  = "terraform"
-    client      = "faith-group"
-    compliance  = "soc2"
+    project    = "risk-manager-pro"
+    managed_by = "terraform"
+    client     = "faith-group"
+    compliance = "soc2"
   }
 }

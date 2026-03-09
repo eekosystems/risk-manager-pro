@@ -5,10 +5,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from app.core.exceptions import ConflictError, NotFoundError, ValidationError
-from app.models.organization import Organization, OrganizationStatus
+from app.core.exceptions import ConflictError, ForbiddenError, NotFoundError, ValidationError
 from app.models.organization_membership import MembershipRole, OrganizationMembership
-from app.models.user import User
 from app.services.organization import OrganizationService
 from tests.conftest import make_test_organization, make_test_user
 
@@ -161,9 +159,7 @@ async def test_remove_member(org_service: OrganizationService) -> None:
         user_id=user.id,
     )
 
-    org_service._membership_repo.remove_member.assert_awaited_once_with(
-        user.id, org.id
-    )
+    org_service._membership_repo.remove_member.assert_awaited_once_with(user.id, org.id)
 
 
 @pytest.mark.asyncio

@@ -5,14 +5,16 @@ Uses a real PostgreSQL database (from docker-compose) with per-test SAVEPOINT
 rollback for isolation. Azure services are mocked.
 """
 
+import os
 import uuid
 from collections.abc import AsyncGenerator
-from datetime import datetime, timezone
-from unittest.mock import AsyncMock
+from datetime import datetime
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from app.core.database import Base, get_db
 from app.core.deps import (
@@ -30,43 +32,34 @@ from app.models.organization_membership import MembershipRole, OrganizationMembe
 from app.models.user import User
 from app.services.audit import AuditLogger
 
-TEST_DATABASE_URL = (
-    "postgresql+asyncpg://rmp_dev:rmp_dev_password@localhost:5432/riskmanagerpro"
+TEST_DATABASE_URL = os.environ.get(
+    "DATABASE_URL",
+    "postgresql+asyncpg://rmp_dev:rmp_dev_password@localhost:5432/riskmanagerpro",
 )
-
-test_engine = create_async_engine(TEST_DATABASE_URL, echo=False)
-TestSessionFactory = async_sessionmaker(test_engine, expire_on_commit=False)
 
 ORGANIZATION_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
 
 
-@pytest.fixture(scope="session", autouse=True)
-async def setup_database() -> AsyncGenerator[None, None]:
-    async with test_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    yield
-    async with test_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-    await test_engine.dispose()
-
-
 @pytest.fixture
 async def db_session() -> AsyncGenerator[AsyncSession, None]:
-    async with test_engine.connect() as conn:
+    engine = create_async_engine(TEST_DATABASE_URL, echo=False)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    async with engine.connect() as conn:
         transaction = await conn.begin()
-        # Use a nested SAVEPOINT so that individual test operations
-        # (including those that internally commit) get properly rolled back
-        nested = await conn.begin_nested()
         session = AsyncSession(bind=conn, expire_on_commit=False)
 
         try:
             yield session
         finally:
             await session.close()
-            if nested.is_active:
-                await nested.rollback()
             if transaction.is_active:
                 await transaction.rollback()
+
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+    await engine.dispose()
 
 
 def make_test_organization(
@@ -104,8 +97,8 @@ def make_test_user(
         display_name=display_name,
         is_platform_admin=is_platform_admin,
         is_active=is_active,
-        created_at=datetime.now(timezone.utc),
-        last_login=datetime.now(timezone.utc),
+        created_at=datetime.utcnow(),
+        last_login=datetime.utcnow(),
     )
 
 
@@ -191,24 +184,24 @@ def mock_audit_logger() -> AsyncMock:
     return logger
 
 
-@pytest.fixture
-async def client(
+def _setup_app(
     db_session: AsyncSession,
-    test_user: User,
+    current_user: User,
     test_organization: Organization,
     mock_audit_logger: AsyncMock,
     mock_openai_client: AsyncMock,
     mock_rag_service: AsyncMock,
     mock_storage_service: AsyncMock,
     mock_search_indexer: AsyncMock,
-) -> AsyncGenerator[AsyncClient, None]:
+) -> FastAPI:
+    """Create a FastAPI app with dependency overrides for testing."""
     app = create_app()
 
     async def _override_db() -> AsyncGenerator[AsyncSession, None]:
         yield db_session
 
     app.dependency_overrides[get_db] = _override_db
-    app.dependency_overrides[get_current_user] = lambda: test_user
+    app.dependency_overrides[get_current_user] = lambda: current_user
     app.dependency_overrides[get_current_organization] = lambda: test_organization
     app.dependency_overrides[get_audit_logger] = lambda: mock_audit_logger
     app.dependency_overrides[get_openai_client] = lambda: mock_openai_client
@@ -216,15 +209,62 @@ async def client(
     app.dependency_overrides[get_storage_service] = lambda: mock_storage_service
     app.dependency_overrides[get_search_indexer] = lambda: mock_search_indexer
 
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
-        yield ac
+    # Set mock services registry so endpoints that access app.state.services work
+    # (lifespan doesn't run with ASGITransport)
+    mock_registry = MagicMock()
+    mock_registry.storage_service = mock_storage_service
+    mock_registry.openai_client = mock_openai_client
+    mock_registry.search_indexer = mock_search_indexer
+    mock_registry.rag_service = mock_rag_service
+    app.state.services = mock_registry
 
+    return app
+
+
+@pytest.fixture
+async def test_app(
+    db_session: AsyncSession,
+    test_user: User,
+    test_organization: Organization,
+    test_membership: OrganizationMembership,
+    mock_audit_logger: AsyncMock,
+    mock_openai_client: AsyncMock,
+    mock_rag_service: AsyncMock,
+    mock_storage_service: AsyncMock,
+    mock_search_indexer: AsyncMock,
+) -> AsyncGenerator[FastAPI, None]:
+    """FastAPI app with test user, organization, and membership seeded into the DB."""
+    # Seed entities into DB so FK constraints are satisfied
+    db_session.add(test_organization)
+    await db_session.flush()
+    db_session.add(test_user)
+    await db_session.flush()
+    db_session.add(test_membership)
+    await db_session.flush()
+
+    app = _setup_app(
+        db_session,
+        test_user,
+        test_organization,
+        mock_audit_logger,
+        mock_openai_client,
+        mock_rag_service,
+        mock_storage_service,
+        mock_search_indexer,
+    )
+    yield app
     app.dependency_overrides.clear()
 
 
 @pytest.fixture
-async def admin_client(
+async def client(test_app: FastAPI) -> AsyncGenerator[AsyncClient, None]:
+    transport = ASGITransport(app=test_app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        yield ac
+
+
+@pytest.fixture
+async def admin_app(
     db_session: AsyncSession,
     platform_admin_user: User,
     test_organization: Organization,
@@ -233,24 +273,30 @@ async def admin_client(
     mock_rag_service: AsyncMock,
     mock_storage_service: AsyncMock,
     mock_search_indexer: AsyncMock,
-) -> AsyncGenerator[AsyncClient, None]:
+) -> AsyncGenerator[FastAPI, None]:
+    """FastAPI app with platform admin user and organization seeded into the DB."""
+    db_session.add(test_organization)
+    await db_session.flush()
+    db_session.add(platform_admin_user)
+    await db_session.flush()
+
+    app = _setup_app(
+        db_session,
+        platform_admin_user,
+        test_organization,
+        mock_audit_logger,
+        mock_openai_client,
+        mock_rag_service,
+        mock_storage_service,
+        mock_search_indexer,
+    )
+    yield app
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture
+async def admin_client(admin_app: FastAPI) -> AsyncGenerator[AsyncClient, None]:
     """Client authenticated as a platform admin user."""
-    app = create_app()
-
-    async def _override_db() -> AsyncGenerator[AsyncSession, None]:
-        yield db_session
-
-    app.dependency_overrides[get_db] = _override_db
-    app.dependency_overrides[get_current_user] = lambda: platform_admin_user
-    app.dependency_overrides[get_current_organization] = lambda: test_organization
-    app.dependency_overrides[get_audit_logger] = lambda: mock_audit_logger
-    app.dependency_overrides[get_openai_client] = lambda: mock_openai_client
-    app.dependency_overrides[get_rag_service] = lambda: mock_rag_service
-    app.dependency_overrides[get_storage_service] = lambda: mock_storage_service
-    app.dependency_overrides[get_search_indexer] = lambda: mock_search_indexer
-
-    transport = ASGITransport(app=app)
+    transport = ASGITransport(app=admin_app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
-
-    app.dependency_overrides.clear()

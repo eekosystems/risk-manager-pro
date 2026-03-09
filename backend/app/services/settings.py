@@ -92,9 +92,7 @@ class SettingsService:
 
     # ── Read ──────────────────────────────────────────────────────────
 
-    async def get_settings(
-        self, organization_id: uuid.UUID, category: str
-    ) -> SettingsResponse:
+    async def get_settings(self, organization_id: uuid.UUID, category: str) -> SettingsResponse:
         row = await self._repo.get(organization_id, category)
         if row:
             return SettingsResponse(
@@ -108,9 +106,7 @@ class SettingsService:
             updated_at=None,
         )
 
-    async def get_all_settings(
-        self, organization_id: uuid.UUID
-    ) -> list[SettingsResponse]:
+    async def get_all_settings(self, organization_id: uuid.UUID) -> list[SettingsResponse]:
         rows = await self._repo.get_all(organization_id)
         saved_categories = {r.category for r in rows}
         result: list[SettingsResponse] = []
@@ -164,9 +160,7 @@ class SettingsService:
 
     # ── Helpers for other services ────────────────────────────────────
 
-    async def get_effective_rag_config(
-        self, organization_id: uuid.UUID
-    ) -> RagSettingsPayload:
+    async def get_effective_rag_config(self, organization_id: uuid.UUID) -> RagSettingsPayload:
         row = await self._repo.get(organization_id, "rag")
         if row:
             return RagSettingsPayload.model_validate(row.settings_json)
@@ -180,9 +174,7 @@ class SettingsService:
             return ModelPreferencesPayload.model_validate(row.settings_json)
         return DEFAULT_MODEL
 
-    async def get_effective_prompts(
-        self, organization_id: uuid.UUID
-    ) -> PromptsPayload:
+    async def get_effective_prompts(self, organization_id: uuid.UUID) -> PromptsPayload:
         row = await self._repo.get(organization_id, "prompts")
         if row:
             return PromptsPayload.model_validate(row.settings_json)

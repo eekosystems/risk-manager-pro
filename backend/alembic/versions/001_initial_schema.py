@@ -5,16 +5,18 @@ Revises:
 Create Date: 2026-03-02
 
 """
-from typing import Sequence, Union
+
+from collections.abc import Sequence
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects.postgresql import JSONB
 
+from alembic import op
+
 revision: str = "001"
-down_revision: Union[str, None] = None
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = None
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -40,9 +42,7 @@ def upgrade() -> None:
         "audit_log",
         sa.Column("id", sa.Uuid(), primary_key=True),
         sa.Column("timestamp", sa.DateTime(), server_default=sa.func.now(), index=True),
-        sa.Column(
-            "user_id", sa.Uuid(), sa.ForeignKey("users.id"), nullable=False, index=True
-        ),
+        sa.Column("user_id", sa.Uuid(), sa.ForeignKey("users.id"), nullable=False, index=True),
         sa.Column("action", sa.String(100), nullable=False, index=True),
         sa.Column("resource_type", sa.String(50), nullable=False),
         sa.Column("resource_id", sa.String(255), nullable=True),

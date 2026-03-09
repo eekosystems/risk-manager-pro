@@ -46,9 +46,7 @@ SYSTEM_PROMPTS: dict[FunctionType, str] = {
 }
 
 
-def _resolve_prompt(
-    function_type: FunctionType, prompts: PromptsPayload | None
-) -> str:
+def _resolve_prompt(function_type: FunctionType, prompts: PromptsPayload | None) -> str:
     """Get the prompt for a function type from org settings, falling back to hardcoded defaults."""
     if prompts is None:
         return SYSTEM_PROMPTS[function_type]
@@ -108,9 +106,7 @@ class ChatService:
         self, request: ChatRequest, user: User, organization_id: uuid.UUID
     ) -> ChatResponse:
         if request.conversation_id:
-            conversation = await self._repo.get_by_id(
-                request.conversation_id, organization_id
-            )
+            conversation = await self._repo.get_by_id(request.conversation_id, organization_id)
             if not conversation:
                 conversation = await self._repo.create(
                     user_id=user.id,

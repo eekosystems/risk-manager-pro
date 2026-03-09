@@ -7,7 +7,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.core.tasks import drain_all_tasks
-from app.models.user import User
 from app.services.audit import AuditLogger
 from tests.conftest import make_test_user
 
@@ -23,8 +22,7 @@ def mock_request() -> MagicMock:
 
 @pytest.mark.asyncio
 async def test_audit_log_creates_task(mock_request: MagicMock) -> None:
-    db = AsyncMock()
-    logger = AuditLogger(db=db, request=mock_request)
+    logger = AuditLogger(request=mock_request)
     user = make_test_user()
 
     with patch("app.services.audit.asyncio.create_task") as mock_create_task:
@@ -46,8 +44,7 @@ async def test_audit_log_creates_task(mock_request: MagicMock) -> None:
 
 @pytest.mark.asyncio
 async def test_audit_log_passes_organization_id(mock_request: MagicMock) -> None:
-    db = AsyncMock()
-    logger = AuditLogger(db=db, request=mock_request)
+    logger = AuditLogger(request=mock_request)
     user = make_test_user()
     org_id = uuid.uuid4()
 
@@ -73,8 +70,7 @@ async def test_audit_log_passes_organization_id(mock_request: MagicMock) -> None
 
 @pytest.mark.asyncio
 async def test_audit_log_with_metadata(mock_request: MagicMock) -> None:
-    db = AsyncMock()
-    logger = AuditLogger(db=db, request=mock_request)
+    logger = AuditLogger(request=mock_request)
     user = make_test_user()
 
     metadata = {"extra_key": "extra_value"}
@@ -95,8 +91,12 @@ async def test_audit_log_with_metadata(mock_request: MagicMock) -> None:
 @pytest.mark.asyncio
 async def test_audit_task_tracking(mock_request: MagicMock) -> None:
     """Verify that pending audit tasks are tracked and can be drained."""
-    db = AsyncMock()
-    logger = AuditLogger(db=db, request=mock_request)
+    from app.core.tasks import _background_tasks
+
+    # Clear any stale tasks from previous tests
+    _background_tasks.clear()
+
+    logger = AuditLogger(request=mock_request)
     user = make_test_user()
 
     # Track tasks created with real asyncio (mock the DB write)
@@ -110,7 +110,7 @@ async def test_audit_task_tracking(mock_request: MagicMock) -> None:
         )
 
         # Give the event loop a moment to schedule the task
-        await asyncio.sleep(0.01)
+        await asyncio.sleep(0.05)
 
         # Drain should complete without error
         await drain_all_tasks()
@@ -119,6 +119,5 @@ async def test_audit_task_tracking(mock_request: MagicMock) -> None:
 @pytest.mark.asyncio
 async def test_audit_logger_does_not_use_db_attribute(mock_request: MagicMock) -> None:
     """Verify the AuditLogger does not carry a dead _db attribute."""
-    db = AsyncMock()
-    logger = AuditLogger(db=db, request=mock_request)
+    logger = AuditLogger(request=mock_request)
     assert not hasattr(logger, "_db")

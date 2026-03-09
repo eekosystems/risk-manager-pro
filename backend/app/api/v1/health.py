@@ -24,13 +24,13 @@ class ReadyResponse(BaseModel):
 
 
 @router.get("/health", response_model=HealthResponse)
-@limiter.exempt
+@limiter.exempt  # type: ignore[untyped-decorator]
 async def health_check() -> HealthResponse:
     return HealthResponse(status="healthy", version=settings.app_version)
 
 
 @router.get("/health/ready", response_model=ReadyResponse)
-@limiter.exempt
+@limiter.exempt  # type: ignore[untyped-decorator]
 async def readiness_check(
     request: Request,
     db: AsyncSession = Depends(get_db),

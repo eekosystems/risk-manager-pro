@@ -34,13 +34,12 @@ class DocumentService:
         data: bytes,
     ) -> Document:
         if content_type not in ALLOWED_CONTENT_TYPES:
-            raise ValidationError(
-                f"Unsupported file type: {content_type}. "
-                f"Allowed: PDF, DOCX, TXT"
-            )
+            raise ValidationError(f"Unsupported file type: {content_type}. Allowed: PDF, DOCX, TXT")
 
         if len(data) > MAX_FILE_SIZE:
-            raise ValidationError(f"File exceeds maximum size of {MAX_FILE_SIZE // (1024*1024)} MB")
+            raise ValidationError(
+                f"File exceeds maximum size of {MAX_FILE_SIZE // (1024 * 1024)} MB"
+            )
 
         blob_path = f"{organization_id}/{uuid.uuid4()}/{filename}"
 
@@ -69,17 +68,13 @@ class DocumentService:
     ) -> tuple[list[Document], int]:
         return await self._repo.list_for_organization(organization_id, skip, limit)
 
-    async def get_document(
-        self, document_id: uuid.UUID, organization_id: uuid.UUID
-    ) -> Document:
+    async def get_document(self, document_id: uuid.UUID, organization_id: uuid.UUID) -> Document:
         document = await self._repo.get_by_id(document_id, organization_id)
         if not document:
             raise NotFoundError("Document", str(document_id))
         return document
 
-    async def delete_document(
-        self, document_id: uuid.UUID, organization_id: uuid.UUID
-    ) -> None:
+    async def delete_document(self, document_id: uuid.UUID, organization_id: uuid.UUID) -> None:
         document = await self._repo.get_by_id(document_id, organization_id)
         if not document:
             raise NotFoundError("Document", str(document_id))

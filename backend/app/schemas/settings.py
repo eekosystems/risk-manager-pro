@@ -3,8 +3,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-
 # ── RAG Settings ──────────────────────────────────────────────────────
+
 
 class RagSettingsPayload(BaseModel):
     chunk_size: int = Field(512, ge=100, le=4000)
@@ -19,6 +19,7 @@ class RagSettingsPayload(BaseModel):
 
 # ── Model Preferences ────────────────────────────────────────────────
 
+
 class ModelPreferencesPayload(BaseModel):
     chat_model: str = Field("gpt-4o")
     temperature: float = Field(0.3, ge=0.0, le=2.0)
@@ -31,6 +32,7 @@ class ModelPreferencesPayload(BaseModel):
 
 # ── Prompts ───────────────────────────────────────────────────────────
 
+
 class PromptsPayload(BaseModel):
     system_prompt: str = Field(..., min_length=1, max_length=10000)
     phl_prompt: str = Field(..., min_length=1, max_length=10000)
@@ -39,6 +41,7 @@ class PromptsPayload(BaseModel):
 
 
 # ── Generic Settings Response ─────────────────────────────────────────
+
 
 class SettingsResponse(BaseModel):
     category: str

@@ -1,15 +1,15 @@
 import { clsx } from "clsx";
 import { AlertTriangle, CheckCircle, Info, X, XCircle } from "lucide-react";
 import {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
   useRef,
   useState,
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
+
+import { ToastContext } from "./toast-context";
 
 type ToastVariant = "success" | "error" | "warning" | "info";
 
@@ -18,12 +18,6 @@ interface Toast {
   message: string;
   variant: ToastVariant;
 }
-
-interface ToastContextValue {
-  addToast: (message: string, variant?: ToastVariant) => void;
-}
-
-const ToastContext = createContext<ToastContextValue | null>(null);
 
 const VARIANT_STYLES: Record<ToastVariant, string> = {
   success: "border-green-200 bg-green-50 text-green-800",
@@ -108,12 +102,4 @@ export function ToastProvider({ children }: ToastProviderProps) {
       )}
     </ToastContext.Provider>
   );
-}
-
-export function useToast(): ToastContextValue {
-  const ctx = useContext(ToastContext);
-  if (!ctx) {
-    throw new Error("useToast must be used within a ToastProvider");
-  }
-  return ctx;
 }

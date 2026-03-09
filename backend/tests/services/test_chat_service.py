@@ -1,6 +1,7 @@
 """Tests for chat service."""
 
 import uuid
+from datetime import datetime
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -52,19 +53,27 @@ async def test_process_message_creates_conversation(
         conversation_id=conversation.id,
         role=MessageRole.USER,
         content="Test question",
+        created_at=datetime.utcnow(),
     )
     assistant_msg = Message(
         id=uuid.uuid4(),
         conversation_id=conversation.id,
         role=MessageRole.ASSISTANT,
         content="Test AI response.",
+        created_at=datetime.utcnow(),
     )
 
-    with patch.object(chat_service, "_repo") as mock_repo:
-        mock_repo.create.return_value = conversation
-        mock_repo.add_message.side_effect = [user_msg, assistant_msg]
-        mock_repo.get_messages.return_value = [user_msg]
+    mock_repo = AsyncMock()
+    mock_repo.create.return_value = conversation
+    mock_repo.add_message.side_effect = [user_msg, assistant_msg]
+    mock_repo.get_messages.return_value = [user_msg]
 
+    mock_settings = AsyncMock()
+
+    with (
+        patch.object(chat_service, "_repo", mock_repo),
+        patch.object(chat_service, "_settings", mock_settings),
+    ):
         request = ChatRequest(
             message="Test question",
             function_type=FunctionType.GENERAL,
@@ -105,23 +114,38 @@ async def test_process_message_includes_citations(
         conversation_id=conversation.id,
         role=MessageRole.ASSISTANT,
         content="Based on FAA AC 120-92B...",
-        citations=[{
-            "source": "FAA AC 120-92B",
-            "section": "Chapter 5",
-            "content": "FAA AC 120-92B guidance",
-            "score": 0.95,
-            "chunk_id": "doc1_0",
-        }],
+        citations=[
+            {
+                "source": "FAA AC 120-92B",
+                "section": "Chapter 5",
+                "content": "FAA AC 120-92B guidance",
+                "score": 0.95,
+                "chunk_id": "doc1_0",
+            }
+        ],
+        created_at=datetime.utcnow(),
     )
 
-    with patch.object(chat_service, "_repo") as mock_repo:
-        mock_repo.create.return_value = conversation
-        mock_repo.add_message.side_effect = [
-            Message(id=uuid.uuid4(), conversation_id=conversation.id, role=MessageRole.USER, content="test"),
-            assistant_msg,
-        ]
-        mock_repo.get_messages.return_value = []
+    mock_repo = AsyncMock()
+    mock_repo.create.return_value = conversation
+    mock_repo.add_message.side_effect = [
+        Message(
+            id=uuid.uuid4(),
+            conversation_id=conversation.id,
+            role=MessageRole.USER,
+            content="test",
+            created_at=datetime.utcnow(),
+        ),
+        assistant_msg,
+    ]
+    mock_repo.get_messages.return_value = []
 
+    mock_settings = AsyncMock()
+
+    with (
+        patch.object(chat_service, "_repo", mock_repo),
+        patch.object(chat_service, "_settings", mock_settings),
+    ):
         request = ChatRequest(
             message="Safety question",
             function_type=FunctionType.SRA,
@@ -154,16 +178,29 @@ async def test_process_message_handles_rag_failure(
         conversation_id=conversation.id,
         role=MessageRole.ASSISTANT,
         content="Response without context.",
+        created_at=datetime.utcnow(),
     )
 
-    with patch.object(chat_service, "_repo") as mock_repo:
-        mock_repo.create.return_value = conversation
-        mock_repo.add_message.side_effect = [
-            Message(id=uuid.uuid4(), conversation_id=conversation.id, role=MessageRole.USER, content="test"),
-            msg,
-        ]
-        mock_repo.get_messages.return_value = []
+    mock_repo = AsyncMock()
+    mock_repo.create.return_value = conversation
+    mock_repo.add_message.side_effect = [
+        Message(
+            id=uuid.uuid4(),
+            conversation_id=conversation.id,
+            role=MessageRole.USER,
+            content="test",
+            created_at=datetime.utcnow(),
+        ),
+        msg,
+    ]
+    mock_repo.get_messages.return_value = []
 
+    mock_settings = AsyncMock()
+
+    with (
+        patch.object(chat_service, "_repo", mock_repo),
+        patch.object(chat_service, "_settings", mock_settings),
+    ):
         request = ChatRequest(message="Test question")
         result = await chat_service.process_message(request, user, ORGANIZATION_ID)
 

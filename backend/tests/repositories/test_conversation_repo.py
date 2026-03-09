@@ -5,12 +5,12 @@ import uuid
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.conversation import Conversation, ConversationStatus, FunctionType
+from app.models.conversation import FunctionType
 from app.models.message import MessageRole
 from app.models.organization import Organization, OrganizationStatus
 from app.models.user import User
 from app.repositories.conversation import ConversationRepository
-from tests.conftest import ORGANIZATION_ID, make_test_organization, make_test_user
+from tests.conftest import make_test_organization, make_test_user
 
 
 async def _seed(db: AsyncSession) -> tuple[User, uuid.UUID]:
@@ -119,9 +119,7 @@ async def test_add_message_and_ordering(db_session: AsyncSession) -> None:
     user, org_id = await _seed(db_session)
     repo = ConversationRepository(db_session)
 
-    conversation = await repo.create(
-        user_id=user.id, organization_id=org_id
-    )
+    conversation = await repo.create(user_id=user.id, organization_id=org_id)
 
     await repo.add_message(
         conversation_id=conversation.id,
@@ -147,9 +145,7 @@ async def test_archive_conversation(db_session: AsyncSession) -> None:
     user, org_id = await _seed(db_session)
     repo = ConversationRepository(db_session)
 
-    conversation = await repo.create(
-        user_id=user.id, organization_id=org_id
-    )
+    conversation = await repo.create(user_id=user.id, organization_id=org_id)
 
     result = await repo.archive(conversation.id, org_id)
     assert result is True
@@ -202,7 +198,9 @@ async def test_add_message_isolation(db_session: AsyncSession) -> None:
     assert msg.content == "Valid message"
 
     # Should fail with wrong org
-    with pytest.raises(ValueError, match="not found"):
+    from app.core.exceptions import NotFoundError
+
+    with pytest.raises(NotFoundError):
         await repo.add_message(
             conversation_id=conv.id,
             organization_id=org_b,
