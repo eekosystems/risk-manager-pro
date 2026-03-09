@@ -6,7 +6,7 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.organization import Organization, OrganizationStatus
-from app.models.organization_membership import MembershipRole, OrganizationMembership
+from app.models.organization_membership import MembershipRole
 from app.models.user import User
 from app.repositories.organization import MembershipRepository, OrganizationRepository
 from tests.conftest import make_test_organization, make_test_user

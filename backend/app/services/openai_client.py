@@ -2,7 +2,7 @@ from collections.abc import AsyncGenerator
 
 import structlog
 from azure.identity.aio import DefaultAzureCredential, get_bearer_token_provider
-from openai import AsyncAzureOpenAI, APIStatusError, RateLimitError
+from openai import APIStatusError, AsyncAzureOpenAI, RateLimitError
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from app.core.config import settings

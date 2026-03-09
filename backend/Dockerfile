@@ -4,10 +4,9 @@ WORKDIR /build
 
 # Install dependencies first (layer caching — only re-runs when pyproject.toml changes)
 COPY pyproject.toml .
-RUN pip install --no-cache-dir --prefix=/install \
-    fastapi uvicorn[standard] sqlalchemy[asyncio] asyncpg pydantic pydantic-settings \
-    structlog python-jose[cryptography] httpx azure-identity azure-search-documents \
-    azure-storage-blob openai alembic tenacity python-multipart pypdf python-docx tiktoken
+# Create minimal package structure so pip can resolve deps from pyproject.toml
+RUN mkdir -p app && touch app/__init__.py && \
+    pip install --no-cache-dir --prefix=/install .
 
 FROM python:3.12-slim
 

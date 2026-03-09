@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import enum
 import uuid
-from datetime import datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, String, func
@@ -11,6 +10,8 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 
 if TYPE_CHECKING:
+    from datetime import datetime
+
     from app.models.organization_membership import OrganizationMembership
 
 

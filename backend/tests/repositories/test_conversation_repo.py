@@ -5,12 +5,12 @@ import uuid
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.conversation import Conversation, ConversationStatus, FunctionType
+from app.models.conversation import FunctionType
 from app.models.message import MessageRole
 from app.models.organization import Organization, OrganizationStatus
 from app.models.user import User
 from app.repositories.conversation import ConversationRepository
-from tests.conftest import ORGANIZATION_ID, make_test_organization, make_test_user
+from tests.conftest import make_test_organization, make_test_user
 
 
 async def _seed(db: AsyncSession) -> tuple[User, uuid.UUID]:

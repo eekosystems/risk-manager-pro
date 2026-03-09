@@ -12,7 +12,6 @@ from app.core.deps import (
     get_current_user,
     get_storage_service,
 )
-from app.core.exceptions import NotFoundError
 from app.core.tasks import track_task
 from app.models.organization import Organization
 from app.models.user import User

@@ -11,11 +11,9 @@ from app.core.deps import (
     require_org_role,
     require_platform_admin,
 )
-from app.core.exceptions import ForbiddenError
 from app.models.organization_membership import MembershipRole
 from app.models.user import User
 from app.schemas.common import DataResponse, MetaResponse
-from app.services.microsoft_graph import MicrosoftGraphService
 from app.schemas.organization import (
     AddMemberRequest,
     CreateOrganizationRequest,
@@ -26,6 +24,7 @@ from app.schemas.organization import (
     UpdateOrganizationRequest,
 )
 from app.services.audit import AuditLogger
+from app.services.microsoft_graph import MicrosoftGraphService
 from app.services.organization import OrganizationService
 
 router = APIRouter(prefix="/organizations", tags=["organizations"])

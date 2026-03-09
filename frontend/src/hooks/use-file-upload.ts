@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 
-import { useToast } from "@/components/ui/toast";
+import { useToast } from "@/hooks/use-toast";
 import { validateFiles, type ValidatedFile } from "@/lib/file-validation";
 
 export function useFileUpload() {

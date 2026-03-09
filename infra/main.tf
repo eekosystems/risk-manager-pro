@@ -72,13 +72,13 @@ module "container_app" {
 
   subnet_id = module.network.container_app_subnet_id
 
-  keyvault_uri             = module.keyvault.vault_uri
-  database_url             = module.database.connection_string
-  openai_endpoint          = module.ai_services.openai_endpoint
-  search_endpoint          = module.ai_services.search_endpoint
-  storage_account_name     = module.storage.storage_account_name
-  azure_ad_tenant_id       = var.azure_ad_tenant_id
-  azure_ad_client_id       = var.azure_ad_client_id
+  keyvault_uri               = module.keyvault.vault_uri
+  database_url               = module.database.connection_string
+  openai_endpoint            = module.ai_services.openai_endpoint
+  search_endpoint            = module.ai_services.search_endpoint
+  storage_account_name       = module.storage.storage_account_name
+  azure_ad_tenant_id         = var.azure_ad_tenant_id
+  azure_ad_client_id         = var.azure_ad_client_id
   log_analytics_workspace_id = module.monitoring.log_analytics_workspace_id
 }
 

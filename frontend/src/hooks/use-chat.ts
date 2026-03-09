@@ -6,7 +6,7 @@ import {
   getConversations,
   sendMessage,
 } from "@/api/chat";
-import { useOrganizationContext } from "@/context/organization-context";
+import { useOrganizationContext } from "@/hooks/use-organization-context";
 import type { ChatRequest } from "@/types/api";
 
 export function useConversations() {

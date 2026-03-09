@@ -1,7 +1,5 @@
 import {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useState,
@@ -12,14 +10,7 @@ import { useOrganizations } from "@/hooks/use-organization";
 import { setActiveOrganizationId } from "@/lib/api-client";
 import type { OrganizationSummary } from "@/types/api";
 
-interface OrganizationContextValue {
-  organizations: OrganizationSummary[];
-  activeOrganization: OrganizationSummary | null;
-  setActiveOrganization: (org: OrganizationSummary) => void;
-  isLoading: boolean;
-}
-
-const OrganizationContext = createContext<OrganizationContextValue | null>(null);
+import { OrganizationContext } from "./organization-context-value";
 
 const STORAGE_KEY = "rmp_active_org_id";
 
@@ -66,12 +57,4 @@ export function OrganizationProvider({ children }: OrganizationProviderProps) {
       {children}
     </OrganizationContext.Provider>
   );
-}
-
-export function useOrganizationContext(): OrganizationContextValue {
-  const ctx = useContext(OrganizationContext);
-  if (!ctx) {
-    throw new Error("useOrganizationContext must be used within an OrganizationProvider");
-  }
-  return ctx;
 }

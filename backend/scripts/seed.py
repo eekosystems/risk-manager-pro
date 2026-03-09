@@ -10,12 +10,11 @@ Usage:
 
 import asyncio
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import async_session_factory, engine, Base
+from app.core.database import async_session_factory
 from app.models.audit import AuditEntry
 from app.models.conversation import Conversation, ConversationStatus, FunctionType
 from app.models.document import Document, DocumentStatus
@@ -69,7 +68,7 @@ USERS = [
         display_name="Sarah Chen",
         is_platform_admin=True,
         is_active=True,
-        last_login=datetime(2024, 12, 15, 10, 30, tzinfo=timezone.utc),
+        last_login=datetime(2024, 12, 15, 10, 30, tzinfo=UTC),
     ),
     User(
         id=_id("user-mike"),
@@ -78,7 +77,7 @@ USERS = [
         display_name="Mike Rodriguez",
         is_platform_admin=False,
         is_active=True,
-        last_login=datetime(2024, 12, 14, 8, 0, tzinfo=timezone.utc),
+        last_login=datetime(2024, 12, 14, 8, 0, tzinfo=UTC),
     ),
     User(
         id=_id("user-emily"),
@@ -87,7 +86,7 @@ USERS = [
         display_name="Emily Park",
         is_platform_admin=False,
         is_active=True,
-        last_login=datetime(2024, 12, 13, 16, 45, tzinfo=timezone.utc),
+        last_login=datetime(2024, 12, 13, 16, 45, tzinfo=UTC),
     ),
 ]
 
@@ -478,7 +477,7 @@ async def _upsert(db: AsyncSession, model_class: type, instances: list[object]) 
     """Insert records that don't already exist (idempotent by primary key)."""
     created = 0
     for instance in instances:
-        pk = getattr(instance, "id")
+        pk = instance.id
         existing = await db.get(model_class, pk)
         if existing is None:
             db.add(instance)

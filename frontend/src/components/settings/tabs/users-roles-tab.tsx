@@ -22,7 +22,7 @@ import {
   removeMember,
   updateMemberRole,
 } from "@/api/organizations";
-import { useOrganizationContext } from "@/context/organization-context";
+import { useOrganizationContext } from "@/hooks/use-organization-context";
 import type { MembershipRole, OrganizationMember } from "@/types/api";
 
 const ROLE_CONFIG: Record<

@@ -3,7 +3,6 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-
 # ── RAG Settings ──────────────────────────────────────────────────────
 
 class RagSettingsPayload(BaseModel):

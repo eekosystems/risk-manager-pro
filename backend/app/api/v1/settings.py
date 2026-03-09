@@ -1,4 +1,3 @@
-import uuid
 
 import structlog
 from fastapi import APIRouter, Depends

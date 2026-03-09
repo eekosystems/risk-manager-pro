@@ -1,7 +1,7 @@
 """Tests for auth token validation."""
 
 import uuid
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import pytest
 from jose import jwt

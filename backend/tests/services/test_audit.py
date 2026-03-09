@@ -7,7 +7,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.core.tasks import drain_all_tasks
-from app.models.user import User
 from app.services.audit import AuditLogger
 from tests.conftest import make_test_user
 
