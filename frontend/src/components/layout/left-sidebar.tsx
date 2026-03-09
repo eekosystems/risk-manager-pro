@@ -37,18 +37,23 @@ export function LeftSidebar({
         isOpen ? "w-[300px] min-w-[300px]" : "w-[60px] min-w-[60px]",
       )}
     >
+      {/* Edge-centered toggle */}
+      <button
+        onClick={onToggle}
+        aria-label={isOpen ? "Collapse sidebar" : "Expand sidebar"}
+        className="absolute -right-3 top-1/2 z-30 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-400 shadow-sm transition-colors hover:bg-brand-50 hover:text-brand-500"
+      >
+        <ChevronRight
+          size={14}
+          className={clsx("transition-transform", isOpen && "rotate-180")}
+        />
+      </button>
+
       {isOpen ? (
         <div className="flex min-w-[300px] flex-col h-full">
           {/* Logo */}
-          <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+          <div className="flex items-center justify-center border-b border-gray-100 px-5 py-4">
             <img src="/logo.webp" alt="Faith Group" className="h-auto w-[200px]" />
-            <button
-              onClick={onToggle}
-              aria-label="Collapse sidebar"
-              className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-brand-50 hover:text-brand-500"
-            >
-              <ChevronRight size={16} className="rotate-180" />
-            </button>
           </div>
 
           {activeOrganization && (
@@ -71,15 +76,6 @@ export function LeftSidebar({
         </div>
       ) : (
         <div className="flex flex-col items-center h-full py-3">
-          {/* Collapsed toggle */}
-          <button
-            onClick={onToggle}
-            aria-label="Expand sidebar"
-            className="mb-4 rounded-lg p-2 text-gray-400 transition-colors hover:bg-brand-50 hover:text-brand-500"
-          >
-            <ChevronRight size={18} />
-          </button>
-
           {/* Collapsed nav icons */}
           <nav aria-label="Core functions" className="flex flex-col items-center gap-1">
             {FUNCTIONS.map((fn) => (
