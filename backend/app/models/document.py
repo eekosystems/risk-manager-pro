@@ -19,9 +19,7 @@ class Document(Base):
     __tablename__ = "documents"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    organization_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("organizations.id"), index=True
-    )
+    organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), index=True)
     uploaded_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
     filename: Mapped[str] = mapped_column(String(500))
     blob_path: Mapped[str] = mapped_column(String(1000))

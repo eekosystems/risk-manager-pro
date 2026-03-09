@@ -80,9 +80,7 @@ class MembershipRepository:
         await self._db.flush()
         return membership
 
-    async def remove_member(
-        self, user_id: uuid.UUID, organization_id: uuid.UUID
-    ) -> bool:
+    async def remove_member(self, user_id: uuid.UUID, organization_id: uuid.UUID) -> bool:
         membership = await self.get_membership(user_id, organization_id)
         if not membership:
             return False

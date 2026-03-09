@@ -43,7 +43,9 @@ async def test_process_document_pipeline(
         status=DocumentStatus.PROCESSING,
     )
 
-    mock_storage_service.download.return_value = b"This is a safety document with important content."
+    mock_storage_service.download.return_value = (
+        b"This is a safety document with important content."
+    )
     mock_openai_client.embed_batch.return_value = [[0.1] * 1536]
     processor._repo.get_by_id_system.return_value = doc
 

@@ -166,9 +166,7 @@ async def test_active_user_accepted(
     db_session.add(user)
     await db_session.flush()
 
-    result = await get_current_user(
-        request=mock_request, token=mock_token, db=db_session
-    )
+    result = await get_current_user(request=mock_request, token=mock_token, db=db_session)
     assert result.id == user.id
     assert result.is_active is True
 
@@ -192,9 +190,7 @@ async def test_last_login_updated_when_stale(
     db_session.add(user)
     await db_session.flush()
 
-    result = await get_current_user(
-        request=mock_request, token=mock_token, db=db_session
-    )
+    result = await get_current_user(request=mock_request, token=mock_token, db=db_session)
 
     assert result.last_login is not None
     assert result.last_login > stale_time
@@ -216,9 +212,7 @@ async def test_last_login_not_updated_when_recent(
     db_session.add(user)
     await db_session.flush()
 
-    result = await get_current_user(
-        request=mock_request, token=mock_token, db=db_session
-    )
+    result = await get_current_user(request=mock_request, token=mock_token, db=db_session)
 
     assert result.last_login == recent_time
 
@@ -238,9 +232,7 @@ async def test_last_login_set_when_none(
     db_session.add(user)
     await db_session.flush()
 
-    result = await get_current_user(
-        request=mock_request, token=mock_token, db=db_session
-    )
+    result = await get_current_user(request=mock_request, token=mock_token, db=db_session)
 
     assert result.last_login is not None
 

@@ -25,9 +25,7 @@ def _membership_to_response(membership: OrganizationMembership) -> MemberRespons
         email=membership.user.email if membership.user else "",
         display_name=membership.user.display_name if membership.user else "",
         invitation_status=(
-            membership.user.invitation_status
-            if membership.user
-            else InvitationStatus.ACTIVE.value
+            membership.user.invitation_status if membership.user else InvitationStatus.ACTIVE.value
         ),
         created_at=membership.created_at,
     )
@@ -75,9 +73,7 @@ class OrganizationService:
                 raise ForbiddenError("You are not a member of this organization")
         return org
 
-    async def verify_membership_or_admin(
-        self, org_id: uuid.UUID, user: User
-    ) -> None:
+    async def verify_membership_or_admin(self, org_id: uuid.UUID, user: User) -> None:
         if user.is_platform_admin:
             return
         membership = await self._membership_repo.get_membership(user.id, org_id)
@@ -259,9 +255,7 @@ class OrganizationService:
         membership = await self.update_member_role(organization_id, user_id, role)
         return _membership_to_response(membership)
 
-    async def remove_member(
-        self, organization_id: uuid.UUID, user_id: uuid.UUID
-    ) -> None:
+    async def remove_member(self, organization_id: uuid.UUID, user_id: uuid.UUID) -> None:
         removed = await self._membership_repo.remove_member(user_id, organization_id)
         if not removed:
             raise NotFoundError("Membership", f"{user_id}/{organization_id}")

@@ -1,6 +1,5 @@
 """Tests for organization endpoints."""
 
-
 import pytest
 from httpx import AsyncClient
 
@@ -75,9 +74,7 @@ async def test_admin_update_organization(admin_client: AsyncClient) -> None:
 @pytest.mark.asyncio
 async def test_admin_list_members(admin_client: AsyncClient) -> None:
     """Platform admin should be able to list members of any organization."""
-    response = await admin_client.get(
-        f"/api/v1/organizations/{ORGANIZATION_ID}/members"
-    )
+    response = await admin_client.get(f"/api/v1/organizations/{ORGANIZATION_ID}/members")
     assert response.status_code == 200
     body = response.json()
     assert "data" in body
@@ -87,9 +84,7 @@ async def test_admin_list_members(admin_client: AsyncClient) -> None:
 @pytest.mark.asyncio
 async def test_admin_get_organization(admin_client: AsyncClient) -> None:
     """Platform admin should be able to read any organization."""
-    response = await admin_client.get(
-        f"/api/v1/organizations/{ORGANIZATION_ID}"
-    )
+    response = await admin_client.get(f"/api/v1/organizations/{ORGANIZATION_ID}")
     assert response.status_code == 200
     body = response.json()
     assert body["data"]["id"] == str(ORGANIZATION_ID)

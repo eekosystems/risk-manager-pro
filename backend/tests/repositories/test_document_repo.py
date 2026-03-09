@@ -196,9 +196,7 @@ async def test_update_status_with_org_isolation(db_session: AsyncSession) -> Non
     )
 
     # Should succeed with matching org
-    await repo.update_status(
-        doc.id, DocumentStatus.INDEXED, chunk_count=5, organization_id=org_a
-    )
+    await repo.update_status(doc.id, DocumentStatus.INDEXED, chunk_count=5, organization_id=org_a)
     updated = await repo.get_by_id(doc.id, org_a)
     assert updated is not None
     assert updated.status == DocumentStatus.INDEXED

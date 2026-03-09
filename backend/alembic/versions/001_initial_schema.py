@@ -5,6 +5,7 @@ Revises:
 Create Date: 2026-03-02
 
 """
+
 from collections.abc import Sequence
 
 import sqlalchemy as sa
@@ -41,9 +42,7 @@ def upgrade() -> None:
         "audit_log",
         sa.Column("id", sa.Uuid(), primary_key=True),
         sa.Column("timestamp", sa.DateTime(), server_default=sa.func.now(), index=True),
-        sa.Column(
-            "user_id", sa.Uuid(), sa.ForeignKey("users.id"), nullable=False, index=True
-        ),
+        sa.Column("user_id", sa.Uuid(), sa.ForeignKey("users.id"), nullable=False, index=True),
         sa.Column("action", sa.String(100), nullable=False, index=True),
         sa.Column("resource_type", sa.String(50), nullable=False),
         sa.Column("resource_id", sa.String(255), nullable=True),

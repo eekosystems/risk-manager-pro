@@ -32,9 +32,7 @@ class Conversation(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
-    organization_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("organizations.id"), index=True
-    )
+    organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), index=True)
     title: Mapped[str] = mapped_column(String(500), default="New Conversation")
     function_type: Mapped[FunctionType] = mapped_column(
         Enum(FunctionType), default=FunctionType.GENERAL

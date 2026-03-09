@@ -89,9 +89,7 @@ async def get_organization(
 async def update_organization(
     org_id: uuid.UUID,
     payload: UpdateOrganizationRequest,
-    current_user: User = Depends(
-        require_org_role(MembershipRole.ORG_ADMIN)
-    ),
+    current_user: User = Depends(require_org_role(MembershipRole.ORG_ADMIN)),
     service: OrganizationService = Depends(_get_org_service),
     audit: AuditLogger = Depends(get_audit_logger),
 ) -> DataResponse[OrganizationResponse]:
@@ -122,9 +120,7 @@ async def update_organization(
 async def add_member(
     org_id: uuid.UUID,
     payload: AddMemberRequest,
-    current_user: User = Depends(
-        require_org_role(MembershipRole.ORG_ADMIN)
-    ),
+    current_user: User = Depends(require_org_role(MembershipRole.ORG_ADMIN)),
     service: OrganizationService = Depends(_get_org_service),
     graph: MicrosoftGraphService = Depends(get_graph_service),
     audit: AuditLogger = Depends(get_audit_logger),
@@ -172,15 +168,11 @@ async def update_member_role(
     org_id: uuid.UUID,
     user_id: uuid.UUID,
     payload: UpdateMemberRoleRequest,
-    current_user: User = Depends(
-        require_org_role(MembershipRole.ORG_ADMIN)
-    ),
+    current_user: User = Depends(require_org_role(MembershipRole.ORG_ADMIN)),
     service: OrganizationService = Depends(_get_org_service),
     audit: AuditLogger = Depends(get_audit_logger),
 ) -> DataResponse[MemberResponse]:
-    member_resp = await service.update_member_role_and_build_response(
-        org_id, user_id, payload.role
-    )
+    member_resp = await service.update_member_role_and_build_response(org_id, user_id, payload.role)
     await audit.log(
         action="organization.member_role_updated",
         user=current_user,
@@ -198,9 +190,7 @@ async def update_member_role(
 async def remove_member(
     org_id: uuid.UUID,
     user_id: uuid.UUID,
-    current_user: User = Depends(
-        require_org_role(MembershipRole.ORG_ADMIN)
-    ),
+    current_user: User = Depends(require_org_role(MembershipRole.ORG_ADMIN)),
     service: OrganizationService = Depends(_get_org_service),
     audit: AuditLogger = Depends(get_audit_logger),
 ) -> None:

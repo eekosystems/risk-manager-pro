@@ -140,8 +140,10 @@ async def _get_or_create_org_for_tenant(
     if not azure_tenant_id:
         azure_tenant_id = str(uuid.uuid4())
 
-    org_id = uuid.UUID(azure_tenant_id) if len(azure_tenant_id) == 36 else uuid.uuid5(
-        uuid.NAMESPACE_URL, azure_tenant_id
+    org_id = (
+        uuid.UUID(azure_tenant_id)
+        if len(azure_tenant_id) == 36
+        else uuid.uuid5(uuid.NAMESPACE_URL, azure_tenant_id)
     )
 
     stmt = select(Organization).where(Organization.id == org_id)

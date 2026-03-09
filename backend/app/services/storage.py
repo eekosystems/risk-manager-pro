@@ -49,9 +49,7 @@ class BlobStorageService:
             logger.warning("container_create_failed", container=container_name, error=str(e))
 
         blob_client = container_client.get_blob_client(blob_path)
-        await blob_client.upload_blob(
-            data, content_type=content_type, overwrite=True
-        )
+        await blob_client.upload_blob(data, content_type=content_type, overwrite=True)
         logger.info("blob_uploaded", path=blob_path, size=len(data))
         return blob_path
 

@@ -150,9 +150,7 @@ async def _write_audit_blob(
         from app.services.storage import BlobStorageService
 
         now = datetime.now(UTC)
-        blob_path = (
-            f"audit/{now.year}/{now.month:02d}/{now.day:02d}/{correlation_id}.json"
-        )
+        blob_path = f"audit/{now.year}/{now.month:02d}/{now.day:02d}/{correlation_id}.json"
 
         audit_data = {
             "timestamp": now.isoformat(),

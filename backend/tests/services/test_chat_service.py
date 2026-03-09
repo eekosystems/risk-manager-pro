@@ -105,19 +105,26 @@ async def test_process_message_includes_citations(
         conversation_id=conversation.id,
         role=MessageRole.ASSISTANT,
         content="Based on FAA AC 120-92B...",
-        citations=[{
-            "source": "FAA AC 120-92B",
-            "section": "Chapter 5",
-            "content": "FAA AC 120-92B guidance",
-            "score": 0.95,
-            "chunk_id": "doc1_0",
-        }],
+        citations=[
+            {
+                "source": "FAA AC 120-92B",
+                "section": "Chapter 5",
+                "content": "FAA AC 120-92B guidance",
+                "score": 0.95,
+                "chunk_id": "doc1_0",
+            }
+        ],
     )
 
     with patch.object(chat_service, "_repo") as mock_repo:
         mock_repo.create.return_value = conversation
         mock_repo.add_message.side_effect = [
-            Message(id=uuid.uuid4(), conversation_id=conversation.id, role=MessageRole.USER, content="test"),
+            Message(
+                id=uuid.uuid4(),
+                conversation_id=conversation.id,
+                role=MessageRole.USER,
+                content="test",
+            ),
             assistant_msg,
         ]
         mock_repo.get_messages.return_value = []
@@ -159,7 +166,12 @@ async def test_process_message_handles_rag_failure(
     with patch.object(chat_service, "_repo") as mock_repo:
         mock_repo.create.return_value = conversation
         mock_repo.add_message.side_effect = [
-            Message(id=uuid.uuid4(), conversation_id=conversation.id, role=MessageRole.USER, content="test"),
+            Message(
+                id=uuid.uuid4(),
+                conversation_id=conversation.id,
+                role=MessageRole.USER,
+                content="test",
+            ),
             msg,
         ]
         mock_repo.get_messages.return_value = []

@@ -159,9 +159,7 @@ async def test_remove_member(org_service: OrganizationService) -> None:
         user_id=user.id,
     )
 
-    org_service._membership_repo.remove_member.assert_awaited_once_with(
-        user.id, org.id
-    )
+    org_service._membership_repo.remove_member.assert_awaited_once_with(user.id, org.id)
 
 
 @pytest.mark.asyncio

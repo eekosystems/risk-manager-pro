@@ -30,9 +30,7 @@ from app.models.organization_membership import MembershipRole, OrganizationMembe
 from app.models.user import User
 from app.services.audit import AuditLogger
 
-TEST_DATABASE_URL = (
-    "postgresql+asyncpg://rmp_dev:rmp_dev_password@localhost:5432/riskmanagerpro"
-)
+TEST_DATABASE_URL = "postgresql+asyncpg://rmp_dev:rmp_dev_password@localhost:5432/riskmanagerpro"
 
 test_engine = create_async_engine(TEST_DATABASE_URL, echo=False)
 TestSessionFactory = async_sessionmaker(test_engine, expire_on_commit=False)

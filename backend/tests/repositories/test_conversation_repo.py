@@ -119,9 +119,7 @@ async def test_add_message_and_ordering(db_session: AsyncSession) -> None:
     user, org_id = await _seed(db_session)
     repo = ConversationRepository(db_session)
 
-    conversation = await repo.create(
-        user_id=user.id, organization_id=org_id
-    )
+    conversation = await repo.create(user_id=user.id, organization_id=org_id)
 
     await repo.add_message(
         conversation_id=conversation.id,
@@ -147,9 +145,7 @@ async def test_archive_conversation(db_session: AsyncSession) -> None:
     user, org_id = await _seed(db_session)
     repo = ConversationRepository(db_session)
 
-    conversation = await repo.create(
-        user_id=user.id, organization_id=org_id
-    )
+    conversation = await repo.create(user_id=user.id, organization_id=org_id)
 
     result = await repo.archive(conversation.id, org_id)
     assert result is True

@@ -24,15 +24,11 @@ class MembershipRole(enum.StrEnum):
 
 class OrganizationMembership(Base):
     __tablename__ = "organization_memberships"
-    __table_args__ = (
-        UniqueConstraint("user_id", "organization_id", name="uq_user_organization"),
-    )
+    __table_args__ = (UniqueConstraint("user_id", "organization_id", name="uq_user_organization"),)
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
-    organization_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("organizations.id"), index=True
-    )
+    organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), index=True)
     role: Mapped[MembershipRole] = mapped_column(
         Enum(MembershipRole), default=MembershipRole.VIEWER
     )

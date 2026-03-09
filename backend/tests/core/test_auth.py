@@ -115,6 +115,7 @@ async def test_expired_token_raises_unauthorized() -> None:
 
         with patch("app.core.auth.jwt.decode") as mock_decode:
             from jwt.exceptions import PyJWTError
+
             mock_decode.side_effect = PyJWTError("Token expired")
 
             with pytest.raises(UnauthorizedError):
@@ -133,6 +134,7 @@ async def test_wrong_audience_raises_unauthorized() -> None:
 
         with patch("app.core.auth.jwt.decode") as mock_decode:
             from jwt.exceptions import PyJWTError
+
             mock_decode.side_effect = PyJWTError("Invalid audience")
 
             with pytest.raises(UnauthorizedError):

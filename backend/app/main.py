@@ -69,35 +69,30 @@ class ServiceRegistry:
 
     @property
     def openai_client(self) -> AzureOpenAIClient:
-
         if self._openai_client is None:
             raise RuntimeError("ServiceRegistry not initialized — call startup() first")
         return self._openai_client
 
     @property
     def rag_service(self) -> RAGService:
-
         if self._rag_service is None:
             raise RuntimeError("ServiceRegistry not initialized — call startup() first")
         return self._rag_service
 
     @property
     def storage_service(self) -> BlobStorageService:
-
         if self._storage_service is None:
             raise RuntimeError("ServiceRegistry not initialized — call startup() first")
         return self._storage_service
 
     @property
     def search_indexer(self) -> SearchIndexer:
-
         if self._search_indexer is None:
             raise RuntimeError("ServiceRegistry not initialized — call startup() first")
         return self._search_indexer
 
     @property
     def graph_service(self) -> MicrosoftGraphService:
-
         if self._graph_service is None:
             raise RuntimeError("ServiceRegistry not initialized — call startup() first")
         return self._graph_service

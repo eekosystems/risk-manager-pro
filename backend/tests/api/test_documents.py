@@ -86,9 +86,7 @@ async def test_delete_document(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
-async def test_upload_invalid_content_type(
-    client: AsyncClient, test_user: User
-) -> None:
+async def test_upload_invalid_content_type(client: AsyncClient, test_user: User) -> None:
     from app.core.exceptions import ValidationError
 
     with patch("app.api.v1.documents._get_document_service") as mock_factory:

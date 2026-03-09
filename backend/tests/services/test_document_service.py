@@ -25,9 +25,7 @@ def document_service(mock_storage_service: AsyncMock) -> DocumentService:
 
 
 @pytest.mark.asyncio
-async def test_upload_validates_content_type(
-    document_service: DocumentService, user: User
-) -> None:
+async def test_upload_validates_content_type(document_service: DocumentService, user: User) -> None:
     with pytest.raises(ValidationError, match="Unsupported file type"):
         await document_service.upload(
             user=user,
@@ -39,9 +37,7 @@ async def test_upload_validates_content_type(
 
 
 @pytest.mark.asyncio
-async def test_upload_validates_file_size(
-    document_service: DocumentService, user: User
-) -> None:
+async def test_upload_validates_file_size(document_service: DocumentService, user: User) -> None:
     oversized_data = b"x" * (MAX_FILE_SIZE + 1)
     with pytest.raises(ValidationError, match="exceeds maximum size"):
         await document_service.upload(
@@ -86,9 +82,7 @@ async def test_upload_stores_and_creates_document(
 
 
 @pytest.mark.asyncio
-async def test_get_document_not_found(
-    document_service: DocumentService, user: User
-) -> None:
+async def test_get_document_not_found(document_service: DocumentService, user: User) -> None:
     document_service._repo = AsyncMock()
     document_service._repo.get_by_id.return_value = None
 

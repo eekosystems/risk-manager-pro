@@ -115,8 +115,7 @@ async def create_or_update_index(index_name: str | None = None) -> str:
     """Create or update the search index in Azure AI Search."""
     if not settings.azure_search_endpoint:
         raise RuntimeError(
-            "AZURE_SEARCH_ENDPOINT is not configured. "
-            "Set it in .env or environment variables."
+            "AZURE_SEARCH_ENDPOINT is not configured. Set it in .env or environment variables."
         )
 
     index = build_index_schema(index_name)
