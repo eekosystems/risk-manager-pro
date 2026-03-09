@@ -32,7 +32,7 @@ export function RightPanel({
       <button
         onClick={onToggle}
         aria-label={isOpen ? "Collapse panel" : "Expand panel"}
-        className="absolute left-0 top-1/2 z-30 -translate-x-full -translate-y-1/2 rounded-l-lg border border-r-0 border-gray-200 bg-white p-1.5 text-gray-400 shadow-sm transition-colors hover:bg-brand-50 hover:text-brand-500"
+        className="absolute left-0 top-1/2 z-30 -translate-x-full -translate-y-1/2 rounded-l-lg border border-r-0 border-gray-200 bg-white px-1 py-3 text-gray-400 shadow-md transition-colors hover:bg-brand-50 hover:text-brand-500"
       >
         <ChevronRight
           size={16}
