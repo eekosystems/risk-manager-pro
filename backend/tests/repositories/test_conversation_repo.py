@@ -198,7 +198,9 @@ async def test_add_message_isolation(db_session: AsyncSession) -> None:
     assert msg.content == "Valid message"
 
     # Should fail with wrong org
-    with pytest.raises(ValueError, match="not found"):
+    from app.core.exceptions import NotFoundError
+
+    with pytest.raises(NotFoundError):
         await repo.add_message(
             conversation_id=conv.id,
             organization_id=org_b,

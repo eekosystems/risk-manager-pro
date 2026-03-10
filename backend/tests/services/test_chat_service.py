@@ -1,6 +1,7 @@
 """Tests for chat service."""
 
 import uuid
+from datetime import datetime
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -52,12 +53,14 @@ async def test_process_message_creates_conversation(
         conversation_id=conversation.id,
         role=MessageRole.USER,
         content="Test question",
+        created_at=datetime.utcnow(),
     )
     assistant_msg = Message(
         id=uuid.uuid4(),
         conversation_id=conversation.id,
         role=MessageRole.ASSISTANT,
         content="Test AI response.",
+        created_at=datetime.utcnow(),
     )
 
     mock_repo = AsyncMock()
@@ -120,6 +123,7 @@ async def test_process_message_includes_citations(
                 "chunk_id": "doc1_0",
             }
         ],
+        created_at=datetime.utcnow(),
     )
 
     mock_repo = AsyncMock()
@@ -130,6 +134,7 @@ async def test_process_message_includes_citations(
             conversation_id=conversation.id,
             role=MessageRole.USER,
             content="test",
+            created_at=datetime.utcnow(),
         ),
         assistant_msg,
     ]
@@ -173,6 +178,7 @@ async def test_process_message_handles_rag_failure(
         conversation_id=conversation.id,
         role=MessageRole.ASSISTANT,
         content="Response without context.",
+        created_at=datetime.utcnow(),
     )
 
     mock_repo = AsyncMock()
@@ -183,6 +189,7 @@ async def test_process_message_handles_rag_failure(
             conversation_id=conversation.id,
             role=MessageRole.USER,
             content="test",
+            created_at=datetime.utcnow(),
         ),
         msg,
     ]

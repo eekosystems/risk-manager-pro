@@ -12,6 +12,7 @@ from datetime import datetime
 from unittest.mock import AsyncMock
 
 import pytest
+from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
@@ -183,24 +184,24 @@ def mock_audit_logger() -> AsyncMock:
     return logger
 
 
-@pytest.fixture
-async def client(
+def _setup_app(
     db_session: AsyncSession,
-    test_user: User,
+    current_user: User,
     test_organization: Organization,
     mock_audit_logger: AsyncMock,
     mock_openai_client: AsyncMock,
     mock_rag_service: AsyncMock,
     mock_storage_service: AsyncMock,
     mock_search_indexer: AsyncMock,
-) -> AsyncGenerator[AsyncClient, None]:
+) -> FastAPI:
+    """Create a FastAPI app with dependency overrides for testing."""
     app = create_app()
 
     async def _override_db() -> AsyncGenerator[AsyncSession, None]:
         yield db_session
 
     app.dependency_overrides[get_db] = _override_db
-    app.dependency_overrides[get_current_user] = lambda: test_user
+    app.dependency_overrides[get_current_user] = lambda: current_user
     app.dependency_overrides[get_current_organization] = lambda: test_organization
     app.dependency_overrides[get_audit_logger] = lambda: mock_audit_logger
     app.dependency_overrides[get_openai_client] = lambda: mock_openai_client
@@ -208,15 +209,53 @@ async def client(
     app.dependency_overrides[get_storage_service] = lambda: mock_storage_service
     app.dependency_overrides[get_search_indexer] = lambda: mock_search_indexer
 
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
-        yield ac
+    return app
 
+
+@pytest.fixture
+async def test_app(
+    db_session: AsyncSession,
+    test_user: User,
+    test_organization: Organization,
+    test_membership: OrganizationMembership,
+    mock_audit_logger: AsyncMock,
+    mock_openai_client: AsyncMock,
+    mock_rag_service: AsyncMock,
+    mock_storage_service: AsyncMock,
+    mock_search_indexer: AsyncMock,
+) -> AsyncGenerator[FastAPI, None]:
+    """FastAPI app with test user, organization, and membership seeded into the DB."""
+    # Seed entities into DB so FK constraints are satisfied
+    db_session.add(test_organization)
+    await db_session.flush()
+    db_session.add(test_user)
+    await db_session.flush()
+    db_session.add(test_membership)
+    await db_session.flush()
+
+    app = _setup_app(
+        db_session,
+        test_user,
+        test_organization,
+        mock_audit_logger,
+        mock_openai_client,
+        mock_rag_service,
+        mock_storage_service,
+        mock_search_indexer,
+    )
+    yield app
     app.dependency_overrides.clear()
 
 
 @pytest.fixture
-async def admin_client(
+async def client(test_app: FastAPI) -> AsyncGenerator[AsyncClient, None]:
+    transport = ASGITransport(app=test_app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        yield ac
+
+
+@pytest.fixture
+async def admin_app(
     db_session: AsyncSession,
     platform_admin_user: User,
     test_organization: Organization,
@@ -225,24 +264,30 @@ async def admin_client(
     mock_rag_service: AsyncMock,
     mock_storage_service: AsyncMock,
     mock_search_indexer: AsyncMock,
-) -> AsyncGenerator[AsyncClient, None]:
+) -> AsyncGenerator[FastAPI, None]:
+    """FastAPI app with platform admin user and organization seeded into the DB."""
+    db_session.add(test_organization)
+    await db_session.flush()
+    db_session.add(platform_admin_user)
+    await db_session.flush()
+
+    app = _setup_app(
+        db_session,
+        platform_admin_user,
+        test_organization,
+        mock_audit_logger,
+        mock_openai_client,
+        mock_rag_service,
+        mock_storage_service,
+        mock_search_indexer,
+    )
+    yield app
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture
+async def admin_client(admin_app: FastAPI) -> AsyncGenerator[AsyncClient, None]:
     """Client authenticated as a platform admin user."""
-    app = create_app()
-
-    async def _override_db() -> AsyncGenerator[AsyncSession, None]:
-        yield db_session
-
-    app.dependency_overrides[get_db] = _override_db
-    app.dependency_overrides[get_current_user] = lambda: platform_admin_user
-    app.dependency_overrides[get_current_organization] = lambda: test_organization
-    app.dependency_overrides[get_audit_logger] = lambda: mock_audit_logger
-    app.dependency_overrides[get_openai_client] = lambda: mock_openai_client
-    app.dependency_overrides[get_rag_service] = lambda: mock_rag_service
-    app.dependency_overrides[get_storage_service] = lambda: mock_storage_service
-    app.dependency_overrides[get_search_indexer] = lambda: mock_search_indexer
-
-    transport = ASGITransport(app=app)
+    transport = ASGITransport(app=admin_app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
-
-    app.dependency_overrides.clear()

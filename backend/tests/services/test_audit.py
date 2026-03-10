@@ -91,6 +91,11 @@ async def test_audit_log_with_metadata(mock_request: MagicMock) -> None:
 @pytest.mark.asyncio
 async def test_audit_task_tracking(mock_request: MagicMock) -> None:
     """Verify that pending audit tasks are tracked and can be drained."""
+    from app.core.tasks import _background_tasks
+
+    # Clear any stale tasks from previous tests
+    _background_tasks.clear()
+
     logger = AuditLogger(request=mock_request)
     user = make_test_user()
 
@@ -105,7 +110,7 @@ async def test_audit_task_tracking(mock_request: MagicMock) -> None:
         )
 
         # Give the event loop a moment to schedule the task
-        await asyncio.sleep(0.01)
+        await asyncio.sleep(0.05)
 
         # Drain should complete without error
         await drain_all_tasks()
