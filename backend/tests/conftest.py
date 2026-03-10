@@ -8,7 +8,7 @@ rollback for isolation. Azure services are mocked.
 import os
 import uuid
 from collections.abc import AsyncGenerator
-from datetime import UTC, datetime
+from datetime import datetime
 from unittest.mock import AsyncMock
 
 import pytest
@@ -96,8 +96,8 @@ def make_test_user(
         display_name=display_name,
         is_platform_admin=is_platform_admin,
         is_active=is_active,
-        created_at=datetime.now(UTC),
-        last_login=datetime.now(UTC),
+        created_at=datetime.utcnow(),
+        last_login=datetime.utcnow(),
     )
 
 

@@ -1,7 +1,7 @@
 """Tests for document endpoints."""
 
 import uuid
-from datetime import UTC, datetime
+from datetime import datetime
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -23,8 +23,8 @@ def _make_document(organization_id: uuid.UUID, user_id: uuid.UUID) -> Document:
         size_bytes=1024,
         status=DocumentStatus.UPLOADED,
         chunk_count=0,
-        created_at=datetime.now(UTC),
-        updated_at=datetime.now(UTC),
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow(),
     )
     return doc
 

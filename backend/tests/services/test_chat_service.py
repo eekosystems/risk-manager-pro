@@ -60,11 +60,17 @@ async def test_process_message_creates_conversation(
         content="Test AI response.",
     )
 
-    with patch.object(chat_service, "_repo") as mock_repo:
-        mock_repo.create.return_value = conversation
-        mock_repo.add_message.side_effect = [user_msg, assistant_msg]
-        mock_repo.get_messages.return_value = [user_msg]
+    mock_repo = AsyncMock()
+    mock_repo.create.return_value = conversation
+    mock_repo.add_message.side_effect = [user_msg, assistant_msg]
+    mock_repo.get_messages.return_value = [user_msg]
 
+    mock_settings = AsyncMock()
+
+    with (
+        patch.object(chat_service, "_repo", mock_repo),
+        patch.object(chat_service, "_settings", mock_settings),
+    ):
         request = ChatRequest(
             message="Test question",
             function_type=FunctionType.GENERAL,
@@ -116,19 +122,25 @@ async def test_process_message_includes_citations(
         ],
     )
 
-    with patch.object(chat_service, "_repo") as mock_repo:
-        mock_repo.create.return_value = conversation
-        mock_repo.add_message.side_effect = [
-            Message(
-                id=uuid.uuid4(),
-                conversation_id=conversation.id,
-                role=MessageRole.USER,
-                content="test",
-            ),
-            assistant_msg,
-        ]
-        mock_repo.get_messages.return_value = []
+    mock_repo = AsyncMock()
+    mock_repo.create.return_value = conversation
+    mock_repo.add_message.side_effect = [
+        Message(
+            id=uuid.uuid4(),
+            conversation_id=conversation.id,
+            role=MessageRole.USER,
+            content="test",
+        ),
+        assistant_msg,
+    ]
+    mock_repo.get_messages.return_value = []
 
+    mock_settings = AsyncMock()
+
+    with (
+        patch.object(chat_service, "_repo", mock_repo),
+        patch.object(chat_service, "_settings", mock_settings),
+    ):
         request = ChatRequest(
             message="Safety question",
             function_type=FunctionType.SRA,
@@ -163,19 +175,25 @@ async def test_process_message_handles_rag_failure(
         content="Response without context.",
     )
 
-    with patch.object(chat_service, "_repo") as mock_repo:
-        mock_repo.create.return_value = conversation
-        mock_repo.add_message.side_effect = [
-            Message(
-                id=uuid.uuid4(),
-                conversation_id=conversation.id,
-                role=MessageRole.USER,
-                content="test",
-            ),
-            msg,
-        ]
-        mock_repo.get_messages.return_value = []
+    mock_repo = AsyncMock()
+    mock_repo.create.return_value = conversation
+    mock_repo.add_message.side_effect = [
+        Message(
+            id=uuid.uuid4(),
+            conversation_id=conversation.id,
+            role=MessageRole.USER,
+            content="test",
+        ),
+        msg,
+    ]
+    mock_repo.get_messages.return_value = []
 
+    mock_settings = AsyncMock()
+
+    with (
+        patch.object(chat_service, "_repo", mock_repo),
+        patch.object(chat_service, "_settings", mock_settings),
+    ):
         request = ChatRequest(message="Test question")
         result = await chat_service.process_message(request, user, ORGANIZATION_ID)
 

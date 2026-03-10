@@ -1,7 +1,7 @@
 """Tests for organization-related dependencies."""
 
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from unittest.mock import MagicMock
 
 import pytest
@@ -183,7 +183,7 @@ async def test_last_login_updated_when_stale(
     db_session.add(org)
     await db_session.flush()
 
-    stale_time = datetime.now(UTC) - timedelta(minutes=10)
+    stale_time = datetime.utcnow() - timedelta(minutes=10)
     user = make_test_user()
     user.entra_id = mock_token.oid
     user.last_login = stale_time
@@ -205,7 +205,7 @@ async def test_last_login_not_updated_when_recent(
     db_session.add(org)
     await db_session.flush()
 
-    recent_time = datetime.now(UTC) - timedelta(minutes=1)
+    recent_time = datetime.utcnow() - timedelta(minutes=1)
     user = make_test_user()
     user.entra_id = mock_token.oid
     user.last_login = recent_time
