@@ -13,7 +13,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from app.core.database import Base, get_db
 from app.core.deps import (
@@ -36,39 +36,29 @@ TEST_DATABASE_URL = os.environ.get(
     "postgresql+asyncpg://rmp_dev:rmp_dev_password@localhost:5432/riskmanagerpro",
 )
 
-test_engine = create_async_engine(TEST_DATABASE_URL, echo=False)
-TestSessionFactory = async_sessionmaker(test_engine, expire_on_commit=False)
-
 ORGANIZATION_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
-
-
-@pytest.fixture(scope="session", autouse=True)
-async def setup_database() -> AsyncGenerator[None, None]:
-    async with test_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    yield
-    async with test_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-    await test_engine.dispose()
 
 
 @pytest.fixture
 async def db_session() -> AsyncGenerator[AsyncSession, None]:
-    async with test_engine.connect() as conn:
+    engine = create_async_engine(TEST_DATABASE_URL, echo=False)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    async with engine.connect() as conn:
         transaction = await conn.begin()
-        # Use a nested SAVEPOINT so that individual test operations
-        # (including those that internally commit) get properly rolled back
-        nested = await conn.begin_nested()
         session = AsyncSession(bind=conn, expire_on_commit=False)
 
         try:
             yield session
         finally:
             await session.close()
-            if nested.is_active:
-                await nested.rollback()
             if transaction.is_active:
                 await transaction.rollback()
+
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+    await engine.dispose()
 
 
 def make_test_organization(
