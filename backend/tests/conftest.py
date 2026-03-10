@@ -9,7 +9,7 @@ import os
 import uuid
 from collections.abc import AsyncGenerator
 from datetime import datetime
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi import FastAPI
@@ -208,6 +208,15 @@ def _setup_app(
     app.dependency_overrides[get_rag_service] = lambda: mock_rag_service
     app.dependency_overrides[get_storage_service] = lambda: mock_storage_service
     app.dependency_overrides[get_search_indexer] = lambda: mock_search_indexer
+
+    # Set mock services registry so endpoints that access app.state.services work
+    # (lifespan doesn't run with ASGITransport)
+    mock_registry = MagicMock()
+    mock_registry.storage_service = mock_storage_service
+    mock_registry.openai_client = mock_openai_client
+    mock_registry.search_indexer = mock_search_indexer
+    mock_registry.rag_service = mock_rag_service
+    app.state.services = mock_registry
 
     return app
 

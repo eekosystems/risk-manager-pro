@@ -87,4 +87,5 @@ class OrganizationRepository:
         if settings_json is not None:
             org.settings_json = settings_json
         await self._db.flush()
+        await self._db.refresh(org)
         return org
