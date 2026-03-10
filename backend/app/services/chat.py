@@ -10,6 +10,7 @@ from app.repositories.conversation import ConversationRepository
 from app.schemas.chat import ChatRequest, ChatResponse, CitationSchema, MessageResponse
 from app.schemas.settings import PromptsPayload
 from app.services.openai_client import AzureOpenAIClient
+from app.services.prompts import GENERAL_PROMPT, PHL_PROMPT, SRA_PROMPT, SYSTEM_ANALYSIS_PROMPT
 from app.services.rag import RAGService, SearchResult
 from app.services.settings import SettingsService
 
@@ -17,32 +18,10 @@ logger = structlog.get_logger(__name__)
 
 # Fallback prompts used when no org-level settings exist
 SYSTEM_PROMPTS: dict[FunctionType, str] = {
-    FunctionType.PHL: (
-        "You are an aviation safety AI assistant specializing in Preliminary Hazard Lists (PHL). "
-        "Help users identify hazards, assess initial risk levels, and document potential dangers "
-        "in aviation operations. Use the provided context from safety documentation to support "
-        "your analysis. Always cite your sources. If the context does not support an answer, "
-        "clearly state that. Follow FAA SMS guidelines for hazard identification."
-    ),
-    FunctionType.SRA: (
-        "You are an aviation safety AI assistant specializing in Safety Risk Assessments (SRA). "
-        "Help users evaluate risk severity and likelihood using standard 5x5 risk matrices per "
-        "FAA SMS guidelines. Guide them through the SRM process: hazard identification, risk "
-        "analysis, risk assessment, and risk control. Always cite your sources. Never fabricate "
-        "safety data."
-    ),
-    FunctionType.SYSTEM_ANALYSIS: (
-        "You are an aviation safety AI assistant specializing in System Safety Analysis. "
-        "Help users analyze aviation systems for potential failure modes, common cause failures, "
-        "and safety-critical interfaces. Reference ICAO Annex 19, FAR regulations, and industry "
-        "best practices. Always cite your sources."
-    ),
-    FunctionType.GENERAL: (
-        "You are an aviation safety AI assistant for Risk Manager Pro. Help users with "
-        "operational risk management, safety documentation, regulatory compliance (FAA, ICAO, "
-        "EASA), and safety management system (SMS) questions. Always cite your sources from "
-        "the provided context. If the context does not contain relevant information, say so."
-    ),
+    FunctionType.PHL: PHL_PROMPT,
+    FunctionType.SRA: SRA_PROMPT,
+    FunctionType.SYSTEM_ANALYSIS: SYSTEM_ANALYSIS_PROMPT,
+    FunctionType.GENERAL: GENERAL_PROMPT,
 }
 
 
