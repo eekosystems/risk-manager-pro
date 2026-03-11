@@ -27,7 +27,8 @@ class OrganizationMembership(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
     organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), index=True)
     role: Mapped[MembershipRole] = mapped_column(
-        Enum(MembershipRole), default=MembershipRole.VIEWER
+        Enum(MembershipRole, values_callable=lambda e: [x.value for x in e]),
+        default=MembershipRole.VIEWER,
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     invited_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), default=None)

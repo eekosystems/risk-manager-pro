@@ -32,10 +32,12 @@ class Conversation(Base):
     organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), index=True)
     title: Mapped[str] = mapped_column(String(500), default="New Conversation")
     function_type: Mapped[FunctionType] = mapped_column(
-        Enum(FunctionType), default=FunctionType.GENERAL
+        Enum(FunctionType, values_callable=lambda e: [x.value for x in e]),
+        default=FunctionType.GENERAL,
     )
     status: Mapped[ConversationStatus] = mapped_column(
-        Enum(ConversationStatus), default=ConversationStatus.ACTIVE
+        Enum(ConversationStatus, values_callable=lambda e: [x.value for x in e]),
+        default=ConversationStatus.ACTIVE,
     )
     created_at: Mapped[datetime] = mapped_column(default=func.now())
     updated_at: Mapped[datetime] = mapped_column(default=func.now(), onupdate=func.now())

@@ -26,7 +26,8 @@ class Organization(Base):
     name: Mapped[str] = mapped_column(String(255))
     slug: Mapped[str] = mapped_column(String(100), unique=True, index=True)
     status: Mapped[OrganizationStatus] = mapped_column(
-        Enum(OrganizationStatus), default=OrganizationStatus.ACTIVE
+        Enum(OrganizationStatus, values_callable=lambda e: [x.value for x in e]),
+        default=OrganizationStatus.ACTIVE,
     )
     is_platform: Mapped[bool] = mapped_column(Boolean, default=False)
     settings_json: Mapped[dict[str, Any] | None] = mapped_column(JSONB, default=None)
