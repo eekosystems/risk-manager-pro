@@ -78,7 +78,10 @@ class EntraIDAuth:
                 token,
                 public_key,
                 algorithms=["RS256"],
-                audience=settings.azure_ad_client_id,
+                audience=[
+                    settings.azure_ad_client_id,
+                    f"api://{settings.azure_ad_client_id}",
+                ],
                 issuer=settings.azure_ad_issuer,
             )
 
