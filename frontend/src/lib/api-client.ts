@@ -1,7 +1,7 @@
 import { type IPublicClientApplication } from "@azure/msal-browser";
 import axios from "axios";
 
-import { apiTokenRequest } from "@/config/auth";
+import { loginRequest } from "@/config/auth";
 import { env } from "@/config/env";
 
 export const apiClient = axios.create({
@@ -42,24 +42,18 @@ apiClient.interceptors.request.use(async (config) => {
   const accounts = msalInstance.getAllAccounts();
   if (accounts.length === 0) return config;
 
-  if (apiTokenRequest.scopes.length === 0) {
-    console.warn("[api-client] VITE_API_SCOPE is not configured — API requests will lack auth tokens");
-    return config;
-  }
-
   try {
     const response = await withTimeout(
       msalInstance.acquireTokenSilent({
-        ...apiTokenRequest,
+        ...loginRequest,
         account: accounts[0],
       }),
       TOKEN_TIMEOUT_MS,
     );
-    config.headers.Authorization = `Bearer ${response.accessToken}`;
+    // Use idToken — its audience matches the client ID which the backend validates
+    config.headers.Authorization = `Bearer ${response.idToken}`;
   } catch (error) {
     console.error("[api-client] Token acquisition failed:", error);
-    // Do NOT redirect — let the request proceed without a token.
-    // The backend will return 401 which is handled by the response interceptor.
   }
 
   if (activeOrganizationId) {
