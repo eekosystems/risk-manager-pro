@@ -34,10 +34,10 @@ class ModelPreferencesPayload(BaseModel):
 
 
 class PromptsPayload(BaseModel):
-    system_prompt: str = Field(..., min_length=1, max_length=10000)
-    phl_prompt: str = Field(..., min_length=1, max_length=10000)
-    sra_prompt: str = Field(..., min_length=1, max_length=10000)
-    system_analysis_prompt: str = Field(..., min_length=1, max_length=10000)
+    system_prompt: str = Field(..., min_length=1, max_length=50000)
+    phl_prompt: str = Field(..., min_length=1, max_length=50000)
+    sra_prompt: str = Field(..., min_length=1, max_length=50000)
+    system_analysis_prompt: str = Field(..., min_length=1, max_length=50000)
 
 
 # ── Generic Settings Response ─────────────────────────────────────────
