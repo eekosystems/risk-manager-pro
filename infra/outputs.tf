@@ -31,3 +31,16 @@ output "static_web_app_url" {
 output "keyvault_uri" {
   value = module.keyvault.vault_uri
 }
+
+output "container_registry_login_server" {
+  value = module.container_registry.login_server
+}
+
+output "container_registry_name" {
+  value = module.container_registry.name
+}
+
+output "static_web_app_api_key" {
+  value     = module.static_web_app.api_key
+  sensitive = true
+}

@@ -69,7 +69,7 @@ def upgrade() -> None:
         """
         INSERT INTO organizations (id, name, slug, status, is_platform)
         SELECT DISTINCT tenant_id, 'Organization ' || ROW_NUMBER() OVER (ORDER BY tenant_id),
-               'org-' || SUBSTRING(tenant_id::text, 1, 8), 'active', false
+               'org-' || SUBSTRING(tenant_id::text, 1, 8), 'active'::organizationstatus, false
         FROM users
         WHERE tenant_id IS NOT NULL
         ON CONFLICT DO NOTHING
