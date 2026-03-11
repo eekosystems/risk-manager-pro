@@ -136,7 +136,7 @@ export function PromptsTab() {
   }
 
   return (
-    <div className="max-w-3xl">
+    <div className="max-w-5xl">
       <div className="mb-6">
         <h2 className="text-lg font-bold text-slate-900">Prompt Configuration</h2>
         <p className="text-sm text-slate-500">

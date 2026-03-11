@@ -71,7 +71,7 @@ export function RagSettingsTab() {
   }
 
   return (
-    <div className="max-w-2xl">
+    <div className="max-w-5xl">
       <div className="mb-6">
         <h2 className="text-lg font-bold text-slate-900">RAG Pipeline Settings</h2>
         <p className="text-sm text-slate-500">
