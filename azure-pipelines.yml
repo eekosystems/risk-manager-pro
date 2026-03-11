@@ -162,12 +162,6 @@ stages:
         pool:
           vmImage: "ubuntu-latest"
         steps:
-          - task: Docker@2
-            displayName: "Login to ACR"
-            inputs:
-              command: login
-              containerRegistry: $(azureServiceConnection)
-
           - task: AzureCLI@2
             displayName: "Build & push to ACR"
             inputs:
