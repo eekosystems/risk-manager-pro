@@ -17,12 +17,18 @@ import {
   updatePromptsSettings,
   type PromptsSettings,
 } from "@/api/settings";
+import {
+  DEFAULT_PHL_PROMPT,
+  DEFAULT_SRA_PROMPT,
+  DEFAULT_SYSTEM_ANALYSIS_PROMPT,
+  DEFAULT_SYSTEM_PROMPT,
+} from "@/constants/default-prompts";
 
-const EMPTY_PROMPTS: PromptsSettings = {
-  system_prompt: "",
-  phl_prompt: "",
-  sra_prompt: "",
-  system_analysis_prompt: "",
+const FALLBACK_PROMPTS: PromptsSettings = {
+  system_prompt: DEFAULT_SYSTEM_PROMPT,
+  phl_prompt: DEFAULT_PHL_PROMPT,
+  sra_prompt: DEFAULT_SRA_PROMPT,
+  system_analysis_prompt: DEFAULT_SYSTEM_ANALYSIS_PROMPT,
 };
 
 type PromptKey = keyof PromptsSettings;
@@ -67,11 +73,11 @@ const PROMPT_SECTIONS: PromptSection[] = [
 
 export function PromptsTab() {
   const queryClient = useQueryClient();
-  const [prompts, setPrompts] = useState<PromptsSettings>(EMPTY_PROMPTS);
+  const [prompts, setPrompts] = useState<PromptsSettings>(FALLBACK_PROMPTS);
   const [activePrompt, setActivePrompt] = useState<PromptKey>("system_prompt");
   const [copied, setCopied] = useState(false);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ["settings", "prompts"],
     queryFn: () => getSettingsByCategory("prompts"),
     retry: false,
@@ -127,6 +133,13 @@ export function PromptsTab() {
           Configure the system prompt and function-specific prompts that guide AI responses.
         </p>
       </div>
+
+      {isError && (
+        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+          <span className="font-semibold">Could not load prompts from the server.</span>{" "}
+          The backend may be unavailable. Default prompts are configured server-side and will still be used by the AI.
+        </div>
+      )}
 
       {/* Prompt selector tabs */}
       <div className="mb-4 flex gap-2 overflow-x-auto">
