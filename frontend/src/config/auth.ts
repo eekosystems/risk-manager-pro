@@ -28,5 +28,7 @@ export const loginRequest = {
 };
 
 export const apiTokenRequest = {
-  scopes: env.apiScope ? [env.apiScope] : [],
+  scopes: env.apiScope
+    ? [env.apiScope]
+    : [`api://${env.azureAdClientId}/access_as_user`],
 };
