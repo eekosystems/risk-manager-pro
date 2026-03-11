@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  AlertTriangle,
   Clock,
   Crown,
   Eye,
@@ -8,6 +9,7 @@ import {
   Mail,
   MoreVertical,
   Plus,
+  RefreshCw,
   Search,
   Shield,
   Trash2,
@@ -79,7 +81,7 @@ export function UsersRolesTab() {
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
-  const { data: members = [], isLoading } = useQuery({
+  const { data: members = [], isLoading, isError, refetch } = useQuery({
     queryKey: ["org-members", orgId],
     queryFn: () => getOrganizationMembers(orgId),
     enabled: !!orgId,
@@ -142,6 +144,23 @@ export function UsersRolesTab() {
     return (
       <div className="flex items-center justify-center py-20">
         <Loader2 size={24} className="animate-spin text-brand-500" />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center">
+        <AlertTriangle size={32} className="mb-3 text-red-400" />
+        <p className="text-sm font-semibold text-slate-700">Failed to load members</p>
+        <p className="mb-4 text-[13px] text-slate-400">The server may be unavailable. Check the browser console for details.</p>
+        <button
+          onClick={() => void refetch()}
+          className="flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50"
+        >
+          <RefreshCw size={14} />
+          Retry
+        </button>
       </div>
     );
   }

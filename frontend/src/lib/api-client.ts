@@ -10,6 +10,7 @@ import { env } from "@/config/env";
 export const apiClient = axios.create({
   baseURL: `${env.apiBaseUrl}/api/v1`,
   headers: { "Content-Type": "application/json" },
+  timeout: 30_000,
 });
 
 let msalInstance: IPublicClientApplication | null = null;
@@ -27,21 +28,42 @@ export function getActiveOrganizationId(): string | null {
   return activeOrganizationId;
 }
 
+const TOKEN_TIMEOUT_MS = 10_000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("Token acquisition timed out")), ms),
+    ),
+  ]);
+}
+
 apiClient.interceptors.request.use(async (config) => {
   if (!msalInstance) return config;
 
   const accounts = msalInstance.getAllAccounts();
   if (accounts.length === 0) return config;
 
+  if (apiTokenRequest.scopes.length === 0) {
+    console.warn("[api-client] VITE_API_SCOPE is not configured — API requests will lack auth tokens");
+    return config;
+  }
+
   try {
-    const response = await msalInstance.acquireTokenSilent({
-      ...apiTokenRequest,
-      account: accounts[0],
-    });
+    const response = await withTimeout(
+      msalInstance.acquireTokenSilent({
+        ...apiTokenRequest,
+        account: accounts[0],
+      }),
+      TOKEN_TIMEOUT_MS,
+    );
     config.headers.Authorization = `Bearer ${response.accessToken}`;
   } catch (error) {
     if (error instanceof InteractionRequiredAuthError) {
       await msalInstance.acquireTokenRedirect(apiTokenRequest);
+    } else {
+      console.error("[api-client] Token acquisition failed:", error);
     }
   }
 
