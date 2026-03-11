@@ -7,7 +7,6 @@ import {
   Copy,
   Loader2,
   MessageSquareCode,
-  RefreshCw,
   RotateCcw,
   Save,
   Shield,
@@ -72,9 +71,10 @@ export function PromptsTab() {
   const [activePrompt, setActivePrompt] = useState<PromptKey>("system_prompt");
   const [copied, setCopied] = useState(false);
 
-  const { data, isLoading, isError, refetch } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ["settings", "prompts"],
     queryFn: () => getSettingsByCategory("prompts"),
+    retry: false,
   });
 
   // The backend always returns the effective prompts (org overrides or server defaults),
@@ -118,22 +118,6 @@ export function PromptsTab() {
     );
   }
 
-  if (isError) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 text-center">
-        <AlertTriangle size={32} className="mb-3 text-red-400" />
-        <p className="text-sm font-semibold text-slate-700">Failed to load prompts</p>
-        <p className="mb-4 text-[13px] text-slate-400">The server may be unavailable. Check the browser console for details.</p>
-        <button
-          onClick={() => void refetch()}
-          className="flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50"
-        >
-          <RefreshCw size={14} />
-          Retry
-        </button>
-      </div>
-    );
-  }
 
   return (
     <div className="max-w-5xl">
