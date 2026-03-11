@@ -23,13 +23,10 @@ class CorrelationIdMiddleware:
 
         # Extract correlation ID from request headers
         headers = dict(scope.get("headers", []))
-        correlation_id = (
-            headers.get(b"x-correlation-id", b"").decode("latin-1")
-            or str(uuid.uuid4())
+        correlation_id = headers.get(b"x-correlation-id", b"").decode("latin-1") or str(
+            uuid.uuid4()
         )
-        organization_id = (
-            headers.get(b"x-organization-id", b"").decode("latin-1")
-        )
+        organization_id = headers.get(b"x-organization-id", b"").decode("latin-1")
 
         # Bind structured logging context
         structlog.contextvars.clear_contextvars()
