@@ -18,13 +18,19 @@ resource "azurerm_container_app" "backend" {
     type = "SystemAssigned"
   }
 
+  registry {
+    server               = var.container_registry_server
+    username             = var.container_registry_username
+    password_secret_name = "registry-password"
+  }
+
   template {
-    min_replicas = 0
+    min_replicas = 1
     max_replicas = 2
 
     container {
       name   = "api"
-      image  = "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest" # Placeholder
+      image  = "${var.container_registry_server}/rmp-backend:latest"
       cpu    = 0.25
       memory = "0.5Gi"
 
@@ -63,15 +69,22 @@ resource "azurerm_container_app" "backend" {
         value = var.azure_ad_client_id
       }
 
+      env {
+        name  = "CORS_ORIGINS"
+        value = "https://lemon-tree-0d582c90f.2.azurestaticapps.net"
+      }
+
       liveness_probe {
-        transport = "HTTP"
-        path      = "/health"
-        port      = 8000
+        transport        = "HTTP"
+        path             = "/api/v1/health"
+        port             = 8000
+        initial_delay    = 15
+        interval_seconds = 30
       }
 
       readiness_probe {
         transport = "HTTP"
-        path      = "/health/ready"
+        path      = "/api/v1/health"
         port      = 8000
       }
     }
@@ -80,6 +93,11 @@ resource "azurerm_container_app" "backend" {
   secret {
     name  = "database-url"
     value = var.database_url
+  }
+
+  secret {
+    name  = "registry-password"
+    value = var.container_registry_password
   }
 
   ingress {

@@ -19,6 +19,10 @@ variables:
   pythonVersion: "3.12"
   nodeVersion: "20.x"
   azureServiceConnection: "azure-rmp-connection"
+  resourceGroup: "rg-rmp-dev"
+  acrName: "acrrmpdev"
+  containerAppName: "ca-rmp-dev-api"
+  backendImage: "rmp-backend"
 
 stages:
   # ──────────────────────────────────────────────
@@ -149,23 +153,33 @@ stages:
             inputs:
               summaryFileLocation: "backend/coverage.xml"
 
-      - job: DockerBuild
-        displayName: "Docker Build"
+      - job: DockerBuildAndPush
+        displayName: "Docker Build & Push"
         dependsOn:
           - LintAndTypeCheck
           - Test
+        condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
         pool:
           vmImage: "ubuntu-latest"
         steps:
           - task: Docker@2
-            displayName: "Build backend image"
+            displayName: "Login to ACR"
             inputs:
-              command: build
-              Dockerfile: backend/Dockerfile
-              buildContext: backend
-              tags: |
-                $(Build.BuildId)
-                latest
+              command: login
+              containerRegistry: $(azureServiceConnection)
+
+          - task: AzureCLI@2
+            displayName: "Build & push to ACR"
+            inputs:
+              azureSubscription: $(azureServiceConnection)
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                az acr login --name $(acrName)
+                cd backend
+                docker build -t $(acrName).azurecr.io/$(backendImage):$(Build.BuildId) -t $(acrName).azurecr.io/$(backendImage):latest .
+                docker push $(acrName).azurecr.io/$(backendImage):$(Build.BuildId)
+                docker push $(acrName).azurecr.io/$(backendImage):latest
 
   # ──────────────────────────────────────────────
   # Frontend — React + TypeScript
@@ -221,3 +235,61 @@ stages:
           - publish: frontend/dist
             artifact: frontend-build
             displayName: "Publish build artifact"
+
+  # ──────────────────────────────────────────────
+  # Deploy — Push to Azure
+  # ──────────────────────────────────────────────
+  - stage: Deploy
+    displayName: "Deploy to Azure"
+    dependsOn:
+      - Infrastructure
+      - Backend
+      - Frontend
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      - job: DeployBackend
+        displayName: "Deploy Backend (Container App)"
+        pool:
+          vmImage: "ubuntu-latest"
+        steps:
+          - task: AzureCLI@2
+            displayName: "Update Container App image"
+            inputs:
+              azureSubscription: $(azureServiceConnection)
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                az containerapp update \
+                  --name $(containerAppName) \
+                  --resource-group $(resourceGroup) \
+                  --image $(acrName).azurecr.io/$(backendImage):$(Build.BuildId)
+
+          - task: AzureCLI@2
+            displayName: "Run database migrations"
+            inputs:
+              azureSubscription: $(azureServiceConnection)
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                az containerapp exec \
+                  --name $(containerAppName) \
+                  --resource-group $(resourceGroup) \
+                  --command "python -m alembic upgrade head" || echo "Migration exec not available — run manually if needed"
+
+      - job: DeployFrontend
+        displayName: "Deploy Frontend (Static Web App)"
+        pool:
+          vmImage: "ubuntu-latest"
+        steps:
+          - download: current
+            artifact: frontend-build
+            displayName: "Download frontend build"
+
+          - task: AzureStaticWebApp@0
+            displayName: "Deploy to Azure Static Web App"
+            inputs:
+              workingDirectory: $(Pipeline.Workspace)/frontend-build
+              app_location: "."
+              skip_app_build: true
+              skip_api_build: true
+              azure_static_web_apps_api_token: $(SWA_DEPLOYMENT_TOKEN)

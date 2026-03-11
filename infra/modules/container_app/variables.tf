@@ -50,3 +50,17 @@ variable "azure_ad_client_id" {
 variable "log_analytics_workspace_id" {
   type = string
 }
+
+variable "container_registry_server" {
+  type = string
+}
+
+variable "container_registry_username" {
+  type      = string
+  sensitive = true
+}
+
+variable "container_registry_password" {
+  type      = string
+  sensitive = true
+}
