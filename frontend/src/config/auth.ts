@@ -24,7 +24,7 @@ export const msalConfig: Configuration = {
 };
 
 export const loginRequest = {
-  scopes: env.apiScope ? [env.apiScope] : ["User.Read"],
+  scopes: ["User.Read"],
 };
 
 export const apiTokenRequest = {
