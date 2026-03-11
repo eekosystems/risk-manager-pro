@@ -32,7 +32,13 @@ const queryClient = new QueryClient({
 async function bootstrap(): Promise<void> {
   await msalInstance.initialize();
 
-  const response = await msalInstance.handleRedirectPromise();
+  let response;
+  try {
+    response = await msalInstance.handleRedirectPromise();
+  } catch (err) {
+    console.error("[auth] handleRedirectPromise failed — clearing session cache:", err);
+    sessionStorage.clear();
+  }
   if (response?.account) {
     msalInstance.setActiveAccount(response.account);
   }
