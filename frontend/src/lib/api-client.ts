@@ -1,7 +1,4 @@
-import {
-  InteractionRequiredAuthError,
-  type IPublicClientApplication,
-} from "@azure/msal-browser";
+import { type IPublicClientApplication } from "@azure/msal-browser";
 import axios from "axios";
 
 import { apiTokenRequest } from "@/config/auth";
@@ -60,11 +57,9 @@ apiClient.interceptors.request.use(async (config) => {
     );
     config.headers.Authorization = `Bearer ${response.accessToken}`;
   } catch (error) {
-    if (error instanceof InteractionRequiredAuthError) {
-      await msalInstance.acquireTokenRedirect(apiTokenRequest);
-    } else {
-      console.error("[api-client] Token acquisition failed:", error);
-    }
+    console.error("[api-client] Token acquisition failed:", error);
+    // Do NOT redirect — let the request proceed without a token.
+    // The backend will return 401 which is handled by the response interceptor.
   }
 
   if (activeOrganizationId) {
@@ -78,9 +73,7 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (axios.isAxiosError(error) && error.response?.status === 401) {
-      if (msalInstance) {
-        msalInstance.acquireTokenRedirect(apiTokenRequest).catch(console.error);
-      }
+      console.warn("[api-client] 401 response — user may need to re-login");
     }
     return Promise.reject(error);
   },
