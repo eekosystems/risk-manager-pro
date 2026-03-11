@@ -6,7 +6,6 @@ import {
   Clock,
   FileText,
   Loader2,
-  RefreshCw,
   Search,
   Trash2,
   Upload,
@@ -62,10 +61,11 @@ export function IndexedFilesTab() {
   const [searchQuery, setSearchQuery] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
-  const { data: files = [], isLoading, isError, refetch } = useQuery({
+  const { data: files = [], isLoading } = useQuery({
     queryKey: ["documents"],
     queryFn: getDocuments,
     refetchInterval: 10_000,
+    retry: false,
   });
 
   const deleteMutation = useMutation({
@@ -125,22 +125,6 @@ export function IndexedFilesTab() {
     );
   }
 
-  if (isError) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 text-center">
-        <AlertTriangle size={32} className="mb-3 text-red-400" />
-        <p className="text-sm font-semibold text-slate-700">Failed to load documents</p>
-        <p className="mb-4 text-[13px] text-slate-400">The server may be unavailable. Check the browser console for details.</p>
-        <button
-          onClick={() => void refetch()}
-          className="flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50"
-        >
-          <RefreshCw size={14} />
-          Retry
-        </button>
-      </div>
-    );
-  }
 
   return (
     <div className="max-w-5xl">
