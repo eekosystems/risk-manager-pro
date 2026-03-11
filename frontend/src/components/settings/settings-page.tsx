@@ -95,7 +95,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
       {/* Modal */}
       <div
         className={clsx(
-          "fixed inset-4 z-50 flex flex-col overflow-hidden rounded-2xl border border-gray-200 bg-gray-50 shadow-2xl transition-all duration-200",
+          "fixed inset-y-8 left-1/2 z-50 flex w-full max-w-5xl -translate-x-1/2 flex-col overflow-hidden rounded-2xl border border-gray-200 bg-gray-50 shadow-2xl transition-all duration-200",
           isVisible
             ? "scale-100 opacity-100"
             : "scale-95 opacity-0",
