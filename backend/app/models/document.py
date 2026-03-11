@@ -26,7 +26,8 @@ class Document(Base):
     content_type: Mapped[str] = mapped_column(String(100))
     size_bytes: Mapped[int] = mapped_column(BigInteger)
     status: Mapped[DocumentStatus] = mapped_column(
-        Enum(DocumentStatus), default=DocumentStatus.UPLOADED
+        Enum(DocumentStatus, values_callable=lambda e: [x.value for x in e]),
+        default=DocumentStatus.UPLOADED,
     )
     chunk_count: Mapped[int] = mapped_column(default=0)
     error_message: Mapped[str | None] = mapped_column(Text, default=None)

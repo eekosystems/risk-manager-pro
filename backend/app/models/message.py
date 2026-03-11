@@ -26,7 +26,9 @@ class Message(Base):
     conversation_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("conversations.id", ondelete="CASCADE"), index=True
     )
-    role: Mapped[MessageRole] = mapped_column(Enum(MessageRole))
+    role: Mapped[MessageRole] = mapped_column(
+        Enum(MessageRole, values_callable=lambda e: [x.value for x in e])
+    )
     content: Mapped[str] = mapped_column(Text)
     citations: Mapped[list[dict[str, str]] | None] = mapped_column(JSONB, default=None)
     metadata_json: Mapped[dict[str, Any] | None] = mapped_column(JSONB, default=None)
