@@ -112,14 +112,20 @@ async def get_current_user(
 
     now = datetime.utcnow()
 
-    # Check session timeout — if last_activity is set and older than threshold, expire
+    # Check session timeout — if last_activity is set and older than threshold,
+    # reset the session instead of permanently locking the user out.
+    # The user has already re-authenticated via Entra ID (token validated above),
+    # so we trust this is a legitimate new session.
     if user.last_activity is not None and (now - user.last_activity) > SESSION_TIMEOUT:
         logger.info(
-            "session_expired",
+            "session_renewed",
             user_id=str(user.id),
             last_activity=user.last_activity.isoformat(),
         )
-        raise UnauthorizedError("Session expired due to inactivity")
+        user.last_activity = now
+        user.last_login = now
+        await db.flush()
+        return user
 
     # Update last_login (throttled to every 5 min)
     if user.last_login is None or (now - user.last_login) > LAST_LOGIN_THROTTLE:
