@@ -3,6 +3,43 @@ import { Database, RefreshCw, Zap } from "lucide-react";
 
 import { getHealthStatus, type HealthStatus } from "@/api/health";
 
+function formatTimeAgo(isoString: string): string {
+  const seconds = Math.floor(
+    (Date.now() - new Date(isoString).getTime()) / 1000,
+  );
+  if (seconds < 60) return "just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours}h ago`;
+}
+
+function checkLabel(value: string): { text: string; color: string } {
+  switch (value) {
+    case "ok":
+      return { text: "Active", color: "text-green-400" };
+    case "not_configured":
+      return { text: "Not Configured", color: "text-slate-500" };
+    default:
+      return { text: "Unavailable", color: "text-red-400" };
+  }
+}
+
+function statusLabel(health: HealthStatus | undefined): {
+  text: string;
+  dotColor: string;
+} {
+  if (!health) return { text: "Checking...", dotColor: "bg-slate-400" };
+  switch (health.status) {
+    case "healthy":
+      return { text: "Connected", dotColor: "bg-green-400" };
+    case "degraded":
+      return { text: "Degraded", dotColor: "bg-yellow-400" };
+    default:
+      return { text: "Unavailable", dotColor: "bg-red-400" };
+  }
+}
+
 export function AiStatusCard() {
   const { data: health } = useQuery<HealthStatus>({
     queryKey: ["health"],
@@ -10,7 +47,11 @@ export function AiStatusCard() {
     refetchInterval: 30_000,
   });
 
-  const isOnline = health?.status === "healthy";
+  const aiCheck = health?.checks?.openai;
+  const searchCheck = health?.checks?.search;
+  const status = statusLabel(health);
+  const aiLabel = aiCheck ? checkLabel(aiCheck) : null;
+  const searchLabel = searchCheck ? checkLabel(searchCheck) : null;
 
   return (
     <div className="rounded-xl bg-slate-800 p-4" role="status">
@@ -25,15 +66,15 @@ export function AiStatusCard() {
           <Zap size={14} className="text-brand-400" />
         </div>
         <div className="flex flex-col">
-          <span className="text-sm font-semibold text-white">Claude Opus</span>
+          <span className="text-sm font-semibold text-white">
+            Azure OpenAI
+          </span>
           <span className="text-[11px] text-slate-400">
-            {isOnline ? "Connected" : health ? "Degraded" : "Checking..."}
+            {aiLabel ? aiLabel.text : status.text}
           </span>
         </div>
         <div className="ml-auto">
-          <div
-            className={`h-2 w-2 rounded-full ${isOnline ? "bg-green-400" : "bg-yellow-400"}`}
-          />
+          <div className={`h-2 w-2 rounded-full ${status.dotColor}`} />
         </div>
       </div>
 
@@ -43,14 +84,20 @@ export function AiStatusCard() {
             <Database size={12} className="text-slate-400" />
             <span className="text-[12px] text-slate-400">RAG Index</span>
           </div>
-          <span className="text-[12px] font-medium text-green-400">Active</span>
+          <span
+            className={`text-[12px] font-medium ${searchLabel?.color ?? "text-slate-500"}`}
+          >
+            {searchLabel?.text ?? "Unknown"}
+          </span>
         </div>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <RefreshCw size={12} className="text-slate-400" />
-            <span className="text-[12px] text-slate-400">Last Sync</span>
+            <span className="text-[12px] text-slate-400">Last Check</span>
           </div>
-          <span className="text-[12px] font-medium text-slate-300">2 min ago</span>
+          <span className="text-[12px] font-medium text-slate-300">
+            {health?.checked_at ? formatTimeAgo(health.checked_at) : "—"}
+          </span>
         </div>
       </div>
     </div>
