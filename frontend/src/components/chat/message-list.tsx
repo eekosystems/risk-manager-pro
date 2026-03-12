@@ -1,10 +1,11 @@
 import { clsx } from "clsx";
 import { format } from "date-fns";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-import type { ChatMessage } from "@/types/api";
+import type { ChatMessage, Citation } from "@/types/api";
 
 import { CitationChip } from "./citation-chip";
+import { CitationModal } from "./citation-modal";
 import { MarkdownContent } from "./markdown-content";
 
 interface MessageListProps {
@@ -12,12 +13,20 @@ interface MessageListProps {
   isTyping: boolean;
 }
 
+interface SelectedCitation {
+  citation: Citation;
+  index: number;
+}
+
 export function MessageList({ messages, isTyping }: MessageListProps) {
   const endRef = useRef<HTMLDivElement>(null);
+  const [selected, setSelected] = useState<SelectedCitation | null>(null);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
+
+  const handleClose = useCallback(() => setSelected(null), []);
 
   return (
     <div className="flex-1 overflow-y-auto px-6 py-6">
@@ -55,7 +64,12 @@ export function MessageList({ messages, isTyping }: MessageListProps) {
                 {msg.citations && msg.citations.length > 0 && (
                   <div className="mt-3 flex flex-wrap gap-1.5 border-t border-gray-100 pt-3">
                     {msg.citations.map((c, i) => (
-                      <CitationChip key={c.chunk_id ?? i} citation={c} index={i} />
+                      <CitationChip
+                        key={c.chunk_id ?? i}
+                        citation={c}
+                        index={i}
+                        onClick={() => setSelected({ citation: c, index: i })}
+                      />
                     ))}
                   </div>
                 )}
@@ -87,6 +101,14 @@ export function MessageList({ messages, isTyping }: MessageListProps) {
 
         <div ref={endRef} />
       </div>
+
+      {selected && (
+        <CitationModal
+          citation={selected.citation}
+          index={selected.index}
+          onClose={handleClose}
+        />
+      )}
     </div>
   );
 }

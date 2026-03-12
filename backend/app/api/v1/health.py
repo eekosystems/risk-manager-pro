@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 import structlog
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
@@ -21,6 +23,7 @@ class HealthResponse(BaseModel):
 class ReadyResponse(BaseModel):
     status: str
     checks: dict[str, str]
+    checked_at: str
 
 
 @router.get("/health", response_model=HealthResponse)
@@ -64,7 +67,11 @@ async def readiness_check(
     else:
         status = "unhealthy"
 
-    return ReadyResponse(status=status, checks=checks)
+    return ReadyResponse(
+        status=status,
+        checks=checks,
+        checked_at=datetime.now(timezone.utc).isoformat(),
+    )
 
 
 async def _check_search() -> str:

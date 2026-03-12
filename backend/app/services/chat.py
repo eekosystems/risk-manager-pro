@@ -59,7 +59,7 @@ def _extract_citations(results: list[SearchResult]) -> list[CitationSchema]:
         CitationSchema(
             source=r.source,
             section=r.section,
-            content=r.content[:200],
+            content=r.content,
             score=r.score,
             chunk_id=r.chunk_id,
         )
