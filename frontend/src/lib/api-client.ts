@@ -1,7 +1,7 @@
 import { type IPublicClientApplication } from "@azure/msal-browser";
 import axios from "axios";
 
-import { apiTokenRequest } from "@/config/auth";
+import { loginRequest } from "@/config/auth";
 import { env } from "@/config/env";
 
 export const apiClient = axios.create({
@@ -45,12 +45,12 @@ apiClient.interceptors.request.use(async (config) => {
   try {
     const response = await withTimeout(
       msalInstance.acquireTokenSilent({
-        ...apiTokenRequest,
+        ...loginRequest,
         account: accounts[0],
       }),
       TOKEN_TIMEOUT_MS,
     );
-    config.headers.Authorization = `Bearer ${response.accessToken}`;
+    config.headers.Authorization = `Bearer ${response.idToken}`;
   } catch (error) {
     console.error("[api-client] Token acquisition failed:", error);
   }
