@@ -12,6 +12,8 @@ class CitationSchema(BaseModel):
     content: str
     score: float | None = None
     chunk_id: str | None = None
+    rank: int | None = None
+    match_tier: str | None = None
 
 
 class ChatRequest(BaseModel):

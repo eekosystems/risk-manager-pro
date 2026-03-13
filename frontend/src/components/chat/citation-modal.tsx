@@ -1,7 +1,13 @@
 import { useEffect, useRef } from "react";
-import { FileText, Hash, TrendingUp, X } from "lucide-react";
+import { FileText, Hash, Shield, X } from "lucide-react";
 
 import type { Citation } from "@/types/api";
+
+const TIER_STYLES: Record<string, { bg: string; text: string; dot: string }> = {
+  High: { bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-500" },
+  Moderate: { bg: "bg-amber-50", text: "text-amber-700", dot: "bg-amber-500" },
+  Low: { bg: "bg-gray-100", text: "text-gray-600", dot: "bg-gray-400" },
+};
 
 interface CitationModalProps {
   citation: Citation;
@@ -24,8 +30,9 @@ export function CitationModal({ citation, index, onClose }: CitationModalProps) 
     if (e.target === overlayRef.current) onClose();
   }
 
-  const scorePercent =
-    citation.score != null ? Math.round(citation.score * 100) : null;
+  const tier = citation.match_tier ?? "Moderate";
+  const tierStyle = TIER_STYLES[tier] ?? TIER_STYLES["Moderate"]!;
+  const rank = citation.rank ?? index + 1;
 
   return (
     <div
@@ -38,11 +45,17 @@ export function CitationModal({ citation, index, onClose }: CitationModalProps) 
         <div className="flex items-center justify-between border-b border-gray-100 bg-gray-50 px-6 py-4">
           <div className="flex items-center gap-2">
             <span className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-100 text-xs font-bold text-brand-700">
-              {index + 1}
+              {rank}
             </span>
             <h3 className="text-sm font-semibold text-gray-900">
-              Source Citation
+              Source #{rank}
             </h3>
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${tierStyle.bg} ${tierStyle.text}`}
+            >
+              <span className={`h-1.5 w-1.5 rounded-full ${tierStyle.dot}`} />
+              {tier} Match
+            </span>
           </div>
           <button
             onClick={onClose}
@@ -80,27 +93,17 @@ export function CitationModal({ citation, index, onClose }: CitationModalProps) 
             </div>
           )}
 
-          {scorePercent != null && (
-            <div className="flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-2">
-              <TrendingUp size={14} className="shrink-0 text-brand-500" />
-              <div className="min-w-0">
-                <div className="text-[10px] font-medium uppercase tracking-wide text-gray-400">
-                  Relevance
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="h-1.5 w-16 overflow-hidden rounded-full bg-gray-200">
-                    <div
-                      className="h-full rounded-full bg-brand-500 transition-all"
-                      style={{ width: `${Math.min(scorePercent, 100)}%` }}
-                    />
-                  </div>
-                  <span className="text-xs font-medium text-gray-800">
-                    {scorePercent}%
-                  </span>
-                </div>
+          <div className="flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-2">
+            <Shield size={14} className="shrink-0 text-brand-500" />
+            <div className="min-w-0">
+              <div className="text-[10px] font-medium uppercase tracking-wide text-gray-400">
+                Match Rank
+              </div>
+              <div className="text-xs font-medium text-gray-800">
+                #{rank} of {citation.rank != null ? "top results" : "results"}
               </div>
             </div>
-          )}
+          </div>
         </div>
 
         {/* Source Content */}
@@ -116,9 +119,10 @@ export function CitationModal({ citation, index, onClose }: CitationModalProps) 
         {/* Footer */}
         <div className="border-t border-gray-100 bg-gray-50 px-6 py-3">
           <p className="text-[11px] text-gray-400">
-            This passage was retrieved from your indexed documents via hybrid
-            search (keyword + vector similarity). The relevance score indicates
-            how closely this content matches the query.
+            This passage was retrieved from your indexed safety documents using
+            hybrid search (keyword + semantic similarity). Sources are ranked by
+            best match — a &quot;High Match&quot; means this document closely aligns with
+            your query.
           </p>
         </div>
       </div>
