@@ -39,16 +39,30 @@ def _resolve_prompt(function_type: FunctionType, prompts: PromptsPayload | None)
     return prompt_map[function_type]
 
 
+def _filter_by_threshold(
+    results: list[SearchResult], threshold: float
+) -> list[SearchResult]:
+    """Remove results below the relevance score threshold."""
+    if not results:
+        return results
+    filtered = [r for r in results if r.score >= threshold]
+    # Always keep at least the top result so the AI has something to work with
+    if not filtered and results:
+        filtered = [results[0]]
+    return filtered
+
+
 def _build_context_block(results: list[SearchResult]) -> str:
     if not results:
         return "No relevant documents found in the knowledge base."
 
     sections: list[str] = []
     for i, r in enumerate(results, 1):
+        score_pct = round(r.score * 100)
         source_label = f"[Source {i}: {r.source}"
         if r.section:
             source_label += f" — {r.section}"
-        source_label += "]"
+        source_label += f" | Relevance: {score_pct}%]"
         sections.append(f"{source_label}\n{r.content}")
 
     return "\n\n---\n\n".join(sections)
@@ -130,15 +144,30 @@ class ChatService:
                 exc_info=True,
             )
 
+        search_results = _filter_by_threshold(search_results, rag_config.score_threshold)
         context_block = _build_context_block(search_results)
         system_prompt = _resolve_prompt(request.function_type, prompts_config)
+
+        reasoning_instructions = (
+            "When answering, follow this structure:\n"
+            "1. **Reasoning:** Briefly explain your logic — which sources you relied on, "
+            "why they are relevant to the question, and how you arrived at your conclusion. "
+            "Reference sources by number (e.g. [Source 1]) and quote key passages.\n"
+            "2. **Answer:** Provide your analysis or recommendation.\n"
+            "3. **Sources Used:** List each source you cited with its relevance score.\n\n"
+            "If a source has low relevance or doesn't directly support your answer, "
+            "say so rather than forcing a connection."
+        )
 
         history = await self._repo.get_messages(conversation.id, organization_id, limit=20)
         messages: list[dict[str, str]] = [
             {"role": "system", "content": system_prompt},
             {
                 "role": "system",
-                "content": f"Relevant context from safety documentation:\n\n{context_block}",
+                "content": (
+                    f"{reasoning_instructions}\n\n"
+                    f"Relevant context from safety documentation:\n\n{context_block}"
+                ),
             },
         ]
         for msg in history:
