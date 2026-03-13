@@ -10,7 +10,7 @@ class RagSettingsPayload(BaseModel):
     chunk_size: int = Field(512, ge=100, le=4000)
     chunk_overlap: int = Field(50, ge=0, le=500)
     top_k: int = Field(5, ge=1, le=20)
-    score_threshold: float = Field(0.7, ge=0.0, le=1.0)
+    score_threshold: float = Field(0.01, ge=0.0, le=1.0)
     search_type: str = Field("hybrid", pattern=r"^(hybrid|vector|keyword)$")
     embedding_model: str = Field("text-embedding-3-small")
     rerank_enabled: bool = True

@@ -52,23 +52,39 @@ def _filter_by_threshold(
     return filtered
 
 
+def _compute_match_tier(rank: int, score: float, total: int) -> str:
+    """Assign a human-readable match tier based on rank position and relative score.
+
+    RRF fusion scores are inherently low (top results ~0.03), so tier assignment
+    is based primarily on rank order rather than raw score magnitude.
+    """
+    if rank == 1:
+        return "High"
+    if rank == 2:
+        return "High" if total <= 3 else "Moderate"
+    if rank <= 3:
+        return "Moderate"
+    return "Low"
+
+
 def _build_context_block(results: list[SearchResult]) -> str:
     if not results:
         return "No relevant documents found in the knowledge base."
 
     sections: list[str] = []
     for i, r in enumerate(results, 1):
-        score_pct = round(r.score * 100)
+        tier = _compute_match_tier(i, r.score, len(results))
         source_label = f"[Source {i}: {r.source}"
         if r.section:
             source_label += f" — {r.section}"
-        source_label += f" | Relevance: {score_pct}%]"
+        source_label += f" | Match: {tier}]"
         sections.append(f"{source_label}\n{r.content}")
 
     return "\n\n---\n\n".join(sections)
 
 
 def _extract_citations(results: list[SearchResult]) -> list[CitationSchema]:
+    total = len(results)
     return [
         CitationSchema(
             source=r.source,
@@ -76,8 +92,10 @@ def _extract_citations(results: list[SearchResult]) -> list[CitationSchema]:
             content=r.content,
             score=r.score,
             chunk_id=r.chunk_id,
+            rank=i,
+            match_tier=_compute_match_tier(i, r.score, total),
         )
-        for r in results
+        for i, r in enumerate(results, 1)
     ]
 
 

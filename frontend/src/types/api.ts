@@ -11,6 +11,8 @@ export interface Citation {
   content: string;
   score: number | null;
   chunk_id: string | null;
+  rank: number | null;
+  match_tier: string | null;
 }
 
 export interface OrganizationSummary {
