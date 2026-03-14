@@ -1,8 +1,10 @@
 import uuid
 
 import structlog
+from azure.core.exceptions import AzureError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.exceptions import NotFoundError, ValidationError
 from app.models.document import Document
 from app.models.user import User
@@ -16,8 +18,6 @@ ALLOWED_CONTENT_TYPES = {
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     "text/plain",
 }
-
-MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 MB
 
 
 class DocumentService:
@@ -36,9 +36,9 @@ class DocumentService:
         if content_type not in ALLOWED_CONTENT_TYPES:
             raise ValidationError(f"Unsupported file type: {content_type}. Allowed: PDF, DOCX, TXT")
 
-        if len(data) > MAX_FILE_SIZE:
+        if len(data) > settings.max_file_size_bytes:
             raise ValidationError(
-                f"File exceeds maximum size of {MAX_FILE_SIZE // (1024 * 1024)} MB"
+                f"File exceeds maximum size of {settings.max_file_size_bytes // (1024 * 1024)} MB"
             )
 
         blob_path = f"{organization_id}/{uuid.uuid4()}/{filename}"
@@ -80,7 +80,7 @@ class DocumentService:
             raise NotFoundError("Document", str(document_id))
         try:
             await self._storage.delete(document.blob_path)
-        except Exception:
+        except AzureError:
             logger.error(
                 "blob_delete_failed",
                 blob_path=document.blob_path,

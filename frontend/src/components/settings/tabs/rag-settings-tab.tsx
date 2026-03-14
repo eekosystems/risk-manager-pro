@@ -7,6 +7,7 @@ import {
   updateRagSettings,
   type RagSettings,
 } from "@/api/settings";
+import { SettingsSection } from "@/components/settings/settings-section";
 
 const DEFAULT_CONFIG: RagSettings = {
   chunk_size: 512,
@@ -25,13 +26,13 @@ export function RagSettingsTab() {
 
   const { data, isLoading } = useQuery({
     queryKey: ["settings", "rag"],
-    queryFn: () => getSettingsByCategory("rag"),
+    queryFn: () => getSettingsByCategory<RagSettings>("rag"),
     retry: false,
   });
 
   useEffect(() => {
     if (data?.settings) {
-      setConfig(data.settings as unknown as RagSettings);
+      setConfig(data.settings);
     }
   }, [data]);
 
@@ -65,7 +66,7 @@ export function RagSettingsTab() {
       </div>
 
       {/* Search Configuration */}
-      <section className="mb-8 rounded-2xl border border-gray-200 bg-white p-6">
+      <div className="mb-8"><SettingsSection>
         <div className="mb-5 flex items-center gap-2">
           <Database size={18} className="text-brand-500" />
           <h3 className="text-sm font-bold text-slate-800">Search Configuration</h3>
@@ -160,10 +161,10 @@ export function RagSettingsTab() {
             </p>
           </div>
         </div>
-      </section>
+      </SettingsSection></div>
 
       {/* Document Processing */}
-      <section className="mb-8 rounded-2xl border border-gray-200 bg-white p-6">
+      <div className="mb-8"><SettingsSection>
         <h3 className="mb-5 text-sm font-bold text-slate-800">Document Processing</h3>
 
         <div className="space-y-5">
@@ -231,7 +232,7 @@ export function RagSettingsTab() {
             </button>
           </div>
         </div>
-      </section>
+      </SettingsSection></div>
 
       {/* Save Button */}
       <button

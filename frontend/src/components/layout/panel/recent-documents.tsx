@@ -93,7 +93,7 @@ export function RecentDocuments() {
         {isLoading && (
           <div className="flex flex-col gap-2 px-2">
             {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-2">
+              <div key={`doc-skeleton-${i}`} className="flex items-center gap-2">
                 <Skeleton className="h-4 w-4 shrink-0" />
                 <Skeleton className="h-4 flex-1" />
                 <Skeleton className="h-3 w-12" />

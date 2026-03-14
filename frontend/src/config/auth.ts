@@ -1,6 +1,7 @@
 import { Configuration, LogLevel } from "@azure/msal-browser";
 
 import { env } from "./env";
+import { logger } from "../lib/logger";
 
 export const msalConfig: Configuration = {
   auth: {
@@ -17,7 +18,7 @@ export const msalConfig: Configuration = {
     loggerOptions: {
       logLevel: LogLevel.Verbose,
       loggerCallback: (_level, message) => {
-        console.log(message);
+        logger.debug(message);
       },
     },
   },

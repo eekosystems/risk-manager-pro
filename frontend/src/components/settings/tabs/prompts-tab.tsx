@@ -17,6 +17,7 @@ import {
   updatePromptsSettings,
   type PromptsSettings,
 } from "@/api/settings";
+import { SettingsSection } from "@/components/settings/settings-section";
 import {
   DEFAULT_PHL_PROMPT,
   DEFAULT_SRA_PROMPT,
@@ -79,14 +80,14 @@ export function PromptsTab() {
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["settings", "prompts"],
-    queryFn: () => getSettingsByCategory("prompts"),
+    queryFn: () => getSettingsByCategory<PromptsSettings>("prompts"),
     retry: false,
   });
 
   // The backend always returns the effective prompts (org overrides or server defaults),
   // so we use the API response as the source of truth for both display and reset.
   const serverPrompts = data?.settings
-    ? (data.settings as unknown as PromptsSettings)
+    ? data.settings
     : null;
 
   useEffect(() => {
@@ -165,7 +166,7 @@ export function PromptsTab() {
 
       {/* Active prompt editor */}
       {activeSection && (
-        <section className="rounded-2xl border border-gray-200 bg-white p-6">
+        <SettingsSection>
           <div className="mb-4 flex items-center justify-between">
             <div>
               <h3 className="text-sm font-bold text-slate-800">
@@ -213,7 +214,7 @@ export function PromptsTab() {
               {Math.ceil(prompts[activePrompt].length / 4)} tokens (estimate)
             </span>
           </div>
-        </section>
+        </SettingsSection>
       )}
 
       {/* Save Button */}

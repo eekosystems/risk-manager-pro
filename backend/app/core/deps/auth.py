@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import structlog
 from fastapi import Depends, Request
@@ -18,8 +18,8 @@ from app.models.user import User
 
 logger = structlog.get_logger(__name__)
 
-LAST_LOGIN_THROTTLE = timedelta(minutes=5)
-LAST_ACTIVITY_THROTTLE = timedelta(minutes=5)
+LAST_LOGIN_THROTTLE = timedelta(seconds=settings.last_login_throttle_seconds)
+LAST_ACTIVITY_THROTTLE = timedelta(seconds=settings.last_activity_throttle_seconds)
 SESSION_TIMEOUT = timedelta(minutes=settings.session_timeout_minutes)
 
 
@@ -67,55 +67,56 @@ async def get_token_payload(request: Request) -> TokenPayload:
     return payload
 
 
-async def get_current_user(
-    request: Request,
-    token: TokenPayload = Depends(get_token_payload),
-    db: AsyncSession = Depends(get_db),
+async def _get_or_create_user(
+    db: AsyncSession, token: TokenPayload, request: Request
 ) -> User:
+    """Look up an existing user by Entra ID or auto-provision a new one."""
     stmt = select(User).where(User.entra_id == token.oid)
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
 
-    if user is None:
-        user = User(
-            entra_id=token.oid,
-            email=token.preferred_username or f"{token.oid}@unknown",
-            display_name=token.name or "Unknown User",
-            is_platform_admin=False,
-        )
-        db.add(user)
-        await db.flush()
+    if user is not None:
+        return user
 
-        org = await _get_or_create_org_for_tenant(db, token.tid, request)
-        membership = OrganizationMembership(
-            user_id=user.id,
-            organization_id=org.id,
-            role=MembershipRole.VIEWER,
-        )
-        db.add(membership)
-        await db.flush()
+    user = User(
+        entra_id=token.oid,
+        email=token.preferred_username or f"{token.oid}@unknown",
+        display_name=token.name or "Unknown User",
+        is_platform_admin=False,
+    )
+    db.add(user)
+    await db.flush()
 
-        logger.info("user_auto_provisioned", user_id=str(user.id), org_id=str(org.id))
+    org = await _get_or_create_org_for_tenant(db, token.tid, request)
+    membership = OrganizationMembership(
+        user_id=user.id,
+        organization_id=org.id,
+        role=MembershipRole.VIEWER,
+    )
+    db.add(membership)
+    await db.flush()
 
-        # Audit log for auto-provisioning
-        audit = await get_audit_logger(request)
-        await audit.log(
-            action="user.auto_provisioned",
-            user=user,
-            resource_type="user",
-            resource_id=str(user.id),
-            organization_id=org.id,
-        )
+    logger.info("user_auto_provisioned", user_id=str(user.id), org_id=str(org.id))
 
-    if not user.is_active:
-        raise ForbiddenError("User account is deactivated")
+    # Audit log for auto-provisioning
+    audit = await get_audit_logger(request)
+    await audit.log(
+        action="user.auto_provisioned",
+        user=user,
+        resource_type="user",
+        resource_id=str(user.id),
+        organization_id=org.id,
+    )
 
-    now = datetime.utcnow()
+    return user
 
-    # Check session timeout — if last_activity is set and older than threshold,
-    # reset the session instead of permanently locking the user out.
-    # The user has already re-authenticated via Entra ID (token validated above),
-    # so we trust this is a legitimate new session.
+
+async def _check_session_timeout(db: AsyncSession, user: User, now: datetime) -> bool:
+    """Check if the session has expired and renew it if so.
+
+    Returns True if the session was renewed (caller should return early),
+    False if no timeout occurred.
+    """
     if user.last_activity is not None and (now - user.last_activity) > SESSION_TIMEOUT:
         logger.info(
             "session_renewed",
@@ -125,17 +126,43 @@ async def get_current_user(
         user.last_activity = now
         user.last_login = now
         await db.flush()
-        return user
+        return True
+    return False
 
-    # Update last_login (throttled to every 5 min)
+
+async def _update_activity_timestamps(db: AsyncSession, user: User, now: datetime) -> None:
+    """Throttled updates to last_login and last_activity to reduce DB writes."""
+    # Update last_login (throttled)
     if user.last_login is None or (now - user.last_login) > LAST_LOGIN_THROTTLE:
         user.last_login = now
         await db.flush()
 
-    # Update last_activity (throttled to every 5 min to reduce DB writes)
+    # Update last_activity (throttled to reduce DB writes)
     if user.last_activity is None or (now - user.last_activity) > LAST_ACTIVITY_THROTTLE:
         user.last_activity = now
         await db.flush()
+
+
+async def get_current_user(
+    request: Request,
+    token: TokenPayload = Depends(get_token_payload),
+    db: AsyncSession = Depends(get_db),
+) -> User:
+    user = await _get_or_create_user(db, token, request)
+
+    if not user.is_active:
+        raise ForbiddenError("User account is deactivated")
+
+    now = datetime.now(timezone.utc)
+
+    # Check session timeout — if last_activity is set and older than threshold,
+    # reset the session instead of permanently locking the user out.
+    # The user has already re-authenticated via Entra ID (token validated above),
+    # so we trust this is a legitimate new session.
+    if await _check_session_timeout(db, user, now):
+        return user
+
+    await _update_activity_timestamps(db, user, now)
 
     return user
 

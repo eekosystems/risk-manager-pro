@@ -44,7 +44,7 @@ async def readiness_check(
     try:
         await db.execute(text("SELECT 1"))
         checks["database"] = "ok"
-    except Exception as e:
+    except Exception as e:  # Deliberately broad: any failure means service is unhealthy
         logger.warning("health_check_database_failed", error=str(e))
         checks["database"] = "unavailable"
 
@@ -93,7 +93,7 @@ async def _check_search() -> str:
         finally:
             await client.close()
             await credential.close()
-    except Exception as e:
+    except Exception as e:  # Deliberately broad: any failure means service is unhealthy
         logger.warning("health_check_search_failed", error=str(e))
         return "unavailable"
 
@@ -119,7 +119,7 @@ async def _check_openai() -> str:
             return "ok"
         finally:
             await credential.close()
-    except Exception as e:
+    except Exception as e:  # Deliberately broad: any failure means service is unhealthy
         logger.warning("health_check_openai_failed", error=str(e))
         return "unavailable"
 
@@ -132,6 +132,6 @@ async def _check_storage(request: Request) -> str:
         client = await storage._get_client()
         await client.get_account_information()
         return "ok"
-    except Exception as e:
+    except Exception as e:  # Deliberately broad: any failure means service is unhealthy
         logger.warning("health_check_storage_failed", error=str(e))
         return "unavailable"

@@ -9,6 +9,12 @@ from app.core.config import settings
 
 logger = structlog.get_logger(__name__)
 
+_retry_on_rate_limit = retry(
+    retry=retry_if_exception_type(RateLimitError),
+    wait=wait_exponential(multiplier=1, min=2, max=30),
+    stop=stop_after_attempt(3),
+)
+
 
 class AzureOpenAIClient:
     def __init__(self) -> None:
@@ -33,11 +39,7 @@ class AzureOpenAIClient:
                 raise RuntimeError("Azure OpenAI endpoint not configured")
         return self._client
 
-    @retry(
-        retry=retry_if_exception_type((RateLimitError,)),
-        wait=wait_exponential(multiplier=1, min=2, max=30),
-        stop=stop_after_attempt(3),
-    )
+    @_retry_on_rate_limit
     async def chat_completion(
         self,
         messages: list[dict[str, str]],
@@ -82,11 +84,7 @@ class AzureOpenAIClient:
             if chunk.choices and chunk.choices[0].delta.content:
                 yield chunk.choices[0].delta.content
 
-    @retry(
-        retry=retry_if_exception_type((RateLimitError,)),
-        wait=wait_exponential(multiplier=1, min=2, max=30),
-        stop=stop_after_attempt(3),
-    )
+    @_retry_on_rate_limit
     async def embed(self, text: str) -> list[float]:
         client = await self._get_client()
         response = await client.embeddings.create(
@@ -95,11 +93,7 @@ class AzureOpenAIClient:
         )
         return response.data[0].embedding
 
-    @retry(
-        retry=retry_if_exception_type((RateLimitError,)),
-        wait=wait_exponential(multiplier=1, min=2, max=30),
-        stop=stop_after_attempt(3),
-    )
+    @_retry_on_rate_limit
     async def embed_batch(self, texts: list[str]) -> list[list[float]]:
         client = await self._get_client()
         response = await client.embeddings.create(

@@ -16,6 +16,7 @@ import { msalConfig } from "./config/auth";
 import { OrganizationProvider } from "./context/organization-context";
 import "./index.css";
 import { setMsalInstance } from "./lib/api-client";
+import { logger } from "./lib/logger";
 
 const msalInstance = new PublicClientApplication(msalConfig);
 setMsalInstance(msalInstance);
@@ -36,7 +37,7 @@ async function bootstrap(): Promise<void> {
   try {
     response = await msalInstance.handleRedirectPromise();
   } catch (err) {
-    console.error("[auth] handleRedirectPromise failed — clearing session cache:", err);
+    logger.error("[auth] handleRedirectPromise failed — clearing session cache:", err);
     sessionStorage.clear();
   }
   if (response?.account) {
