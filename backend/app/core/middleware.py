@@ -1,3 +1,4 @@
+import asyncio
 import json
 import uuid
 from typing import Any
@@ -60,6 +61,8 @@ class CorrelationIdMiddleware:
 
         try:
             await self.app(scope, receive, send_with_correlation_id)
+        except (asyncio.CancelledError, KeyboardInterrupt):
+            raise
         except Exception:
             logger.error(
                 "unhandled_exception_in_middleware",

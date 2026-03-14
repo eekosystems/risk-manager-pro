@@ -3,6 +3,7 @@ import axios from "axios";
 
 import { loginRequest } from "@/config/auth";
 import { env } from "@/config/env";
+import { logger } from "./logger";
 
 export const apiClient = axios.create({
   baseURL: `${env.apiBaseUrl}/api/v1`,
@@ -43,16 +44,17 @@ apiClient.interceptors.request.use(async (config) => {
   if (accounts.length === 0) return config;
 
   try {
+    const account = accounts[0];
     const response = await withTimeout(
       msalInstance.acquireTokenSilent({
         ...loginRequest,
-        account: accounts[0],
+        ...(account ? { account } : {}),
       }),
       TOKEN_TIMEOUT_MS,
     );
     config.headers.Authorization = `Bearer ${response.idToken}`;
   } catch (error) {
-    console.error("[api-client] Token acquisition failed:", error);
+    logger.error("[api-client] Token acquisition failed:", error);
   }
 
   if (activeOrganizationId) {
@@ -66,7 +68,7 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (axios.isAxiosError(error) && error.response?.status === 401) {
-      console.warn("[api-client] 401 response — user may need to re-login");
+      logger.warn("[api-client] 401 response — user may need to re-login");
     }
     return Promise.reject(error);
   },

@@ -107,7 +107,7 @@ export function CitationModal({ citation, index, onClose }: CitationModalProps) 
         </div>
 
         {/* Source Content */}
-        <div className="overflow-y-auto px-6 py-4" style={{ maxHeight: "50vh" }}>
+        <div className="overflow-y-auto px-6 py-4 max-h-[50vh]">
           <div className="mb-2 text-[10px] font-medium uppercase tracking-wide text-gray-400">
             Source Content
           </div>

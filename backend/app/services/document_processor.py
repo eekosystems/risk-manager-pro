@@ -5,6 +5,7 @@ import uuid
 import structlog
 import tiktoken
 
+from app.core.config import settings
 from app.models.document import DocumentStatus
 from app.repositories.document import DocumentRepository
 from app.services.openai_client import AzureOpenAIClient
@@ -12,9 +13,6 @@ from app.services.search_indexer import SearchIndexer
 from app.services.storage import BlobStorageService
 
 logger = structlog.get_logger(__name__)
-
-CHUNK_SIZE_TOKENS = 500
-CHUNK_OVERLAP_TOKENS = 50
 
 
 class DocumentProcessor:
@@ -74,11 +72,11 @@ class DocumentProcessor:
 
         start = 0
         while start < len(tokens):
-            end = start + CHUNK_SIZE_TOKENS
+            end = start + settings.chunk_size_tokens
             chunk_tokens = tokens[start:end]
             chunk_text = encoding.decode(chunk_tokens)
             chunks.append(chunk_text)
-            start = end - CHUNK_OVERLAP_TOKENS
+            start = end - settings.chunk_overlap_tokens
 
         return chunks
 
@@ -116,7 +114,7 @@ class DocumentProcessor:
             )
 
             embeddings: list[list[float]] = []
-            batch_size = 16
+            batch_size = settings.embedding_batch_size
             for i in range(0, len(chunks), batch_size):
                 batch = chunks[i : i + batch_size]
                 batch_embeddings = await self._openai.embed_batch(batch)

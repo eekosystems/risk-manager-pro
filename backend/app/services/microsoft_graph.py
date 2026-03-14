@@ -39,7 +39,7 @@ class MicrosoftGraphService:
     async def _ensure_client(self) -> httpx.AsyncClient:
         if self._client is None:
             self._credential = DefaultAzureCredential()
-            self._client = httpx.AsyncClient(timeout=30.0)
+            self._client = httpx.AsyncClient(timeout=settings.graph_api_timeout)
         return self._client
 
     async def _get_token(self) -> str:

@@ -2,6 +2,7 @@ import asyncio
 import uuid
 
 import structlog
+from azure.core.exceptions import AzureError
 from fastapi import APIRouter, Depends, Request, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -94,7 +95,15 @@ async def _process_document_background(
             )
             await processor.process(document_id)
             await db.commit()
-        except Exception:
+        except (AzureError, ValueError) as exc:
+            await db.rollback()
+            logger.error(
+                "background_processing_failed",
+                document_id=str(document_id),
+                error_type=type(exc).__name__,
+                exc_info=True,
+            )
+        except Exception:  # Broad fallback: background task must not propagate unhandled errors
             await db.rollback()
             logger.error(
                 "background_processing_failed",

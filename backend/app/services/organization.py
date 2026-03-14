@@ -104,6 +104,64 @@ class OrganizationService:
         logger.info("organization_updated", org_id=str(org_id))
         return org
 
+    async def _provision_from_graph(
+        self,
+        email: str,
+        graph_service: MicrosoftGraphService,
+    ) -> tuple[User, InvitationStatus]:
+        """Look up user in Microsoft Graph directory and create a local user record."""
+        graph_user = await graph_service.find_user_by_email(email)
+        if not graph_user:
+            return await self._send_b2b_invitation(email, graph_service)
+
+        user = User(
+            entra_id=graph_user.object_id,
+            email=graph_user.email or email,
+            display_name=graph_user.display_name,
+            invitation_status=InvitationStatus.PROVISIONED.value,
+        )
+        self._db.add(user)
+        await self._db.flush()
+        logger.info(
+            "user_provisioned_from_directory",
+            user_id=str(user.id),
+            entra_id=graph_user.object_id,
+        )
+        return user, InvitationStatus.PROVISIONED
+
+    async def _send_b2b_invitation(
+        self,
+        email: str,
+        graph_service: MicrosoftGraphService,
+    ) -> tuple[User, InvitationStatus]:
+        """Send a B2B invitation for an external user not found in the directory."""
+        invitation = await graph_service.send_b2b_invitation(email)
+        user = User(
+            entra_id=invitation.invited_user_id,
+            email=email,
+            display_name=email.split("@")[0],
+            invitation_status=InvitationStatus.INVITED.value,
+        )
+        self._db.add(user)
+        await self._db.flush()
+        logger.info(
+            "user_invited_via_b2b",
+            user_id=str(user.id),
+            entra_id=invitation.invited_user_id,
+            invitation_status=invitation.status,
+        )
+        return user, InvitationStatus.INVITED
+
+    async def _activate_existing_membership(
+        self,
+        existing: OrganizationMembership,
+        role: MembershipRole,
+    ) -> OrganizationMembership:
+        """Reactivate a previously removed membership."""
+        existing.is_active = True
+        existing.role = role
+        return existing
+
     async def add_member(
         self,
         organization_id: uuid.UUID,
@@ -123,43 +181,8 @@ class OrganizationService:
             user = await self._membership_repo.find_user_by_email(email)
 
             if not user and graph_service:
-                # Step 2: Check Entra ID directory
-                graph_user = await graph_service.find_user_by_email(email)
-
-                if graph_user:
-                    # Found in directory — provision locally
-                    user = User(
-                        entra_id=graph_user.object_id,
-                        email=graph_user.email or email,
-                        display_name=graph_user.display_name,
-                        invitation_status=InvitationStatus.PROVISIONED.value,
-                    )
-                    self._db.add(user)
-                    await self._db.flush()
-                    invitation_status = InvitationStatus.PROVISIONED
-                    logger.info(
-                        "user_provisioned_from_directory",
-                        user_id=str(user.id),
-                        entra_id=graph_user.object_id,
-                    )
-                else:
-                    # Step 3: Not in directory — send B2B invitation
-                    invitation = await graph_service.send_b2b_invitation(email)
-                    user = User(
-                        entra_id=invitation.invited_user_id,
-                        email=email,
-                        display_name=email.split("@")[0],
-                        invitation_status=InvitationStatus.INVITED.value,
-                    )
-                    self._db.add(user)
-                    await self._db.flush()
-                    invitation_status = InvitationStatus.INVITED
-                    logger.info(
-                        "user_invited_via_b2b",
-                        user_id=str(user.id),
-                        entra_id=invitation.invited_user_id,
-                        invitation_status=invitation.status,
-                    )
+                # Step 2: Check Entra ID directory (falls through to B2B invite if not found)
+                user, invitation_status = await self._provision_from_graph(email, graph_service)
 
             if not user:
                 raise NotFoundError("User", email)
@@ -174,9 +197,7 @@ class OrganizationService:
             raise ConflictError("User is already a member of this organization")
 
         if existing and not existing.is_active:
-            existing.is_active = True
-            existing.role = role
-            return existing
+            return await self._activate_existing_membership(existing, role)
 
         membership = await self._membership_repo.add_member(
             user_id=user_id,

@@ -7,6 +7,7 @@ import {
   updateModelSettings,
   type ModelSettings,
 } from "@/api/settings";
+import { SettingsSection } from "@/components/settings/settings-section";
 
 const DEFAULT_CONFIG: ModelSettings = {
   chat_model: "gpt-4o",
@@ -45,13 +46,13 @@ export function ModelPreferencesTab() {
 
   const { data, isLoading } = useQuery({
     queryKey: ["settings", "model"],
-    queryFn: () => getSettingsByCategory("model"),
+    queryFn: () => getSettingsByCategory<ModelSettings>("model"),
     retry: false,
   });
 
   useEffect(() => {
     if (data?.settings) {
-      setConfig(data.settings as unknown as ModelSettings);
+      setConfig(data.settings);
     }
   }, [data]);
 
@@ -85,7 +86,7 @@ export function ModelPreferencesTab() {
       </div>
 
       {/* Model Selection */}
-      <section className="mb-8 rounded-2xl border border-gray-200 bg-white p-6">
+      <div className="mb-8"><SettingsSection>
         <div className="mb-5 flex items-center gap-2">
           <Brain size={18} className="text-brand-500" />
           <h3 className="text-sm font-bold text-slate-800">Chat Model</h3>
@@ -123,10 +124,10 @@ export function ModelPreferencesTab() {
             </button>
           ))}
         </div>
-      </section>
+      </SettingsSection></div>
 
       {/* Generation Parameters */}
-      <section className="mb-8 rounded-2xl border border-gray-200 bg-white p-6">
+      <div className="mb-8"><SettingsSection>
         <div className="mb-5 flex items-center gap-2">
           <Thermometer size={18} className="text-brand-500" />
           <h3 className="text-sm font-bold text-slate-800">Generation Parameters</h3>
@@ -267,10 +268,10 @@ export function ModelPreferencesTab() {
             </button>
           </div>
         </div>
-      </section>
+      </SettingsSection></div>
 
       {/* Preset buttons */}
-      <section className="mb-8 rounded-2xl border border-gray-200 bg-white p-6">
+      <div className="mb-8"><SettingsSection>
         <div className="mb-4 flex items-center gap-2">
           <Zap size={18} className="text-brand-500" />
           <h3 className="text-sm font-bold text-slate-800">Quick Presets</h3>
@@ -319,7 +320,7 @@ export function ModelPreferencesTab() {
             Creative Brainstorming
           </button>
         </div>
-      </section>
+      </SettingsSection></div>
 
       {/* Save Button */}
       <button

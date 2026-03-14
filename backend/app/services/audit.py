@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 
 import structlog
 from fastapi import Request  # noqa: TCH002
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.database import async_session_factory
 from app.core.tasks import track_task
@@ -110,7 +111,7 @@ async def _write_audit_entry(
             storage=storage,
         )
 
-    except Exception:
+    except SQLAlchemyError:
         logger.error(
             "audit_entry_failed",
             action=action,
@@ -174,7 +175,7 @@ async def _write_audit_blob(
             if owns_storage:
                 await storage.close()
 
-    except Exception:
+    except (OSError, ValueError):
         logger.error(
             "audit_blob_write_failed",
             correlation_id=str(correlation_id),

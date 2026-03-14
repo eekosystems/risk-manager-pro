@@ -1,9 +1,9 @@
 import { apiClient } from "@/lib/api-client";
 import type { DataResponse } from "@/types/api";
 
-export interface SettingsResponse {
+export interface SettingsResponse<T = Record<string, unknown>> {
   category: string;
-  settings: Record<string, unknown>;
+  settings: T;
   updated_at: string | null;
 }
 
@@ -42,10 +42,10 @@ export async function getAllSettings(): Promise<SettingsResponse[]> {
   return response.data.data;
 }
 
-export async function getSettingsByCategory(
+export async function getSettingsByCategory<T = Record<string, unknown>>(
   category: string,
-): Promise<SettingsResponse> {
-  const response = await apiClient.get<DataResponse<SettingsResponse>>(
+): Promise<SettingsResponse<T>> {
+  const response = await apiClient.get<DataResponse<SettingsResponse<T>>>(
     `/settings/${category}`,
   );
   return response.data.data;

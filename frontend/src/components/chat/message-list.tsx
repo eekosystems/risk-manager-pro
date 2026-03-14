@@ -65,7 +65,7 @@ export function MessageList({ messages, isTyping }: MessageListProps) {
                   <div className="mt-3 flex flex-wrap gap-1.5 border-t border-gray-100 pt-3">
                     {msg.citations.map((c, i) => (
                       <CitationChip
-                        key={c.chunk_id ?? i}
+                        key={c.chunk_id ?? `citation-${i}`}
                         citation={c}
                         index={i}
                         onClick={() => setSelected({ citation: c, index: i })}
@@ -87,12 +87,9 @@ export function MessageList({ messages, isTyping }: MessageListProps) {
             <div className="flex items-center gap-1.5 rounded-2xl border border-gray-200 bg-white px-5 py-3.5 shadow-sm">
               {[0, 1, 2].map((i) => (
                 <div
-                  key={i}
-                  className="h-2 w-2 rounded-full bg-brand-400"
-                  style={{
-                    animation: `typingDot 1.2s infinite`,
-                    animationDelay: `${i * 0.2}s`,
-                  }}
+                  key={`dot-${i}`}
+                  className="h-2 w-2 rounded-full bg-brand-400 animate-typing-dot"
+                  style={{ animationDelay: `${i * 0.2}s` }}
                 />
               ))}
             </div>

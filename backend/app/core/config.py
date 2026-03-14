@@ -61,6 +61,20 @@ class Settings(BaseSettings):
     # Microsoft Graph API
     invitation_redirect_url: str = ""
 
+    # Document processing
+    chunk_size_tokens: int = 500
+    chunk_overlap_tokens: int = 50
+    max_file_size_bytes: int = 50 * 1024 * 1024  # 50 MB
+    embedding_batch_size: int = 16
+    search_index_batch_size: int = 100
+
+    # HTTP timeouts
+    graph_api_timeout: float = 30.0
+
+    # Session management
+    last_login_throttle_seconds: int = 300  # 5 minutes
+    last_activity_throttle_seconds: int = 300  # 5 minutes
+
     @model_validator(mode="after")
     def _validate_database_url(self) -> "Settings":
         if not self.database_url:

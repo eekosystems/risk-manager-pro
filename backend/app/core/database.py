@@ -3,6 +3,7 @@ from collections.abc import AsyncGenerator
 from datetime import datetime
 
 from sqlalchemy import func
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -37,6 +38,6 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
         try:
             yield session
             await session.commit()
-        except Exception:
+        except SQLAlchemyError:
             await session.rollback()
             raise

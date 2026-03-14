@@ -51,7 +51,7 @@ class SearchIndexer:
                 }
             )
 
-        batch_size = 100
+        batch_size = settings.search_index_batch_size
         indexed = 0
         for start in range(0, len(documents), batch_size):
             batch = documents[start : start + batch_size]
