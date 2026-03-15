@@ -6,6 +6,9 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
 env:
   PYTHON_VERSION: "3.12"
   NODE_VERSION: "20"
@@ -111,8 +114,33 @@ jobs:
 
       - name: Frontend dependency audit
         working-directory: frontend
-        run: npm ci && npm audit --audit-level=high
-        continue-on-error: true
+        run: npm ci && npm audit --audit-level=critical
+
+  sast:
+    name: SAST (Static Analysis)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+
+      - name: Install bandit
+        run: pip install bandit[toml]
+
+      - name: Run bandit (Python SAST)
+        working-directory: backend
+        run: bandit -r app/ -c pyproject.toml -f json -o bandit-report.json || bandit -r app/ -f screen
+
+      - name: Upload bandit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-report
+          path: backend/bandit-report.json
 
   frontend-lint:
     name: Frontend Lint & Type Check

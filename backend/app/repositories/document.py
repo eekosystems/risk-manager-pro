@@ -3,7 +3,7 @@ import uuid
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.document import Document, DocumentStatus
+from app.models.document import Document, DocumentStatus, SourceType
 
 
 class DocumentRepository:
@@ -18,6 +18,7 @@ class DocumentRepository:
         blob_path: str,
         content_type: str,
         size_bytes: int,
+        source_type: SourceType = SourceType.CLIENT,
     ) -> Document:
         document = Document(
             organization_id=organization_id,
@@ -26,6 +27,7 @@ class DocumentRepository:
             blob_path=blob_path,
             content_type=content_type,
             size_bytes=size_bytes,
+            source_type=source_type,
         )
         self._db.add(document)
         await self._db.flush()

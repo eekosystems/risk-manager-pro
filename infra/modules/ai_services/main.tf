@@ -12,7 +12,11 @@ resource "azurerm_cognitive_account" "openai" {
   }
 
   network_acls {
-    default_action = "Allow"
+    default_action = "Deny"
+
+    virtual_network_rules {
+      subnet_id = var.container_app_subnet_id
+    }
   }
 }
 
@@ -49,13 +53,14 @@ resource "azurerm_cognitive_deployment" "embedding" {
 }
 
 resource "azurerm_search_service" "main" {
-  name                = "search-${var.name_prefix}"
-  resource_group_name = var.resource_group_name
-  location            = var.location
-  sku                 = "free"
-  replica_count       = 1
-  partition_count     = 1
-  tags                = var.tags
+  name                          = "search-${var.name_prefix}"
+  resource_group_name           = var.resource_group_name
+  location                      = var.location
+  sku                           = "basic"
+  replica_count                 = 1
+  partition_count               = 1
+  public_network_access_enabled = false
+  tags                          = var.tags
 
   identity {
     type = "SystemAssigned"

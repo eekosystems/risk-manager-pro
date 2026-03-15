@@ -55,12 +55,7 @@ variable "container_registry_server" {
   type = string
 }
 
-variable "container_registry_username" {
-  type      = string
-  sensitive = true
-}
-
-variable "container_registry_password" {
-  type      = string
-  sensitive = true
+variable "container_registry_id" {
+  type        = string
+  description = "Resource ID of the ACR for AcrPull role assignment"
 }

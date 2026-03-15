@@ -26,7 +26,7 @@ export function RecentDocuments() {
         setUploadErrors(errors);
       }
       for (const vf of valid) {
-        uploadMutation.mutate(vf.file);
+        uploadMutation.mutate({ file: vf.file });
       }
     },
     [uploadMutation],

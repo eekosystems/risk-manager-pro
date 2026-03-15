@@ -3,7 +3,7 @@ import uuid
 
 import structlog
 from azure.core.exceptions import AzureError
-from fastapi import APIRouter, Depends, Request, UploadFile
+from fastapi import APIRouter, Depends, Query, Request, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import async_session_factory, get_db
@@ -14,6 +14,7 @@ from app.core.deps import (
     get_storage_service,
 )
 from app.core.tasks import track_task
+from app.models.document import SourceType
 from app.models.organization import Organization
 from app.models.user import User
 from app.repositories.document import DocumentRepository
@@ -42,6 +43,7 @@ def _get_document_service(
 async def upload_document(
     file: UploadFile,
     request: Request,
+    source_type: SourceType = Query(SourceType.CLIENT, alias="source_type"),
     current_user: User = Depends(get_current_user),
     organization: Organization = Depends(get_current_organization),
     service: DocumentService = Depends(_get_document_service),
@@ -54,6 +56,7 @@ async def upload_document(
         filename=file.filename or "unnamed",
         content_type=file.content_type or "application/octet-stream",
         data=data,
+        source_type=source_type,
     )
     await audit.log(
         action="document.uploaded",
@@ -114,8 +117,8 @@ async def _process_document_background(
 
 @router.get("", response_model=PaginatedResponse[DocumentListItem])
 async def list_documents(
-    skip: int = 0,
-    limit: int = 50,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
     current_user: User = Depends(get_current_user),
     organization: Organization = Depends(get_current_organization),
     service: DocumentService = Depends(_get_document_service),

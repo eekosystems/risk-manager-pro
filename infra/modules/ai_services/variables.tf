@@ -13,3 +13,8 @@ variable "name_prefix" {
 variable "tags" {
   type = map(string)
 }
+
+variable "container_app_subnet_id" {
+  type        = string
+  description = "Subnet ID for the container app — used in network ACLs"
+}

@@ -31,7 +31,10 @@ class ConversationRepository:
         return conversation
 
     async def get_by_id(
-        self, conversation_id: uuid.UUID, organization_id: uuid.UUID
+        self,
+        conversation_id: uuid.UUID,
+        organization_id: uuid.UUID,
+        user_id: uuid.UUID | None = None,
     ) -> Conversation | None:
         stmt = (
             select(Conversation)
@@ -41,6 +44,8 @@ class ConversationRepository:
             )
             .options(selectinload(Conversation.messages))
         )
+        if user_id is not None:
+            stmt = stmt.where(Conversation.user_id == user_id)
         result = await self._db.execute(stmt)
         return result.scalar_one_or_none()
 
@@ -108,8 +113,13 @@ class ConversationRepository:
         result = await self._db.execute(stmt)
         return list(result.scalars().all())
 
-    async def archive(self, conversation_id: uuid.UUID, organization_id: uuid.UUID) -> bool:
-        conversation = await self.get_by_id(conversation_id, organization_id)
+    async def archive(
+        self,
+        conversation_id: uuid.UUID,
+        organization_id: uuid.UUID,
+        user_id: uuid.UUID | None = None,
+    ) -> bool:
+        conversation = await self.get_by_id(conversation_id, organization_id, user_id=user_id)
         if not conversation:
             return False
         conversation.status = ConversationStatus.ARCHIVED

@@ -19,9 +19,8 @@ resource "azurerm_container_app" "backend" {
   }
 
   registry {
-    server               = var.container_registry_server
-    username             = var.container_registry_username
-    password_secret_name = "registry-password"
+    server   = var.container_registry_server
+    identity = "system"
   }
 
   template {
@@ -95,19 +94,22 @@ resource "azurerm_container_app" "backend" {
     value = var.database_url
   }
 
-  secret {
-    name  = "registry-password"
-    value = var.container_registry_password
-  }
-
   ingress {
-    external_enabled = true
-    target_port      = 8000
-    transport        = "auto"
+    external_enabled           = true
+    target_port                = 8000
+    transport                  = "http"
+    allow_insecure_connections = false
 
     traffic_weight {
       percentage      = 100
       latest_revision = true
     }
   }
+}
+
+# Grant Container App system-assigned identity AcrPull on the registry
+resource "azurerm_role_assignment" "container_app_acr_pull" {
+  scope                = var.container_registry_id
+  role_definition_name = "AcrPull"
+  principal_id         = azurerm_container_app.backend.identity[0].principal_id
 }

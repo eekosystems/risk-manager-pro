@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+import re
+
 import httpx
 import structlog
 from azure.identity.aio import DefaultAzureCredential
 from pydantic import BaseModel
 
 from app.core.config import settings
-from app.core.exceptions import ExternalServiceError
+from app.core.exceptions import ExternalServiceError, ValidationError
 
 logger = structlog.get_logger(__name__)
 
@@ -48,15 +50,31 @@ class MicrosoftGraphService:
         token = await self._credential.get_token(GRAPH_SCOPE)
         return token.token
 
+    @staticmethod
+    def _sanitize_odata_value(value: str) -> str:
+        """Escape single quotes for safe OData filter interpolation."""
+        return value.replace("'", "''")
+
+    @staticmethod
+    def _validate_email_format(email: str) -> None:
+        """Reject values that are clearly not email addresses."""
+        if not re.match(r"^[^'\";<>]{1,320}@[^'\";<>]+\.[^'\";<>]+$", email):
+            raise ValidationError(
+                code="INVALID_EMAIL",
+                message="Invalid email format",
+            )
+
     async def find_user_by_email(self, email: str) -> GraphUser | None:
         """Look up a user in the Entra ID directory by email or UPN."""
+        self._validate_email_format(email)
+        safe_email = self._sanitize_odata_value(email)
         try:
             client = await self._ensure_client()
             token = await self._get_token()
             response = await client.get(
                 f"{GRAPH_BASE_URL}/users",
                 params={
-                    "$filter": f"mail eq '{email}' or userPrincipalName eq '{email}'",
+                    "$filter": f"mail eq '{safe_email}' or userPrincipalName eq '{safe_email}'",
                     "$select": "id,mail,displayName,userPrincipalName",
                 },
                 headers={"Authorization": f"Bearer {token}"},
@@ -106,6 +124,7 @@ class MicrosoftGraphService:
         redirect_url: str | None = None,
     ) -> GraphInvitation:
         """Send a B2B guest invitation via Microsoft Graph."""
+        self._validate_email_format(email)
         redirect = (
             redirect_url or settings.invitation_redirect_url or "https://myapps.microsoft.com"
         )

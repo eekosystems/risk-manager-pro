@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -62,8 +62,8 @@ async def create_organization(
 
 @router.get("", response_model=DataResponse[list[OrganizationListItem]])
 async def list_organizations(
-    skip: int = 0,
-    limit: int = 50,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
     current_user: User = Depends(get_current_user),
     service: OrganizationService = Depends(_get_org_service),
 ) -> DataResponse[list[OrganizationListItem]]:
@@ -150,8 +150,8 @@ async def add_member(
 @router.get("/{org_id}/members", response_model=DataResponse[list[MemberResponse]])
 async def list_members(
     org_id: uuid.UUID,
-    skip: int = 0,
-    limit: int = 50,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
     current_user: User = Depends(get_current_user),
     service: OrganizationService = Depends(_get_org_service),
 ) -> DataResponse[list[MemberResponse]]:

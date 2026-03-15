@@ -105,11 +105,11 @@ service_registry = ServiceRegistry()
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     setup_logging()
 
-    if settings.is_production:
+    if settings.app_env != "development":
         origins = settings.cors_origins
         if "*" in origins:
             raise RuntimeError(
-                "CORS_ORIGINS must not contain '*' in production. "
+                "CORS_ORIGINS must not contain '*' outside of local development. "
                 "Set explicit origins in CORS_ORIGINS environment variable."
             )
 

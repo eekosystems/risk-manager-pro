@@ -70,6 +70,16 @@ def _compute_match_tier(rank: int, score: float, total: int) -> str:
     return "Low"
 
 
+_SOURCE_TYPE_LABELS: dict[str, str] = {
+    "client": "Client Document",
+    "faa": "FAA Regulation",
+    "icao": "ICAO Standard",
+    "easa": "EASA Regulation",
+    "nasa_asrs": "NASA ASRS Report",
+    "internal": "Internal Document",
+}
+
+
 def _build_context_block(results: list[SearchResult]) -> str:
     if not results:
         return "No relevant documents found in the knowledge base."
@@ -77,7 +87,8 @@ def _build_context_block(results: list[SearchResult]) -> str:
     sections: list[str] = []
     for i, r in enumerate(results, 1):
         tier = _compute_match_tier(i, r.score, len(results))
-        source_label = f"[Source {i}: {r.source}"
+        type_label = _SOURCE_TYPE_LABELS.get(r.source_type, "Document")
+        source_label = f"[Source {i}: {r.source} ({type_label})"
         if r.section:
             source_label += f" — {r.section}"
         source_label += f" | Match: {tier}]"
@@ -91,6 +102,7 @@ def _extract_citations(results: list[SearchResult]) -> list[CitationSchema]:
     return [
         CitationSchema(
             source=r.source,
+            source_type=r.source_type,
             section=r.section,
             content=r.content,
             score=r.score,
@@ -271,9 +283,9 @@ class ChatService:
         )
 
     async def get_conversation(
-        self, conversation_id: uuid.UUID, organization_id: uuid.UUID
+        self, conversation_id: uuid.UUID, organization_id: uuid.UUID, user_id: uuid.UUID | None = None
     ) -> Conversation | None:
-        return await self._repo.get_by_id(conversation_id, organization_id)
+        return await self._repo.get_by_id(conversation_id, organization_id, user_id=user_id)
 
     async def list_conversations(
         self, user_id: uuid.UUID, organization_id: uuid.UUID, skip: int = 0, limit: int = 50
@@ -281,6 +293,6 @@ class ChatService:
         return await self._repo.list_for_user(user_id, organization_id, skip, limit)
 
     async def delete_conversation(
-        self, conversation_id: uuid.UUID, organization_id: uuid.UUID
+        self, conversation_id: uuid.UUID, organization_id: uuid.UUID, user_id: uuid.UUID | None = None
     ) -> bool:
-        return await self._repo.archive(conversation_id, organization_id)
+        return await self._repo.archive(conversation_id, organization_id, user_id=user_id)

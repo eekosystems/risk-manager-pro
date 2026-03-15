@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 
 import { deleteDocument, getDocuments, uploadDocument } from "@/api/documents";
-import type { DocumentItem, DocumentStatus } from "@/types/api";
+import type { DocumentItem, DocumentStatus, SourceType } from "@/types/api";
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -29,6 +29,15 @@ function formatDate(iso: string): string {
     minute: "2-digit",
   });
 }
+
+const SOURCE_TYPE_LABELS: Record<SourceType, { label: string; className: string }> = {
+  client: { label: "Client", className: "text-blue-600 bg-blue-50" },
+  faa: { label: "FAA", className: "text-indigo-600 bg-indigo-50" },
+  icao: { label: "ICAO", className: "text-purple-600 bg-purple-50" },
+  easa: { label: "EASA", className: "text-violet-600 bg-violet-50" },
+  nasa_asrs: { label: "NASA ASRS", className: "text-teal-600 bg-teal-50" },
+  internal: { label: "Internal", className: "text-gray-600 bg-gray-50" },
+};
 
 const STATUS_CONFIG: Record<
   DocumentStatus,
@@ -90,7 +99,7 @@ export function IndexedFilesTab() {
     input.onchange = (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (file) {
-        uploadMutation.mutate(file);
+        uploadMutation.mutate({ file });
       }
     };
     input.click();
@@ -222,6 +231,13 @@ export function IndexedFilesTab() {
                       />
                       {statusConfig.label}
                     </span>
+                    {file.source_type && (
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${SOURCE_TYPE_LABELS[file.source_type]?.className ?? "text-gray-600 bg-gray-50"}`}
+                      >
+                        {SOURCE_TYPE_LABELS[file.source_type]?.label ?? file.source_type}
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-3 text-[12px] text-slate-400">
                     <span>{formatBytes(file.size_bytes)}</span>

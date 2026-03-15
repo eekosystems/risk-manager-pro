@@ -45,10 +45,11 @@ module "storage" {
 module "ai_services" {
   source = "./modules/ai_services"
 
-  resource_group_name = azurerm_resource_group.main.name
-  location            = var.location
-  name_prefix         = local.name_prefix
-  tags                = var.tags
+  resource_group_name     = azurerm_resource_group.main.name
+  location                = var.location
+  name_prefix             = local.name_prefix
+  tags                    = var.tags
+  container_app_subnet_id = module.network.container_app_subnet_id
 }
 
 module "keyvault" {
@@ -90,8 +91,7 @@ module "container_app" {
   azure_ad_client_id          = var.azure_ad_client_id
   log_analytics_workspace_id  = module.monitoring.log_analytics_workspace_id
   container_registry_server   = module.container_registry.login_server
-  container_registry_username = module.container_registry.admin_username
-  container_registry_password = module.container_registry.admin_password
+  container_registry_id       = module.container_registry.id
 }
 
 # Grant Container App managed identity access to Key Vault (breaks circular dependency)
