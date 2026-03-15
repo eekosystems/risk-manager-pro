@@ -69,6 +69,7 @@ export function IndexedFilesTab() {
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [selectedSourceType, setSelectedSourceType] = useState<SourceType>("client");
 
   const { data: files = [], isLoading } = useQuery({
     queryKey: ["documents"],
@@ -99,7 +100,7 @@ export function IndexedFilesTab() {
     input.onchange = (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (file) {
-        uploadMutation.mutate({ file });
+        uploadMutation.mutate({ file, sourceType: selectedSourceType });
       }
     };
     input.click();
@@ -176,6 +177,19 @@ export function IndexedFilesTab() {
           )}
           Upload Document
         </button>
+        <select
+          value={selectedSourceType}
+          onChange={(e) => setSelectedSourceType(e.target.value as SourceType)}
+          className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-slate-800 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+        >
+          {(Object.entries(SOURCE_TYPE_LABELS) as [SourceType, { label: string }][]).map(
+            ([value, { label }]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ),
+          )}
+        </select>
         <div className="relative flex-1">
           <Search
             size={16}

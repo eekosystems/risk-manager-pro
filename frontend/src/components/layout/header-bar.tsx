@@ -1,18 +1,25 @@
 import { Search, Settings } from "lucide-react";
 
+import type { AppView } from "./app-layout";
+
 interface HeaderBarProps {
+  currentView?: AppView;
   onSettingsClick?: () => void;
 }
 
-export function HeaderBar({ onSettingsClick }: HeaderBarProps) {
+export function HeaderBar({ currentView = "chat", onSettingsClick }: HeaderBarProps) {
+  const isRiskRegister = currentView === "risk-register";
+
   return (
     <div className="flex items-center justify-between border-b border-gray-200 bg-white px-8 py-4">
       <div className="flex flex-col">
         <h1 className="text-[22px] font-bold text-slate-900">
-          Risk Manager Pro
+          {isRiskRegister ? "Risk Register" : "Risk Manager Pro"}
         </h1>
         <p className="text-[13px] text-slate-500">
-          AI-powered risk analysis using indexed Faith Group safety data
+          {isRiskRegister
+            ? "Track hazards, assess risks, and manage mitigations"
+            : "AI-powered risk analysis using indexed Faith Group safety data"}
         </p>
       </div>
 

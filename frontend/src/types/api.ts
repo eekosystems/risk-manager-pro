@@ -131,3 +131,89 @@ export interface PaginatedResponse<T> {
 export interface ErrorResponse {
   error: { code: string; message: string };
 }
+
+// --- Risk Register Types ---
+
+export type RiskStatus = "open" | "mitigating" | "closed" | "accepted";
+export type MitigationStatus = "pending" | "in_progress" | "completed" | "cancelled";
+
+export interface RiskEntryListItem {
+  id: string;
+  title: string;
+  hazard: string;
+  severity: number;
+  likelihood: string;
+  risk_level: string;
+  status: RiskStatus;
+  function_type: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MitigationItem {
+  id: string;
+  risk_entry_id: string;
+  title: string;
+  description: string;
+  assignee: string | null;
+  due_date: string | null;
+  status: MitigationStatus;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RiskEntryDetail {
+  id: string;
+  organization_id: string;
+  created_by: string;
+  title: string;
+  description: string;
+  hazard: string;
+  severity: number;
+  likelihood: string;
+  risk_level: string;
+  status: RiskStatus;
+  function_type: string;
+  conversation_id: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  mitigations: MitigationItem[];
+}
+
+export interface CreateRiskEntryRequest {
+  title: string;
+  description: string;
+  hazard: string;
+  severity: number;
+  likelihood: string;
+  function_type?: string;
+  conversation_id?: string | null;
+  notes?: string | null;
+}
+
+export interface UpdateRiskEntryRequest {
+  title?: string | null;
+  description?: string | null;
+  hazard?: string | null;
+  severity?: number | null;
+  likelihood?: string | null;
+  status?: RiskStatus | null;
+  notes?: string | null;
+}
+
+export interface CreateMitigationRequest {
+  title: string;
+  description: string;
+  assignee?: string | null;
+  due_date?: string | null;
+}
+
+export interface UpdateMitigationRequest {
+  title?: string | null;
+  description?: string | null;
+  assignee?: string | null;
+  due_date?: string | null;
+  status?: MitigationStatus | null;
+}

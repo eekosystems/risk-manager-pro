@@ -1,5 +1,11 @@
 import { clsx } from "clsx";
-import { ChevronRight, FileText, FolderSearch, User } from "lucide-react";
+import {
+  ChevronRight,
+  FileText,
+  FolderSearch,
+  ShieldAlert,
+  User,
+} from "lucide-react";
 
 import { IndexedSources } from "@/components/layout/panel/indexed-sources";
 import { RecentDocuments } from "@/components/layout/panel/recent-documents";
@@ -9,11 +15,15 @@ import { UserCard } from "@/components/layout/sidebar/user-card";
 import { FUNCTIONS } from "@/constants/functions";
 import type { FunctionType, OrganizationSummary } from "@/types/api";
 
+import type { AppView } from "./app-layout";
+
 interface LeftSidebarProps {
   isOpen: boolean;
   onToggle: () => void;
   activeFunction: FunctionType;
   onFunctionSelect: (fn: FunctionType) => void;
+  currentView: AppView;
+  onViewChange: (view: AppView) => void;
   activeOrganization: OrganizationSummary | null;
   organizations: OrganizationSummary[];
   onOrganizationSelect: (org: OrganizationSummary) => void;
@@ -24,6 +34,8 @@ export function LeftSidebar({
   onToggle,
   activeFunction,
   onFunctionSelect,
+  currentView,
+  onViewChange,
   activeOrganization,
   organizations,
   onOrganizationSelect,
@@ -68,6 +80,23 @@ export function LeftSidebar({
               activeFunction={activeFunction}
               onFunctionSelect={onFunctionSelect}
             />
+
+            {/* Risk Register nav button */}
+            <div className="mt-2">
+              <button
+                onClick={() => onViewChange("risk-register")}
+                className={clsx(
+                  "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all",
+                  currentView === "risk-register"
+                    ? "gradient-brand text-white shadow-md shadow-brand-500/30"
+                    : "text-gray-600 hover:bg-brand-50 hover:text-brand-500",
+                )}
+              >
+                <ShieldAlert size={18} />
+                Risk Register
+              </button>
+            </div>
+
             <RecentDocuments />
             <IndexedSources />
           </nav>
@@ -86,7 +115,7 @@ export function LeftSidebar({
                 title={fn.name}
                 className={clsx(
                   "flex h-10 w-10 items-center justify-center rounded-lg transition-all",
-                  activeFunction === fn.id
+                  activeFunction === fn.id && currentView === "chat"
                     ? "gradient-brand text-white shadow-md shadow-brand-500/30"
                     : "text-gray-400 hover:bg-brand-50 hover:text-brand-500",
                 )}
@@ -95,6 +124,23 @@ export function LeftSidebar({
               </button>
             ))}
           </nav>
+
+          <div className="mx-3 my-3 h-px w-8 bg-gray-200" />
+
+          {/* Risk Register icon */}
+          <button
+            onClick={() => onViewChange("risk-register")}
+            aria-label="Risk Register"
+            title="Risk Register"
+            className={clsx(
+              "flex h-10 w-10 items-center justify-center rounded-lg transition-all",
+              currentView === "risk-register"
+                ? "gradient-brand text-white shadow-md shadow-brand-500/30"
+                : "text-gray-400 hover:bg-brand-50 hover:text-brand-500",
+            )}
+          >
+            <ShieldAlert size={20} />
+          </button>
 
           <div className="mx-3 my-3 h-px w-8 bg-gray-200" />
 

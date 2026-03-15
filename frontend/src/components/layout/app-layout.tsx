@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { RiskRegisterPage } from "@/components/risk-register/risk-register-page";
 import { SettingsPage } from "@/components/settings/settings-page";
 import { useOrganizationContext } from "@/hooks/use-organization-context";
 import type { FunctionType } from "@/types/api";
@@ -7,6 +8,8 @@ import type { FunctionType } from "@/types/api";
 import { HeaderBar } from "./header-bar";
 import { LeftSidebar } from "./left-sidebar";
 import { RightPanel } from "./right-panel";
+
+export type AppView = "chat" | "risk-register";
 
 interface AppLayoutProps {
   children: (props: {
@@ -22,6 +25,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   const [showSettings, setShowSettings] = useState(false);
   const [activeFunction, setActiveFunction] = useState<FunctionType>("general");
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [currentView, setCurrentView] = useState<AppView>("chat");
   const { activeOrganization, organizations, setActiveOrganization } =
     useOrganizationContext();
 
@@ -35,7 +39,10 @@ export function AppLayout({ children }: AppLayoutProps) {
         onFunctionSelect={(fn) => {
           setActiveFunction(fn);
           setConversationId(null);
+          setCurrentView("chat");
         }}
+        currentView={currentView}
+        onViewChange={setCurrentView}
         activeOrganization={activeOrganization}
         organizations={organizations}
         onOrganizationSelect={(org) => {
@@ -45,16 +52,26 @@ export function AppLayout({ children }: AppLayoutProps) {
       />
 
       {/* Main Content */}
-      <main aria-label="Chat workspace" className="flex flex-1 flex-col overflow-hidden">
-        <HeaderBar onSettingsClick={() => setShowSettings(true)} />
-        {children({ activeFunction, conversationId, setConversationId })}
+      <main aria-label="Main workspace" className="flex flex-1 flex-col overflow-hidden">
+        <HeaderBar
+          currentView={currentView}
+          onSettingsClick={() => setShowSettings(true)}
+        />
+        {currentView === "risk-register" ? (
+          <RiskRegisterPage />
+        ) : (
+          children({ activeFunction, conversationId, setConversationId })
+        )}
       </main>
 
       {/* Right Panel */}
       <RightPanel
         isOpen={rightOpen}
         onToggle={() => setRightOpen(!rightOpen)}
-        onConversationSelect={setConversationId}
+        onConversationSelect={(id) => {
+          setConversationId(id);
+          setCurrentView("chat");
+        }}
       />
 
       {/* Settings Modal */}
