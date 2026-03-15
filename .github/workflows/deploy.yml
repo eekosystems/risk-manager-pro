@@ -82,11 +82,24 @@ jobs:
       - name: Login to ACR
         run: az acr login --name ${{ env.ACR_NAME }}
 
-      - name: Build and push
+      - name: Build image
         working-directory: backend
         run: |
           IMAGE_TAG="${{ env.ACR_NAME }}.azurecr.io/rmp-api:${{ github.sha }}"
           docker build -t "$IMAGE_TAG" .
+
+      - name: Scan image for vulnerabilities
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: "${{ env.ACR_NAME }}.azurecr.io/rmp-api:${{ github.sha }}"
+          format: "table"
+          exit-code: "1"
+          severity: "CRITICAL,HIGH"
+
+      - name: Push image
+        working-directory: backend
+        run: |
+          IMAGE_TAG="${{ env.ACR_NAME }}.azurecr.io/rmp-api:${{ github.sha }}"
           docker push "$IMAGE_TAG"
 
       - name: Update Container App

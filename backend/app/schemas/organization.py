@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, EmailStr, Field, model_validator
 
 from app.models.organization import OrganizationStatus
 from app.models.organization_membership import MembershipRole
@@ -44,7 +44,7 @@ class OrganizationListItem(BaseModel):
 
 class AddMemberRequest(BaseModel):
     user_id: uuid.UUID | None = None
-    email: str | None = None
+    email: EmailStr | None = Field(None, max_length=320)
     role: MembershipRole = MembershipRole.VIEWER
 
     @model_validator(mode="after")

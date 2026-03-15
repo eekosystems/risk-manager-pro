@@ -3,14 +3,23 @@ import type {
   DataResponse,
   DocumentItem,
   PaginatedResponse,
+  SourceType,
 } from "@/types/api";
 
-export async function uploadDocument(file: File): Promise<DocumentItem> {
+export interface UploadDocumentParams {
+  file: File;
+  sourceType?: SourceType;
+}
+
+export async function uploadDocument(
+  params: UploadDocumentParams,
+): Promise<DocumentItem> {
+  const { file, sourceType = "client" } = params;
   const formData = new FormData();
   formData.append("file", file);
 
   const response = await apiClient.post<DataResponse<DocumentItem>>(
-    "/documents/upload",
+    `/documents/upload?source_type=${encodeURIComponent(sourceType)}`,
     formData,
     { headers: { "Content-Type": "multipart/form-data" } },
   );

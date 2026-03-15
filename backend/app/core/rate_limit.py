@@ -5,7 +5,8 @@ Three tiers:
 - General API: 60/minute (configurable)
 - AI/chat endpoints: 20/minute (configurable)
 
-Phase 1: in-memory storage. Set RATE_LIMIT_STORAGE_URI to a Redis URL for multi-instance.
+Set RATE_LIMIT_STORAGE_URI to a Redis URL (e.g. redis://host:6379) for
+multi-instance deployments. Falls back to in-memory when unset.
 """
 
 from fastapi import Request
@@ -16,9 +17,12 @@ from slowapi.util import get_remote_address
 
 from app.core.config import settings
 
+_storage_uri = settings.rate_limit_storage_uri or None
+
 limiter = Limiter(
     key_func=get_remote_address,
     default_limits=[settings.rate_limit_default],
+    storage_uri=_storage_uri,
 )
 
 

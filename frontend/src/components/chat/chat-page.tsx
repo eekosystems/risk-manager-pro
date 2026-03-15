@@ -56,7 +56,7 @@ export function ChatPage({
   const handleSend = useCallback(
     (message: string, files: File[]) => {
       for (const file of files) {
-        uploadDocumentMutation.mutate(file, {
+        uploadDocumentMutation.mutate({ file }, {
           onSuccess: () => {
             addToast(`"${file.name}" uploaded successfully`, "success");
           },

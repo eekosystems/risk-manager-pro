@@ -33,6 +33,7 @@ class SearchIndexer:
         source: str,
         chunks: list[str],
         embeddings: list[list[float]],
+        source_type: str = "client",
     ) -> int:
         client = await self._get_client()
 
@@ -45,6 +46,7 @@ class SearchIndexer:
                     "document_id": str(document_id),
                     "tenant_id": str(organization_id),
                     "source": source,
+                    "source_type": source_type,
                     "section": f"Chunk {i + 1}",
                     "content": chunk,
                     "content_vector": embedding,

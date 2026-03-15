@@ -1,12 +1,14 @@
 export type FunctionType = "phl" | "sra" | "system" | "general";
 export type MessageRole = "user" | "assistant" | "system";
 export type DocumentStatus = "uploaded" | "processing" | "indexed" | "failed";
+export type SourceType = "client" | "faa" | "icao" | "easa" | "nasa_asrs" | "internal";
 export type MembershipRole = "org_admin" | "analyst" | "viewer";
 export type InvitationStatus = "active" | "invited" | "provisioned";
 export type OrganizationStatus = "active" | "suspended" | "archived";
 
 export interface Citation {
   source: string;
+  source_type: SourceType;
   section: string | null;
   content: string;
   score: number | null;
@@ -100,6 +102,7 @@ export interface DocumentItem {
   content_type: string;
   size_bytes: number;
   status: DocumentStatus;
+  source_type: SourceType;
   created_at: string;
 }
 

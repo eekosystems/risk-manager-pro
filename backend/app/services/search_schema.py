@@ -50,6 +50,12 @@ def build_index_schema(index_name: str | None = None) -> SearchIndex:
             filterable=True,
             facetable=True,
         ),
+        SimpleField(
+            name="source_type",
+            type=SearchFieldDataType.String,
+            filterable=True,
+            facetable=True,
+        ),
         SearchableField(
             name="section",
             type=SearchFieldDataType.String,

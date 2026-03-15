@@ -1,7 +1,7 @@
 import { type IPublicClientApplication } from "@azure/msal-browser";
 import axios from "axios";
 
-import { loginRequest } from "@/config/auth";
+import { apiTokenRequest } from "@/config/auth";
 import { env } from "@/config/env";
 import { logger } from "./logger";
 
@@ -43,18 +43,19 @@ apiClient.interceptors.request.use(async (config) => {
   const accounts = msalInstance.getAllAccounts();
   if (accounts.length === 0) return config;
 
+  const account = accounts[0];
   try {
-    const account = accounts[0];
     const response = await withTimeout(
       msalInstance.acquireTokenSilent({
-        ...loginRequest,
+        ...apiTokenRequest,
         ...(account ? { account } : {}),
       }),
       TOKEN_TIMEOUT_MS,
     );
-    config.headers.Authorization = `Bearer ${response.idToken}`;
+    config.headers.Authorization = `Bearer ${response.accessToken}`;
   } catch (error) {
     logger.error("[api-client] Token acquisition failed:", error);
+    return Promise.reject(new Error("Authentication required — please log in again"));
   }
 
   if (activeOrganizationId) {
@@ -68,7 +69,10 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (axios.isAxiosError(error) && error.response?.status === 401) {
-      logger.warn("[api-client] 401 response — user may need to re-login");
+      logger.warn("[api-client] 401 response — redirecting to login");
+      msalInstance?.logoutRedirect({
+        postLogoutRedirectUri: window.location.origin,
+      });
     }
     return Promise.reject(error);
   },

@@ -8,6 +8,15 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.core.database import Base
 
 
+class SourceType(enum.StrEnum):
+    CLIENT = "client"
+    FAA = "faa"
+    ICAO = "icao"
+    EASA = "easa"
+    NASA_ASRS = "nasa_asrs"
+    INTERNAL = "internal"
+
+
 class DocumentStatus(enum.StrEnum):
     UPLOADED = "uploaded"
     PROCESSING = "processing"
@@ -28,6 +37,10 @@ class Document(Base):
     status: Mapped[DocumentStatus] = mapped_column(
         Enum(DocumentStatus, values_callable=lambda e: [x.value for x in e]),
         default=DocumentStatus.UPLOADED,
+    )
+    source_type: Mapped[SourceType] = mapped_column(
+        Enum(SourceType, values_callable=lambda e: [x.value for x in e]),
+        default=SourceType.CLIENT,
     )
     chunk_count: Mapped[int] = mapped_column(default=0)
     error_message: Mapped[str | None] = mapped_column(Text, default=None)

@@ -15,6 +15,7 @@ logger = structlog.get_logger(__name__)
 class SearchResult(BaseModel):
     content: str
     source: str
+    source_type: str = "client"
     section: str | None = None
     score: float
     chunk_id: str
@@ -64,13 +65,14 @@ class RAGService:
             vector_queries=[vector_query],
             filter=tenant_filter,
             top=top_k,
-            select=["content", "source", "section", "chunk_id"],
+            select=["content", "source", "source_type", "section", "chunk_id"],
         )
         async for result in search_results:
             results.append(
                 SearchResult(
                     content=result["content"],
                     source=result.get("source", "Unknown"),
+                    source_type=result.get("source_type", "client"),
                     section=result.get("section"),
                     score=result["@search.score"],
                     chunk_id=result.get("chunk_id", ""),

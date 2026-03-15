@@ -126,6 +126,7 @@ class DocumentProcessor:
                 source=document.filename,
                 chunks=chunks,
                 embeddings=embeddings,
+                source_type=document.source_type.value,
             )
 
             await self._repo.update_status(

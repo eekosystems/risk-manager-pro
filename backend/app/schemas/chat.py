@@ -8,6 +8,7 @@ from app.models.conversation import FunctionType
 
 class CitationSchema(BaseModel):
     source: str
+    source_type: str = "client"
     section: str | None = None
     content: str
     score: float | None = None

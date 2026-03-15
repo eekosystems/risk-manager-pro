@@ -3,7 +3,7 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
-from app.models.document import DocumentStatus
+from app.models.document import DocumentStatus, SourceType
 
 
 class DocumentResponse(BaseModel):
@@ -12,6 +12,7 @@ class DocumentResponse(BaseModel):
     content_type: str
     size_bytes: int
     status: DocumentStatus
+    source_type: SourceType
     chunk_count: int
     created_at: datetime
 
@@ -24,6 +25,7 @@ class DocumentListItem(BaseModel):
     content_type: str
     size_bytes: int
     status: DocumentStatus
+    source_type: SourceType
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -35,6 +37,7 @@ class DocumentDetail(BaseModel):
     content_type: str
     size_bytes: int
     status: DocumentStatus
+    source_type: SourceType
     chunk_count: int
     error_message: str | None
     created_at: datetime

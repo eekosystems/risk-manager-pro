@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     rate_limit_default: str = "60/minute"
     rate_limit_auth: str = "20/minute"
     rate_limit_ai: str = "20/minute"
+    rate_limit_storage_uri: str = ""  # Redis URL for multi-instance; empty = in-memory
 
     # Database — no default; must be set via env var or .env file
     database_url: str = ""

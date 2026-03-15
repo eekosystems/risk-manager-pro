@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -65,8 +65,8 @@ async def send_message(
 
 @router.get("/conversations", response_model=DataResponse[list[ConversationListItem]])
 async def list_conversations(
-    skip: int = 0,
-    limit: int = 50,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
     current_user: User = Depends(get_current_user),
     organization: Organization = Depends(get_current_organization),
     service: ChatService = Depends(_get_chat_service),
@@ -88,7 +88,9 @@ async def get_conversation(
     organization: Organization = Depends(get_current_organization),
     service: ChatService = Depends(_get_chat_service),
 ) -> DataResponse[ConversationDetail]:
-    conversation = await service.get_conversation(conversation_id, organization.id)
+    conversation = await service.get_conversation(
+        conversation_id, organization.id, user_id=current_user.id
+    )
     if not conversation:
         raise NotFoundError("Conversation", str(conversation_id))
     detail = ConversationDetail.model_validate(conversation)
@@ -103,7 +105,9 @@ async def delete_conversation(
     service: ChatService = Depends(_get_chat_service),
     audit: AuditLogger = Depends(get_audit_logger),
 ) -> None:
-    deleted = await service.delete_conversation(conversation_id, organization.id)
+    deleted = await service.delete_conversation(
+        conversation_id, organization.id, user_id=current_user.id
+    )
     if not deleted:
         raise NotFoundError("Conversation", str(conversation_id))
     await audit.log(
