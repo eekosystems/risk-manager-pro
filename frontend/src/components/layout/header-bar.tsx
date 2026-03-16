@@ -7,19 +7,36 @@ interface HeaderBarProps {
   onSettingsClick?: () => void;
 }
 
+const VIEW_HEADERS: Record<AppView, { title: string; subtitle: string }> = {
+  chat: {
+    title: "Risk Manager Pro",
+    subtitle: "AI-powered risk analysis using indexed Faith Group safety data",
+  },
+  "risk-register": {
+    title: "Risk Register",
+    subtitle: "Track hazards, assess risks, and manage mitigations",
+  },
+  "phl-workflow": {
+    title: "PHL Wizard",
+    subtitle: "Guided Preliminary Hazard List generation (AC 150/5200-37A Steps 1-2)",
+  },
+  "sra-workflow": {
+    title: "SRA Wizard",
+    subtitle: "Guided Safety Risk Assessment (AC 150/5200-37A Steps 3-5)",
+  },
+};
+
 export function HeaderBar({ currentView = "chat", onSettingsClick }: HeaderBarProps) {
-  const isRiskRegister = currentView === "risk-register";
+  const header = VIEW_HEADERS[currentView];
 
   return (
     <div className="flex items-center justify-between border-b border-gray-200 bg-white px-8 py-4">
       <div className="flex flex-col">
         <h1 className="text-[22px] font-bold text-slate-900">
-          {isRiskRegister ? "Risk Register" : "Risk Manager Pro"}
+          {header.title}
         </h1>
         <p className="text-[13px] text-slate-500">
-          {isRiskRegister
-            ? "Track hazards, assess risks, and manage mitigations"
-            : "AI-powered risk analysis using indexed Faith Group safety data"}
+          {header.subtitle}
         </p>
       </div>
 

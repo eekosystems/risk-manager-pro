@@ -9,12 +9,15 @@ import {
   SEVERITY_LABELS,
   type Likelihood,
   type RiskMatrixSelection,
+  type RiskPositionCount,
   type Severity,
 } from "@/types/risk-matrix";
 
 interface RiskMatrixProps {
   selection: RiskMatrixSelection | null;
   onSelect: (selection: RiskMatrixSelection) => void;
+  riskPositions?: RiskPositionCount[];
+  readOnly?: boolean;
 }
 
 const CELL_COLORS: Record<string, string> = {
@@ -24,11 +27,21 @@ const CELL_COLORS: Record<string, string> = {
   high: "bg-red-200 hover:bg-red-300",
 };
 
-export function RiskMatrix({ selection, onSelect }: RiskMatrixProps) {
+export function RiskMatrix({ selection, onSelect, riskPositions, readOnly }: RiskMatrixProps) {
   const handleCellClick = (likelihood: Likelihood, severity: Severity) => {
+    if (readOnly) return;
     const riskLevel = RISK_MATRIX[likelihood][severity];
     onSelect({ severity, likelihood, riskLevel });
   };
+
+  const positionMap = new Map<string, number>();
+  if (riskPositions) {
+    for (const pos of riskPositions) {
+      if (pos.count > 0) {
+        positionMap.set(`${pos.likelihood}-${pos.severity}`, pos.count);
+      }
+    }
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -60,19 +73,26 @@ export function RiskMatrix({ selection, onSelect }: RiskMatrixProps) {
                   const riskLevel = RISK_MATRIX[l][s];
                   const isSelected =
                     selection?.likelihood === l && selection?.severity === s;
+                  const count = positionMap.get(`${l}-${s}`);
                   return (
                     <td key={s} className="p-1">
                       <button
                         onClick={() => handleCellClick(l, s)}
                         className={clsx(
-                          "flex h-14 w-full items-center justify-center rounded-lg border-2 text-xs font-bold transition-all",
+                          "relative flex h-14 w-full items-center justify-center rounded-lg border-2 text-xs font-bold transition-all",
                           CELL_COLORS[riskLevel],
+                          readOnly ? "cursor-default" : "",
                           isSelected
                             ? "border-gray-900 ring-2 ring-gray-900/20 scale-105"
                             : "border-transparent",
                         )}
                       >
                         {RISK_LEVEL_CONFIG[riskLevel].label}
+                        {count != null && (
+                          <span className="absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-slate-800 px-1 text-[10px] font-bold text-white shadow-sm">
+                            {count}
+                          </span>
+                        )}
                       </button>
                     </td>
                   );

@@ -54,5 +54,11 @@ export const RISK_LEVEL_CONFIG: Record<
   high:    { label: "High",    color: "text-red-800",    bg: "bg-red-100",    border: "border-red-300"    },
 };
 
+export interface RiskPositionCount {
+  severity: Severity;
+  likelihood: Likelihood;
+  count: number;
+}
+
 export const SEVERITIES: Severity[] = [1, 2, 3, 4, 5];
 export const LIKELIHOODS: Likelihood[] = ["A", "B", "C", "D", "E"];

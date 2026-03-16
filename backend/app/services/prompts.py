@@ -563,7 +563,32 @@ Never auto-accept Extreme risks. Default to conservative scoring. All High/Extre
 must include explicit recommendation for Accountable Executive review. The human shall \
 always remain as the final control for all RMP-produced outcomes."""
 
-# Sub-prompt variables kept for backward compatibility — the full text lives in GENERAL_PROMPT
-SYSTEM_ANALYSIS_PROMPT = GENERAL_PROMPT
-PHL_PROMPT = GENERAL_PROMPT
-SRA_PROMPT = GENERAL_PROMPT
+# Shared baseline: Purpose & Identity through Overarching Constraints (lines 8–366 of GENERAL_PROMPT).
+# Sub-prompts get only their specific instructions appended to this baseline.
+_BASELINE_CONTEXT = GENERAL_PROMPT[:GENERAL_PROMPT.index(
+    "\nSub-Prompt 1 (Workflow Stage 1):"
+)]
+
+# --- Sub-Prompt 1: System Analysis & Mitigation Generator ---
+_SUB_PROMPT_1 = GENERAL_PROMPT[
+    GENERAL_PROMPT.index("\nSub-Prompt 1 (Workflow Stage 1):") : GENERAL_PROMPT.index(
+        "\nSub-Prompt 2 (Workflow Stage 2):"
+    )
+]
+
+SYSTEM_ANALYSIS_PROMPT = _BASELINE_CONTEXT + _SUB_PROMPT_1
+
+# --- Sub-Prompt 2: Preliminary Hazard List (PHL) ---
+_SUB_PROMPT_2 = GENERAL_PROMPT[
+    GENERAL_PROMPT.index("\nSub-Prompt 2 (Workflow Stage 2):") : GENERAL_PROMPT.index(
+        "\nSub-Prompt 3 (Workflow Stage 3):"
+    )
+]
+
+PHL_PROMPT = _BASELINE_CONTEXT + _SUB_PROMPT_2
+
+# --- Sub-Prompt 3: Safety Risk Assessment (SRA) ---
+_SUB_PROMPT_3 = GENERAL_PROMPT[
+    GENERAL_PROMPT.index("\nSub-Prompt 3 (Workflow Stage 3):"):]
+
+SRA_PROMPT = _BASELINE_CONTEXT + _SUB_PROMPT_3

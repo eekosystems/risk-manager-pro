@@ -2,6 +2,8 @@ import { useState } from "react";
 
 import { RiskRegisterPage } from "@/components/risk-register/risk-register-page";
 import { SettingsPage } from "@/components/settings/settings-page";
+import { PHLWizard } from "@/components/workflows/phl-wizard";
+import { SRAWizard } from "@/components/workflows/sra-wizard";
 import { useOrganizationContext } from "@/hooks/use-organization-context";
 import type { FunctionType } from "@/types/api";
 
@@ -9,7 +11,7 @@ import { HeaderBar } from "./header-bar";
 import { LeftSidebar } from "./left-sidebar";
 import { RightPanel } from "./right-panel";
 
-export type AppView = "chat" | "risk-register";
+export type AppView = "chat" | "risk-register" | "phl-workflow" | "sra-workflow";
 
 interface AppLayoutProps {
   children: (props: {
@@ -59,6 +61,16 @@ export function AppLayout({ children }: AppLayoutProps) {
         />
         {currentView === "risk-register" ? (
           <RiskRegisterPage />
+        ) : currentView === "phl-workflow" ? (
+          <PHLWizard
+            onComplete={() => setCurrentView("risk-register")}
+            onCancel={() => setCurrentView("chat")}
+          />
+        ) : currentView === "sra-workflow" ? (
+          <SRAWizard
+            onComplete={() => setCurrentView("risk-register")}
+            onCancel={() => setCurrentView("chat")}
+          />
         ) : (
           children({ activeFunction, conversationId, setConversationId })
         )}

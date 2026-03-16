@@ -1,5 +1,6 @@
 import { clsx } from "clsx";
 import { format } from "date-fns";
+import { ShieldAlert } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { ChatMessage, Citation } from "@/types/api";
@@ -11,6 +12,7 @@ import { MarkdownContent } from "./markdown-content";
 interface MessageListProps {
   messages: ChatMessage[];
   isTyping: boolean;
+  onSaveAsRisk?: (messageContent: string) => void;
 }
 
 interface SelectedCitation {
@@ -18,7 +20,7 @@ interface SelectedCitation {
   index: number;
 }
 
-export function MessageList({ messages, isTyping }: MessageListProps) {
+export function MessageList({ messages, isTyping, onSaveAsRisk }: MessageListProps) {
   const endRef = useRef<HTMLDivElement>(null);
   const [selected, setSelected] = useState<SelectedCitation | null>(null);
 
@@ -74,6 +76,16 @@ export function MessageList({ messages, isTyping }: MessageListProps) {
                   </div>
                 )}
               </div>
+              {msg.role === "assistant" && msg.id !== "welcome" && onSaveAsRisk && (
+                <button
+                  onClick={() => onSaveAsRisk(msg.content)}
+                  className="mt-1 ml-1 flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] text-gray-400 transition-colors hover:bg-brand-50 hover:text-brand-500"
+                  title="Save as Risk Entry"
+                >
+                  <ShieldAlert size={12} />
+                  Save as Risk
+                </button>
+              )}
               <MessageTimestamp
                 createdAt={msg.created_at}
                 isUser={msg.role === "user"}

@@ -10,9 +10,16 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { RiskMatrix } from "@/components/ui/risk-matrix";
 import { useDeleteRisk, useRisks } from "@/hooks/use-risks";
 import type { RiskEntryListItem, RiskStatus } from "@/types/api";
-import { RISK_LEVEL_CONFIG, type RiskLevel } from "@/types/risk-matrix";
+import {
+  RISK_LEVEL_CONFIG,
+  type Likelihood,
+  type RiskLevel,
+  type RiskPositionCount,
+  type Severity,
+} from "@/types/risk-matrix";
 
 const STATUS_LABELS: Record<RiskStatus, { label: string; className: string }> = {
   open: { label: "Open", className: "text-blue-600 bg-blue-50" },
@@ -45,6 +52,24 @@ export function RiskListView({ onSelectRisk, onCreateNew }: RiskListViewProps) {
   const highCount = risks.filter(
     (r) => r.risk_level === "high" || r.risk_level === "serious",
   ).length;
+
+  const riskPositions: RiskPositionCount[] = (() => {
+    const counts = new Map<string, number>();
+    for (const risk of risks) {
+      const key = `${risk.likelihood}-${risk.severity}`;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    const result: RiskPositionCount[] = [];
+    for (const [key, count] of counts) {
+      const [likelihood, severityStr] = key.split("-");
+      result.push({
+        likelihood: likelihood as Likelihood,
+        severity: Number(severityStr) as Severity,
+        count,
+      });
+    }
+    return result;
+  })();
 
   function handleDelete(e: React.MouseEvent, riskId: string) {
     e.stopPropagation();
@@ -82,6 +107,19 @@ export function RiskListView({ onSelectRisk, onCreateNew }: RiskListViewProps) {
           <div className="text-[12px] text-slate-500">High / Serious</div>
         </div>
       </div>
+
+      {/* Risk Matrix Heatmap */}
+      {risks.length > 0 && (
+        <div className="mb-6 rounded-2xl border border-gray-200 bg-white p-4">
+          <h3 className="mb-3 text-sm font-bold text-slate-700">Risk Distribution</h3>
+          <RiskMatrix
+            selection={null}
+            onSelect={() => {}}
+            riskPositions={riskPositions}
+            readOnly
+          />
+        </div>
+      )}
 
       {/* Actions + Filters */}
       <div className="mb-4 flex items-center gap-3">

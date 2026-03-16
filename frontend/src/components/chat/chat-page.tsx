@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 
+import { CreateRiskModal } from "@/components/risk-register/create-risk-modal";
 import { useConversation, useSendMessage } from "@/hooks/use-chat";
 import { useUploadDocument } from "@/hooks/use-documents";
-import type { ChatMessage, FunctionType } from "@/types/api";
-
+import { useCreateRisk } from "@/hooks/use-risks";
 import { useToast } from "@/hooks/use-toast";
+import type { ChatMessage, CreateRiskEntryRequest, FunctionType } from "@/types/api";
+
 import { ChatInput } from "./chat-input";
 import { MessageList } from "./message-list";
 
@@ -35,7 +37,9 @@ export function ChatPage({
     WELCOME_MESSAGE,
   ]);
   const [isTyping, setIsTyping] = useState(false);
+  const [showRiskModal, setShowRiskModal] = useState(false);
   const { addToast } = useToast();
+  const createRiskMutation = useCreateRisk();
 
   const { data: conversation } = useConversation(conversationId);
   const sendMessageMutation = useSendMessage();
@@ -119,13 +123,45 @@ export function ChatPage({
     ],
   );
 
+  const handleSaveAsRisk = useCallback(() => {
+    setShowRiskModal(true);
+  }, []);
+
+  const handleCreateRisk = useCallback(
+    (payload: CreateRiskEntryRequest) => {
+      createRiskMutation.mutate(payload, {
+        onSuccess: () => {
+          setShowRiskModal(false);
+          addToast("Risk entry created successfully", "success");
+        },
+        onError: () => {
+          addToast("Failed to create risk entry", "error");
+        },
+      });
+    },
+    [createRiskMutation, addToast],
+  );
+
   return (
     <>
-      <MessageList messages={localMessages} isTyping={isTyping} />
+      <MessageList
+        messages={localMessages}
+        isTyping={isTyping}
+        onSaveAsRisk={handleSaveAsRisk}
+      />
       <ChatInput
         onSend={handleSend}
         disabled={sendMessageMutation.isPending}
       />
+      {showRiskModal && (
+        <CreateRiskModal
+          onClose={() => setShowRiskModal(false)}
+          onSubmit={handleCreateRisk}
+          isPending={createRiskMutation.isPending}
+          defaultFunctionType={activeFunction}
+          conversationId={conversationId}
+        />
+      )}
     </>
   );
 }

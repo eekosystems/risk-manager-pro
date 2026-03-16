@@ -1,10 +1,13 @@
 import { clsx } from "clsx";
 import {
+  AlertTriangle,
   ChevronRight,
   FileText,
   FolderSearch,
+  Shield,
   ShieldAlert,
   User,
+  Workflow,
 } from "lucide-react";
 
 import { IndexedSources } from "@/components/layout/panel/indexed-sources";
@@ -97,6 +100,42 @@ export function LeftSidebar({
               </button>
             </div>
 
+            {/* Workflows section */}
+            <div className="mt-4">
+              <div className="mb-1.5 flex items-center gap-2 px-3">
+                <Workflow size={12} className="text-gray-400" />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                  Workflows
+                </span>
+              </div>
+              <div className="space-y-1">
+                <button
+                  onClick={() => onViewChange("phl-workflow")}
+                  className={clsx(
+                    "flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all",
+                    currentView === "phl-workflow"
+                      ? "gradient-brand text-white shadow-md shadow-brand-500/30"
+                      : "text-gray-600 hover:bg-brand-50 hover:text-brand-500",
+                  )}
+                >
+                  <AlertTriangle size={16} />
+                  PHL Wizard
+                </button>
+                <button
+                  onClick={() => onViewChange("sra-workflow")}
+                  className={clsx(
+                    "flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all",
+                    currentView === "sra-workflow"
+                      ? "gradient-brand text-white shadow-md shadow-brand-500/30"
+                      : "text-gray-600 hover:bg-brand-50 hover:text-brand-500",
+                  )}
+                >
+                  <Shield size={16} />
+                  SRA Wizard
+                </button>
+              </div>
+            </div>
+
             <RecentDocuments />
             <IndexedSources />
           </nav>
@@ -140,6 +179,36 @@ export function LeftSidebar({
             )}
           >
             <ShieldAlert size={20} />
+          </button>
+
+          <div className="mx-3 my-3 h-px w-8 bg-gray-200" />
+
+          {/* Workflow icons */}
+          <button
+            onClick={() => onViewChange("phl-workflow")}
+            aria-label="PHL Wizard"
+            title="PHL Wizard"
+            className={clsx(
+              "flex h-10 w-10 items-center justify-center rounded-lg transition-all",
+              currentView === "phl-workflow"
+                ? "gradient-brand text-white shadow-md shadow-brand-500/30"
+                : "text-gray-400 hover:bg-brand-50 hover:text-brand-500",
+            )}
+          >
+            <AlertTriangle size={20} />
+          </button>
+          <button
+            onClick={() => onViewChange("sra-workflow")}
+            aria-label="SRA Wizard"
+            title="SRA Wizard"
+            className={clsx(
+              "flex h-10 w-10 items-center justify-center rounded-lg transition-all",
+              currentView === "sra-workflow"
+                ? "gradient-brand text-white shadow-md shadow-brand-500/30"
+                : "text-gray-400 hover:bg-brand-50 hover:text-brand-500",
+            )}
+          >
+            <Shield size={20} />
           </button>
 
           <div className="mx-3 my-3 h-px w-8 bg-gray-200" />

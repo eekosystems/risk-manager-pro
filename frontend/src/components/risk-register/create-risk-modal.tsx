@@ -26,6 +26,8 @@ interface CreateRiskModalProps {
   onSubmit: (payload: CreateRiskEntryRequest) => void;
   isPending: boolean;
   existingRisk?: RiskEntryDetail;
+  defaultFunctionType?: string;
+  conversationId?: string | null;
 }
 
 export function CreateRiskModal({
@@ -33,6 +35,8 @@ export function CreateRiskModal({
   onSubmit,
   isPending,
   existingRisk,
+  defaultFunctionType,
+  conversationId,
 }: CreateRiskModalProps) {
   const [title, setTitle] = useState(existingRisk?.title ?? "");
   const [hazard, setHazard] = useState(existingRisk?.hazard ?? "");
@@ -44,7 +48,7 @@ export function CreateRiskModal({
     (existingRisk?.likelihood as Likelihood) ?? "C",
   );
   const [functionType, setFunctionType] = useState(
-    existingRisk?.function_type ?? "general",
+    existingRisk?.function_type ?? defaultFunctionType ?? "general",
   );
   const [notes, setNotes] = useState(existingRisk?.notes ?? "");
 
@@ -61,6 +65,7 @@ export function CreateRiskModal({
       severity,
       likelihood,
       function_type: functionType,
+      conversation_id: conversationId ?? null,
       notes: notes.trim() || null,
     });
   }
