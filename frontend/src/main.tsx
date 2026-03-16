@@ -12,7 +12,7 @@ import { BrowserRouter } from "react-router-dom";
 
 import { App } from "./app";
 import { ToastProvider } from "./components/ui/toast";
-import { msalConfig } from "./config/auth";
+import { isMsalConfigured, msalConfig } from "./config/auth";
 import { OrganizationProvider } from "./context/organization-context";
 import "./index.css";
 import { setMsalInstance } from "./lib/api-client";
@@ -33,9 +33,17 @@ const queryClient = new QueryClient({
 async function bootstrap(): Promise<void> {
   await msalInstance.initialize();
 
+  if (!isMsalConfigured) {
+    logger.warn(
+      "[auth] Skipping MSAL login flow — set VITE_AZURE_AD_CLIENT_ID and VITE_AZURE_AD_AUTHORITY in .env"
+    );
+  }
+
   let response;
   try {
-    response = await msalInstance.handleRedirectPromise();
+    response = isMsalConfigured
+      ? await msalInstance.handleRedirectPromise()
+      : null;
   } catch (err) {
     logger.error("[auth] handleRedirectPromise failed — clearing session cache:", err);
     sessionStorage.clear();
