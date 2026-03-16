@@ -6,6 +6,7 @@ import {
   FileText,
   MessageSquareCode,
   Settings,
+  ShieldCheck,
   Users,
   X,
 } from "lucide-react";
@@ -14,6 +15,7 @@ import { RagSettingsTab } from "./tabs/rag-settings-tab";
 import { IndexedFilesTab } from "./tabs/indexed-files-tab";
 import { PromptsTab } from "./tabs/prompts-tab";
 import { ModelPreferencesTab } from "./tabs/model-preferences-tab";
+import { QaqcSettingsTab } from "./tabs/qaqc-settings-tab";
 import { UsersRolesTab } from "./tabs/users-roles-tab";
 
 type SettingsTab =
@@ -21,7 +23,8 @@ type SettingsTab =
   | "model"
   | "indexed-files"
   | "prompts"
-  | "users";
+  | "users"
+  | "qaqc";
 
 interface TabDefinition {
   id: SettingsTab;
@@ -60,6 +63,12 @@ const TABS: TabDefinition[] = [
     label: "Users & Roles",
     icon: Users,
     description: "Manage team members and permissions",
+  },
+  {
+    id: "qaqc",
+    label: "QA/QC Reviewers",
+    icon: ShieldCheck,
+    description: "Configure QA/QC notification recipients",
   },
 ];
 
@@ -165,6 +174,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
             {activeTab === "indexed-files" && <IndexedFilesTab />}
             {activeTab === "prompts" && <PromptsTab />}
             {activeTab === "users" && <UsersRolesTab />}
+            {activeTab === "qaqc" && <QaqcSettingsTab />}
           </div>
         </div>
       </div>

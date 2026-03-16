@@ -1,10 +1,13 @@
 import { Search, Settings } from "lucide-react";
 
+import { NotificationBell } from "@/components/notifications/notification-bell";
+
 import type { AppView } from "./app-layout";
 
 interface HeaderBarProps {
   currentView?: AppView;
   onSettingsClick?: () => void;
+  onViewChange?: (view: AppView) => void;
 }
 
 const VIEW_HEADERS: Record<AppView, { title: string; subtitle: string }> = {
@@ -34,7 +37,7 @@ const VIEW_HEADERS: Record<AppView, { title: string; subtitle: string }> = {
   },
 };
 
-export function HeaderBar({ currentView = "chat", onSettingsClick }: HeaderBarProps) {
+export function HeaderBar({ currentView = "chat", onSettingsClick, onViewChange }: HeaderBarProps) {
   const header = VIEW_HEADERS[currentView];
 
   return (
@@ -56,6 +59,7 @@ export function HeaderBar({ currentView = "chat", onSettingsClick }: HeaderBarPr
             ⌘K
           </kbd>
         </div>
+        <NotificationBell onNavigate={onViewChange} />
         <button
           onClick={onSettingsClick}
           className="rounded-xl border border-gray-200 p-2.5 text-gray-400 transition-colors hover:bg-gray-50 hover:text-gray-600"

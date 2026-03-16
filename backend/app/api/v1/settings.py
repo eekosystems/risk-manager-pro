@@ -12,6 +12,7 @@ from app.schemas.common import DataResponse, MetaResponse
 from app.schemas.settings import (
     ModelPreferencesPayload,
     PromptsPayload,
+    QaqcSettingsPayload,
     RagSettingsPayload,
     SettingsResponse,
 )
@@ -129,6 +130,30 @@ async def update_prompts(
         user=current_user,
         resource_type="settings",
         resource_id="prompts",
+        organization_id=organization.id,
+    )
+    return DataResponse(data=result, meta=MetaResponse(request_id=""))
+
+
+@router.put(
+    "/qaqc",
+    response_model=DataResponse[SettingsResponse],
+    dependencies=[Depends(require_org_role(MembershipRole.ORG_ADMIN))],
+)
+async def update_qaqc_settings(
+    payload: QaqcSettingsPayload,
+    current_user: User = Depends(get_current_user),
+    organization: Organization = Depends(get_current_organization),
+    service: SettingsService = Depends(_get_settings_service),
+    audit: AuditLogger = Depends(get_audit_logger),
+) -> DataResponse[SettingsResponse]:
+    """Update QA/QC reviewer settings. Requires org_admin role."""
+    result = await service.update_qaqc_settings(organization.id, payload, current_user.id)
+    await audit.log(
+        action="settings.qaqc.updated",
+        user=current_user,
+        resource_type="settings",
+        resource_id="qaqc",
         organization_id=organization.id,
     )
     return DataResponse(data=result, meta=MetaResponse(request_id=""))

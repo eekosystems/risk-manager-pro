@@ -8,6 +8,7 @@ from app.repositories.settings import SettingsRepository
 from app.schemas.settings import (
     ModelPreferencesPayload,
     PromptsPayload,
+    QaqcSettingsPayload,
     RagSettingsPayload,
     SettingsResponse,
 )
@@ -15,13 +16,15 @@ from app.services.prompts import GENERAL_PROMPT, PHL_PROMPT, SRA_PROMPT, SYSTEM_
 
 logger = structlog.get_logger(__name__)
 
-VALID_CATEGORIES = {"rag", "model", "prompts"}
+VALID_CATEGORIES = {"rag", "model", "prompts", "qaqc"}
 
 # ── Defaults ──────────────────────────────────────────────────────────
 
 DEFAULT_RAG = RagSettingsPayload()
 
 DEFAULT_MODEL = ModelPreferencesPayload()
+
+DEFAULT_QAQC = QaqcSettingsPayload()
 
 DEFAULT_PROMPTS = PromptsPayload(
     system_prompt=GENERAL_PROMPT,
@@ -104,6 +107,14 @@ class SettingsService:
     ) -> SettingsResponse:
         return await self._save(organization_id, "prompts", payload.model_dump(), user_id)
 
+    async def update_qaqc_settings(
+        self,
+        organization_id: uuid.UUID,
+        payload: QaqcSettingsPayload,
+        user_id: uuid.UUID,
+    ) -> SettingsResponse:
+        return await self._save(organization_id, "qaqc", payload.model_dump(), user_id)
+
     # ── Helpers for other services ────────────────────────────────────
 
     async def get_effective_rag_config(self, organization_id: uuid.UUID) -> RagSettingsPayload:
@@ -125,6 +136,14 @@ class SettingsService:
         if row:
             return PromptsPayload.model_validate(row.settings_json)
         return DEFAULT_PROMPTS
+
+    async def get_effective_qaqc_config(
+        self, organization_id: uuid.UUID
+    ) -> QaqcSettingsPayload:
+        row = await self._repo.get(organization_id, "qaqc")
+        if row:
+            return QaqcSettingsPayload.model_validate(row.settings_json)
+        return DEFAULT_QAQC
 
     # ── Internal ──────────────────────────────────────────────────────
 
@@ -156,4 +175,6 @@ class SettingsService:
             return DEFAULT_MODEL.model_dump()
         if category == "prompts":
             return DEFAULT_PROMPTS.model_dump()
+        if category == "qaqc":
+            return DEFAULT_QAQC.model_dump()
         return {}

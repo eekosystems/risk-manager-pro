@@ -80,3 +80,19 @@ export async function updatePromptsSettings(
   );
   return response.data.data;
 }
+
+export interface QaqcSettings {
+  reviewer_user_ids: string[];
+  notify_on_chat: boolean;
+  notify_on_risk_created: boolean;
+}
+
+export async function updateQaqcSettings(
+  payload: QaqcSettings,
+): Promise<SettingsResponse> {
+  const response = await apiClient.put<DataResponse<SettingsResponse>>(
+    "/settings/qaqc",
+    payload,
+  );
+  return response.data.data;
+}

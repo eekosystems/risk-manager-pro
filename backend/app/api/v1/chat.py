@@ -23,10 +23,14 @@ from app.schemas.chat import (
     ConversationListItem,
 )
 from app.schemas.common import DataResponse, MetaResponse
+from app.models.notification import NotificationType
 from app.services.audit import AuditLogger
 from app.services.chat import ChatService
+from app.services.notification import NotificationDispatcher
 from app.services.openai_client import AzureOpenAIClient
 from app.services.rag import RAGService
+
+_notification_dispatcher = NotificationDispatcher()
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -56,6 +60,15 @@ async def send_message(
         resource_type="conversation",
         resource_id=str(result.conversation_id),
         organization_id=organization.id,
+    )
+    _notification_dispatcher.dispatch(
+        organization_id=organization.id,
+        triggered_by=current_user,
+        notification_type=NotificationType.CHAT_RESPONSE,
+        title=f"AI response in: {result.title or 'conversation'}",
+        body=result.message.content[:500],
+        resource_type="conversation",
+        resource_id=str(result.conversation_id),
     )
     return DataResponse(
         data=result,

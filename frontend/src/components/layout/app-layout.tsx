@@ -60,6 +60,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         <HeaderBar
           currentView={currentView}
           onSettingsClick={() => setShowSettings(true)}
+          onViewChange={setCurrentView}
         />
         {currentView === "analytics" ? (
           <AnalyticsDashboard />

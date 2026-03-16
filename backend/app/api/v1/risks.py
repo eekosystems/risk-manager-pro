@@ -18,8 +18,12 @@ from app.schemas.risk import (
     UpdateMitigationRequest,
     UpdateRiskEntryRequest,
 )
+from app.models.notification import NotificationType
 from app.services.audit import AuditLogger
+from app.services.notification import NotificationDispatcher
 from app.services.risk import RiskService
+
+_notification_dispatcher = NotificationDispatcher()
 
 router = APIRouter(prefix="/risks", tags=["risks"])
 
@@ -46,6 +50,15 @@ async def create_risk_entry(
         resource_type="risk_entry",
         resource_id=str(entry.id),
         organization_id=organization.id,
+    )
+    _notification_dispatcher.dispatch(
+        organization_id=organization.id,
+        triggered_by=current_user,
+        notification_type=NotificationType.RISK_CREATED,
+        title=f"New risk: {payload.title[:100]}",
+        body=f"Hazard: {payload.hazard[:200]} | Severity: {payload.severity}, Likelihood: {payload.likelihood}",
+        resource_type="risk_entry",
+        resource_id=str(entry.id),
     )
     return DataResponse(
         data=RiskEntryResponse.model_validate(entry),

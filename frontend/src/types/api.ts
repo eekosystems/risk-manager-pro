@@ -299,3 +299,21 @@ export interface AuditFilterOptions {
   resource_types: string[];
   outcomes: string[];
 }
+
+// --- Notification Types ---
+
+export interface NotificationItem {
+  id: string;
+  type: string;
+  title: string;
+  body: string;
+  resource_type: string;
+  resource_id: string | null;
+  is_read: boolean;
+  created_at: string;
+  triggered_by_user_id: string;
+}
+
+export interface UnreadCount {
+  count: number;
+}

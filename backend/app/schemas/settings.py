@@ -40,6 +40,15 @@ class PromptsPayload(BaseModel):
     system_analysis_prompt: str = Field(..., min_length=1, max_length=50000)
 
 
+# ── QA/QC Settings ────────────────────────────────────────────────────
+
+
+class QaqcSettingsPayload(BaseModel):
+    reviewer_user_ids: list[str] = Field(default_factory=list)
+    notify_on_chat: bool = True
+    notify_on_risk_created: bool = True
+
+
 # ── Generic Settings Response ─────────────────────────────────────────
 
 
