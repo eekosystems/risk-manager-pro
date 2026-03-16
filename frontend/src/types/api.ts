@@ -216,3 +216,65 @@ export interface UpdateMitigationRequest {
   due_date?: string | null;
   status?: MitigationStatus | null;
 }
+
+// --- Analytics Dashboard Types ---
+
+export interface RiskKPIs {
+  total_risks: number;
+  open_risks: number;
+  high_count: number;
+  serious_count: number;
+  overdue_mitigations: number;
+  avg_days_to_close: number | null;
+}
+
+export interface RiskLevelTimeSeries {
+  month: string;
+  low: number;
+  medium: number;
+  serious: number;
+  high: number;
+}
+
+export interface RiskStatusBreakdownItem {
+  status: string;
+  count: number;
+}
+
+export interface RisksByFunctionTypeItem {
+  function_type: string;
+  count: number;
+}
+
+export interface MitigationPerformance {
+  total_mitigations: number;
+  completed_count: number;
+  overdue_count: number;
+  completion_rate: number;
+  avg_days_to_complete: number | null;
+}
+
+export interface RiskPositionItem {
+  likelihood: string;
+  severity: number;
+  count: number;
+}
+
+export interface DashboardData {
+  kpis: RiskKPIs;
+  risk_level_over_time: RiskLevelTimeSeries[];
+  status_breakdown: RiskStatusBreakdownItem[];
+  by_function_type: RisksByFunctionTypeItem[];
+  mitigation_performance: MitigationPerformance;
+  risk_positions: RiskPositionItem[];
+}
+
+export interface ActivityEntry {
+  id: string;
+  action: string;
+  resource_type: string;
+  resource_id: string | null;
+  outcome: string;
+  timestamp: string;
+  user_id: string;
+}

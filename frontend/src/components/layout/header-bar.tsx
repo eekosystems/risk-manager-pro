@@ -24,6 +24,10 @@ const VIEW_HEADERS: Record<AppView, { title: string; subtitle: string }> = {
     title: "SRA Wizard",
     subtitle: "Guided Safety Risk Assessment (AC 150/5200-37A Steps 3-5)",
   },
+  analytics: {
+    title: "Analytics Dashboard",
+    subtitle: "Safety performance metrics and risk trends",
+  },
 };
 
 export function HeaderBar({ currentView = "chat", onSettingsClick }: HeaderBarProps) {

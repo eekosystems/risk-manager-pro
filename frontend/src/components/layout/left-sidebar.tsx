@@ -1,6 +1,7 @@
 import { clsx } from "clsx";
 import {
   AlertTriangle,
+  BarChart3,
   ChevronRight,
   FileText,
   FolderSearch,
@@ -84,8 +85,20 @@ export function LeftSidebar({
               onFunctionSelect={onFunctionSelect}
             />
 
-            {/* Risk Register nav button */}
-            <div className="mt-2">
+            {/* Analytics + Risk Register nav */}
+            <div className="mt-2 space-y-1">
+              <button
+                onClick={() => onViewChange("analytics")}
+                className={clsx(
+                  "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all",
+                  currentView === "analytics"
+                    ? "gradient-brand text-white shadow-md shadow-brand-500/30"
+                    : "text-gray-600 hover:bg-brand-50 hover:text-brand-500",
+                )}
+              >
+                <BarChart3 size={18} />
+                Analytics
+              </button>
               <button
                 onClick={() => onViewChange("risk-register")}
                 className={clsx(
@@ -165,6 +178,21 @@ export function LeftSidebar({
           </nav>
 
           <div className="mx-3 my-3 h-px w-8 bg-gray-200" />
+
+          {/* Analytics icon */}
+          <button
+            onClick={() => onViewChange("analytics")}
+            aria-label="Analytics"
+            title="Analytics"
+            className={clsx(
+              "flex h-10 w-10 items-center justify-center rounded-lg transition-all",
+              currentView === "analytics"
+                ? "gradient-brand text-white shadow-md shadow-brand-500/30"
+                : "text-gray-400 hover:bg-brand-50 hover:text-brand-500",
+            )}
+          >
+            <BarChart3 size={20} />
+          </button>
 
           {/* Risk Register icon */}
           <button
