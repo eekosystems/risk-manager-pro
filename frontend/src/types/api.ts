@@ -11,7 +11,6 @@ export interface Citation {
   source_type: SourceType;
   section: string | null;
   content: string;
-  score: number | null;
   chunk_id: string | null;
   rank: number | null;
   match_tier: string | null;

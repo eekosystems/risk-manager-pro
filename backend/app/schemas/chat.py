@@ -11,7 +11,6 @@ class CitationSchema(BaseModel):
     source_type: str = "client"
     section: str | None = None
     content: str
-    score: float | None = None
     chunk_id: str | None = None
     rank: int | None = None
     match_tier: str | None = None

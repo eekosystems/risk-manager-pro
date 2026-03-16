@@ -1,3 +1,4 @@
+import { useIsAuthenticated } from "@azure/msal-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
@@ -11,9 +12,11 @@ import {
 import type { MembershipRole } from "@/types/api";
 
 export function useOrganizations() {
+  const isAuthenticated = useIsAuthenticated();
   return useQuery({
     queryKey: ["organizations"],
     queryFn: getOrganizations,
+    enabled: isAuthenticated,
   });
 }
 

@@ -69,10 +69,15 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (axios.isAxiosError(error) && error.response?.status === 401) {
-      logger.warn("[api-client] 401 response — redirecting to login");
-      msalInstance?.logoutRedirect({
-        postLogoutRedirectUri: window.location.origin,
-      });
+      // Only trigger logout if user has an active session — otherwise this is
+      // just an unauthenticated request before login and should not redirect.
+      const hasAccount = msalInstance && msalInstance.getAllAccounts().length > 0;
+      if (hasAccount && msalInstance) {
+        logger.warn("[api-client] 401 response — redirecting to login");
+        msalInstance.logoutRedirect({
+          postLogoutRedirectUri: window.location.origin,
+        });
+      }
     }
     return Promise.reject(error);
   },

@@ -105,7 +105,6 @@ def _extract_citations(results: list[SearchResult]) -> list[CitationSchema]:
             source_type=r.source_type,
             section=r.section,
             content=r.content,
-            score=r.score,
             chunk_id=r.chunk_id,
             rank=i,
             match_tier=_compute_match_tier(i, r.score, total),
@@ -191,7 +190,10 @@ class ChatService:
             "why they are relevant to the question, and how you arrived at your conclusion. "
             "Reference sources by number (e.g. [Source 1]) and quote key passages.\n"
             "2. **Answer:** Provide your analysis or recommendation.\n"
-            "3. **Sources Used:** List each source you cited with its relevance score.\n\n"
+            "3. **Sources Used:** List each source you cited with its match level "
+            "(High, Moderate, or Low — shown next to each source above).\n\n"
+            "Do NOT display numerical scores or percentages for relevance. "
+            "Use only the match tier labels (High, Moderate, Low). "
             "If a source has low relevance or doesn't directly support your answer, "
             "say so rather than forcing a connection."
         )
