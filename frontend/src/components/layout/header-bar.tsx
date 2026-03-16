@@ -28,6 +28,10 @@ const VIEW_HEADERS: Record<AppView, { title: string; subtitle: string }> = {
     title: "Analytics Dashboard",
     subtitle: "Safety performance metrics and risk trends",
   },
+  "audit-log": {
+    title: "Audit Log",
+    subtitle: "SOC 2 compliant activity log — all state-changing operations",
+  },
 };
 
 export function HeaderBar({ currentView = "chat", onSettingsClick }: HeaderBarProps) {

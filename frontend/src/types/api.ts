@@ -278,3 +278,24 @@ export interface ActivityEntry {
   timestamp: string;
   user_id: string;
 }
+
+// --- Audit Log Types ---
+
+export interface AuditEntry {
+  id: string;
+  timestamp: string;
+  user_id: string;
+  action: string;
+  resource_type: string;
+  resource_id: string | null;
+  ip_address: string;
+  correlation_id: string;
+  outcome: string;
+  organization_id: string | null;
+}
+
+export interface AuditFilterOptions {
+  actions: string[];
+  resource_types: string[];
+  outcomes: string[];
+}

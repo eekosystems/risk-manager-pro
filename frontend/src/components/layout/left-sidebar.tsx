@@ -5,6 +5,7 @@ import {
   ChevronRight,
   FileText,
   FolderSearch,
+  ScrollText,
   Shield,
   ShieldAlert,
   User,
@@ -111,6 +112,18 @@ export function LeftSidebar({
                 <ShieldAlert size={18} />
                 Risk Register
               </button>
+              <button
+                onClick={() => onViewChange("audit-log")}
+                className={clsx(
+                  "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all",
+                  currentView === "audit-log"
+                    ? "gradient-brand text-white shadow-md shadow-brand-500/30"
+                    : "text-gray-600 hover:bg-brand-50 hover:text-brand-500",
+                )}
+              >
+                <ScrollText size={18} />
+                Audit Log
+              </button>
             </div>
 
             {/* Workflows section */}
@@ -207,6 +220,21 @@ export function LeftSidebar({
             )}
           >
             <ShieldAlert size={20} />
+          </button>
+
+          {/* Audit Log icon */}
+          <button
+            onClick={() => onViewChange("audit-log")}
+            aria-label="Audit Log"
+            title="Audit Log"
+            className={clsx(
+              "flex h-10 w-10 items-center justify-center rounded-lg transition-all",
+              currentView === "audit-log"
+                ? "gradient-brand text-white shadow-md shadow-brand-500/30"
+                : "text-gray-400 hover:bg-brand-50 hover:text-brand-500",
+            )}
+          >
+            <ScrollText size={20} />
           </button>
 
           <div className="mx-3 my-3 h-px w-8 bg-gray-200" />

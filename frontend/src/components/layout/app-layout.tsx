@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import { AnalyticsDashboard } from "@/components/analytics/analytics-dashboard";
+import { AuditLogPage } from "@/components/audit/audit-log-page";
 import { RiskRegisterPage } from "@/components/risk-register/risk-register-page";
 import { SettingsPage } from "@/components/settings/settings-page";
 import { PHLWizard } from "@/components/workflows/phl-wizard";
@@ -12,7 +13,7 @@ import { HeaderBar } from "./header-bar";
 import { LeftSidebar } from "./left-sidebar";
 import { RightPanel } from "./right-panel";
 
-export type AppView = "chat" | "risk-register" | "phl-workflow" | "sra-workflow" | "analytics";
+export type AppView = "chat" | "risk-register" | "phl-workflow" | "sra-workflow" | "analytics" | "audit-log";
 
 interface AppLayoutProps {
   children: (props: {
@@ -62,6 +63,8 @@ export function AppLayout({ children }: AppLayoutProps) {
         />
         {currentView === "analytics" ? (
           <AnalyticsDashboard />
+        ) : currentView === "audit-log" ? (
+          <AuditLogPage />
         ) : currentView === "risk-register" ? (
           <RiskRegisterPage />
         ) : currentView === "phl-workflow" ? (
