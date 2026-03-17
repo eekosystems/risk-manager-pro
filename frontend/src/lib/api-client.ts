@@ -6,7 +6,7 @@ import { env } from "@/config/env";
 import { logger } from "./logger";
 
 export const apiClient = axios.create({
-  baseURL: `${env.apiBaseUrl}/api/v1`,
+  baseURL: env.apiBaseUrl,
   headers: { "Content-Type": "application/json" },
   timeout: 30_000,
 });
@@ -85,7 +85,7 @@ apiClient.interceptors.response.use(
 
 export async function checkApiHealth(): Promise<boolean> {
   try {
-    const response = await axios.get(`${env.apiBaseUrl}/api/v1/health`);
+    const response = await axios.get(`${env.apiBaseUrl}/health`);
     return response.data?.status === "healthy";
   } catch {
     return false;
