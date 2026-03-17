@@ -1,0 +1,40 @@
+name: risk-manager-pro
+metadata:
+  template: risk-manager-pro@0.1.0
+
+infra:
+  provider: terraform
+  path: ./infra
+
+services:
+  api:
+    project: ./backend
+    host: containerapp
+    language: python
+    docker:
+      path: ./Dockerfile
+
+  web:
+    project: ./frontend
+    host: staticwebapp
+    language: js
+    dist: dist
+    build:
+      steps:
+        - run: npm install
+        - run: npm run build
+          env:
+            VITE_API_BASE_URL: ${SERVICE_API_URI}
+            VITE_AZURE_AD_CLIENT_ID: ${AZURE_AD_CLIENT_ID}
+            VITE_AZURE_AD_AUTHORITY: https://login.microsoftonline.com/${AZURE_AD_TENANT_ID}
+            VITE_AZURE_AD_REDIRECT_URI: https://${SERVICE_WEB_URI}
+            VITE_API_SCOPE: api://${AZURE_AD_CLIENT_ID}/access_as_user
+
+hooks:
+  preprovision:
+    shell: sh
+    run: ./scripts/preprovision.sh
+
+  postprovision:
+    shell: sh
+    run: ./scripts/postprovision.sh

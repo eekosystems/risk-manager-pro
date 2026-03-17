@@ -20,12 +20,14 @@ variable "azure_ad_tenant_id" {
   description = "Azure AD tenant ID for authentication"
   type        = string
   sensitive   = true
+  default     = ""
 }
 
 variable "azure_ad_client_id" {
   description = "Azure AD application (client) ID"
   type        = string
   sensitive   = true
+  default     = ""
 }
 
 variable "db_admin_username" {
