@@ -59,3 +59,8 @@ variable "container_registry_id" {
   type        = string
   description = "Resource ID of the ACR for AcrPull role assignment"
 }
+
+variable "cors_origins" {
+  type        = string
+  description = "JSON array of allowed CORS origins"
+}

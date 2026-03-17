@@ -92,6 +92,7 @@ module "container_app" {
   log_analytics_workspace_id  = module.monitoring.log_analytics_workspace_id
   container_registry_server   = module.container_registry.login_server
   container_registry_id       = module.container_registry.id
+  cors_origins                = "[\"https://${module.static_web_app.default_hostname}\"]"
 }
 
 # Grant Container App managed identity access to Key Vault (breaks circular dependency)

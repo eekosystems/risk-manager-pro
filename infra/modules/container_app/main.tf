@@ -70,7 +70,7 @@ resource "azurerm_container_app" "backend" {
 
       env {
         name  = "CORS_ORIGINS"
-        value = "[\"https://lemon-tree-0d582c90f.2.azurestaticapps.net\"]"
+        value = var.cors_origins
       }
 
       liveness_probe {
