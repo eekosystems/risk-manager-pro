@@ -16,19 +16,16 @@ services:
 
   web:
     project: ./frontend
-    host: staticwebapp
+    host: containerapp
     language: js
-    dist: dist
-    build:
-      steps:
-        - run: npm install
-        - run: npm run build
-          env:
-            VITE_API_BASE_URL: ${SERVICE_API_URI}
-            VITE_AZURE_AD_CLIENT_ID: ${AZURE_AD_CLIENT_ID}
-            VITE_AZURE_AD_AUTHORITY: https://login.microsoftonline.com/${AZURE_AD_TENANT_ID}
-            VITE_AZURE_AD_REDIRECT_URI: https://${SERVICE_WEB_URI}
-            VITE_API_SCOPE: api://${AZURE_AD_CLIENT_ID}/access_as_user
+    docker:
+      path: ./Dockerfile
+      buildArgs:
+        VITE_API_BASE_URL: ${SERVICE_API_URI}
+        VITE_AZURE_AD_CLIENT_ID: ${AZURE_AD_CLIENT_ID}
+        VITE_AZURE_AD_AUTHORITY: https://login.microsoftonline.com/${AZURE_AD_TENANT_ID}
+        VITE_AZURE_AD_REDIRECT_URI: https://${SERVICE_WEB_URI}
+        VITE_API_SCOPE: api://${AZURE_AD_CLIENT_ID}/access_as_user
 
 hooks:
   preprovision:
