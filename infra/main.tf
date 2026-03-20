@@ -1,5 +1,6 @@
 locals {
-  name_prefix = "${var.project_name}-${var.environment}"
+  # Sanitize: replace underscores with hyphens so Azure resource names stay valid
+  name_prefix = replace("${var.project_name}-${var.environment}", "_", "-")
 }
 
 resource "azurerm_resource_group" "main" {
