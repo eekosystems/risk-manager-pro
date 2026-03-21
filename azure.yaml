@@ -21,7 +21,7 @@ services:
     docker:
       path: ./Dockerfile
       buildArgs:
-        VITE_API_BASE_URL: ${SERVICE_API_URI}
+        VITE_API_BASE_URL: ${SERVICE_API_URI}/api/v1
         VITE_AZURE_AD_CLIENT_ID: ${AZURE_AD_CLIENT_ID}
         VITE_AZURE_AD_AUTHORITY: https://login.microsoftonline.com/${AZURE_AD_TENANT_ID}
         VITE_AZURE_AD_REDIRECT_URI: https://${SERVICE_WEB_URI}
