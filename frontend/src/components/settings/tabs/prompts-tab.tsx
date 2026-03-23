@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   BarChart3,
   Copy,
+  Database,
   Loader2,
   MessageSquareCode,
   RotateCcw,
@@ -19,6 +20,7 @@ import {
 } from "@/api/settings";
 import { SettingsSection } from "@/components/settings/settings-section";
 import {
+  DEFAULT_INDEXING_INSTRUCTIONS,
   DEFAULT_PHL_PROMPT,
   DEFAULT_SRA_PROMPT,
   DEFAULT_SYSTEM_ANALYSIS_PROMPT,
@@ -30,6 +32,7 @@ const FALLBACK_PROMPTS: PromptsSettings = {
   phl_prompt: DEFAULT_PHL_PROMPT,
   sra_prompt: DEFAULT_SRA_PROMPT,
   system_analysis_prompt: DEFAULT_SYSTEM_ANALYSIS_PROMPT,
+  indexing_instructions: DEFAULT_INDEXING_INSTRUCTIONS,
 };
 
 type PromptKey = keyof PromptsSettings;
@@ -69,6 +72,13 @@ const PROMPT_SECTIONS: PromptSection[] = [
     description:
       "Instructions for the System Analysis function.",
     icon: BarChart3,
+  },
+  {
+    key: "indexing_instructions",
+    label: "Vector DB / Indexing",
+    description:
+      "Indexing requirements, document tagging conventions, source hierarchy, and dev partner handoff specifications for the vector database.",
+    icon: Database,
   },
 ];
 

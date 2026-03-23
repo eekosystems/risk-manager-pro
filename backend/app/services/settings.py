@@ -12,7 +12,13 @@ from app.schemas.settings import (
     RagSettingsPayload,
     SettingsResponse,
 )
-from app.services.prompts import GENERAL_PROMPT, PHL_PROMPT, SRA_PROMPT, SYSTEM_ANALYSIS_PROMPT
+from app.services.prompts import (
+    GENERAL_PROMPT,
+    INDEXING_INSTRUCTIONS,
+    PHL_PROMPT,
+    SRA_PROMPT,
+    SYSTEM_ANALYSIS_PROMPT,
+)
 
 logger = structlog.get_logger(__name__)
 
@@ -31,6 +37,7 @@ DEFAULT_PROMPTS = PromptsPayload(
     phl_prompt=PHL_PROMPT,
     sra_prompt=SRA_PROMPT,
     system_analysis_prompt=SYSTEM_ANALYSIS_PROMPT,
+    indexing_instructions=INDEXING_INSTRUCTIONS,
 )
 
 

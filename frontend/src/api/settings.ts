@@ -33,6 +33,7 @@ export interface PromptsSettings {
   phl_prompt: string;
   sra_prompt: string;
   system_analysis_prompt: string;
+  indexing_instructions: string;
 }
 
 export async function getAllSettings(): Promise<SettingsResponse[]> {

@@ -38,6 +38,7 @@ class PromptsPayload(BaseModel):
     phl_prompt: str = Field(..., min_length=1, max_length=50000)
     sra_prompt: str = Field(..., min_length=1, max_length=50000)
     system_analysis_prompt: str = Field(..., min_length=1, max_length=50000)
+    indexing_instructions: str = Field(..., min_length=1, max_length=80000)
 
 
 # ── QA/QC Settings ────────────────────────────────────────────────────
