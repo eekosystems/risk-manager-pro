@@ -118,10 +118,10 @@ class RiskRepository:
     async def update_mitigation_status(
         self, mitigation: Mitigation, status: MitigationStatus
     ) -> Mitigation:
-        from datetime import datetime, timezone
+        from datetime import UTC, datetime
 
         mitigation.status = status
         if status == MitigationStatus.COMPLETED:
-            mitigation.completed_at = datetime.now(timezone.utc)
+            mitigation.completed_at = datetime.now(UTC)
         await self._db.flush()
         return mitigation

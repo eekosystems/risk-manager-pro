@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.deps import get_audit_logger, get_current_organization, get_current_user
+from app.models.notification import NotificationType
 from app.models.organization import Organization
 from app.models.user import User
 from app.schemas.common import DataResponse, MetaResponse, PaginatedMeta, PaginatedResponse
@@ -18,7 +19,6 @@ from app.schemas.risk import (
     UpdateMitigationRequest,
     UpdateRiskEntryRequest,
 )
-from app.models.notification import NotificationType
 from app.services.audit import AuditLogger
 from app.services.notification import NotificationDispatcher
 from app.services.risk import RiskService

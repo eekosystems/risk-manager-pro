@@ -121,6 +121,17 @@ stages:
         displayName: "Unit Tests"
         pool:
           vmImage: "ubuntu-latest"
+        services:
+          postgres:
+            image: postgres:16
+            ports:
+              - 5432:5432
+            env:
+              POSTGRES_USER: rmp_test
+              POSTGRES_PASSWORD: rmp_test_password
+              POSTGRES_DB: riskmanagerpro_test
+        variables:
+          DATABASE_URL: "postgresql+asyncpg://rmp_test:rmp_test_password@localhost:5432/riskmanagerpro_test"
         steps:
           - task: UsePythonVersion@0
             inputs:
@@ -140,6 +151,8 @@ stages:
                 --cov-report=term-missing \
                 --junitxml=test-results.xml
             displayName: "Run tests"
+            env:
+              DATABASE_URL: $(DATABASE_URL)
 
           - task: PublishTestResults@2
             condition: succeededOrFailed()

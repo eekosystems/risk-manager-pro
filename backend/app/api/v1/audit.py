@@ -6,7 +6,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.deps import get_current_organization, get_current_user, require_org_role
+from app.core.deps import get_current_organization, require_org_role
 from app.models.organization import Organization
 from app.models.organization_membership import MembershipRole
 from app.models.user import User

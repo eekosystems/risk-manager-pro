@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import structlog
 from fastapi import APIRouter, Depends, Request
@@ -70,7 +70,7 @@ async def readiness_check(
     return ReadyResponse(
         status=status,
         checks=checks,
-        checked_at=datetime.now(timezone.utc).isoformat(),
+        checked_at=datetime.now(UTC).isoformat(),
     )
 
 

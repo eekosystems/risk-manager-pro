@@ -3,8 +3,13 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-from app.models.risk import Likelihood, MitigationStatus, RiskLevel, RiskStatus, Severity
-
+from app.models.risk import (
+    Likelihood,
+    MitigationStatus,
+    RiskLevel,
+    RiskStatus,
+    Severity,
+)
 
 # --- Risk Entry Schemas ---
 

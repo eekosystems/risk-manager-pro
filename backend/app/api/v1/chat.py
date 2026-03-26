@@ -14,6 +14,7 @@ from app.core.deps import (
 )
 from app.core.exceptions import NotFoundError
 from app.core.rate_limit import limiter
+from app.models.notification import NotificationType
 from app.models.organization import Organization
 from app.models.user import User
 from app.schemas.chat import (
@@ -23,7 +24,6 @@ from app.schemas.chat import (
     ConversationListItem,
 )
 from app.schemas.common import DataResponse, MetaResponse
-from app.models.notification import NotificationType
 from app.services.audit import AuditLogger
 from app.services.chat import ChatService
 from app.services.notification import NotificationDispatcher

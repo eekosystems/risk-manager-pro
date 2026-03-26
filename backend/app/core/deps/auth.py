@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import structlog
 from fastapi import Depends, Request
@@ -153,7 +153,7 @@ async def get_current_user(
     if not user.is_active:
         raise ForbiddenError("User account is deactivated")
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     # Check session timeout — if last_activity is set and older than threshold,
     # reset the session instead of permanently locking the user out.

@@ -18,8 +18,6 @@ logger = structlog.get_logger(__name__)
 
 class NotificationService:
     def __init__(self, db: object) -> None:
-        from sqlalchemy.ext.asyncio import AsyncSession
-
         self._repo = NotificationRepository(db)  # type: ignore[arg-type]
 
     async def list_notifications(
