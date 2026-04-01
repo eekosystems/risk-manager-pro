@@ -94,17 +94,16 @@ export function PromptsTab() {
     retry: false,
   });
 
-  // The backend always returns the effective prompts (org overrides or server defaults),
-  // so we use the API response as the source of truth for both display and reset.
-  const serverPrompts = data?.settings
-    ? data.settings
-    : null;
+  // Use API response if available, otherwise fall back to built-in defaults.
+  const effectiveDefaults = data?.settings ?? FALLBACK_PROMPTS;
 
   useEffect(() => {
-    if (serverPrompts) {
-      setPrompts(serverPrompts);
+    if (data?.settings) {
+      setPrompts(data.settings);
+    } else if (isError) {
+      setPrompts(FALLBACK_PROMPTS);
     }
-  }, [serverPrompts]);
+  }, [data?.settings, isError]);
 
   const mutation = useMutation({
     mutationFn: updatePromptsSettings,
@@ -114,9 +113,7 @@ export function PromptsTab() {
   });
 
   function handleReset(key: PromptKey) {
-    if (serverPrompts) {
-      setPrompts((prev) => ({ ...prev, [key]: serverPrompts[key] }));
-    }
+    setPrompts((prev) => ({ ...prev, [key]: effectiveDefaults[key] }));
   }
 
   function handleCopy() {
