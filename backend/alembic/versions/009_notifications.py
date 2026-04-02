@@ -17,7 +17,8 @@ depends_on = None
 
 def upgrade() -> None:
     notification_type = sa.Enum(
-        "chat_response", "risk_created",
+        "chat_response",
+        "risk_created",
         name="notificationtype",
     )
     notification_type.create(op.get_bind(), checkfirst=True)

@@ -146,9 +146,7 @@ class SettingsService:
             return PromptsPayload.model_validate(row.settings_json)
         return DEFAULT_PROMPTS
 
-    async def get_effective_qaqc_config(
-        self, organization_id: uuid.UUID
-    ) -> QaqcSettingsPayload:
+    async def get_effective_qaqc_config(self, organization_id: uuid.UUID) -> QaqcSettingsPayload:
         row = await self._repo.get(organization_id, "qaqc")
         if row:
             return QaqcSettingsPayload.model_validate(row.settings_json)

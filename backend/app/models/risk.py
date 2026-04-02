@@ -39,11 +39,41 @@ class RiskLevel(enum.StrEnum):
 
 # FAA Order 8040.4B risk matrix: RISK_MATRIX[likelihood][severity] -> RiskLevel
 RISK_MATRIX: dict[str, dict[int, RiskLevel]] = {
-    "A": {1: RiskLevel.MEDIUM,  2: RiskLevel.HIGH,   3: RiskLevel.HIGH,    4: RiskLevel.HIGH,    5: RiskLevel.HIGH},
-    "B": {1: RiskLevel.LOW,     2: RiskLevel.MEDIUM, 3: RiskLevel.HIGH,    4: RiskLevel.HIGH,    5: RiskLevel.HIGH},
-    "C": {1: RiskLevel.LOW,     2: RiskLevel.LOW,    3: RiskLevel.MEDIUM,  4: RiskLevel.HIGH,    5: RiskLevel.HIGH},
-    "D": {1: RiskLevel.LOW,     2: RiskLevel.LOW,    3: RiskLevel.MEDIUM,  4: RiskLevel.MEDIUM,  5: RiskLevel.HIGH},
-    "E": {1: RiskLevel.LOW,     2: RiskLevel.LOW,    3: RiskLevel.LOW,     4: RiskLevel.LOW,     5: RiskLevel.MEDIUM},
+    "A": {
+        1: RiskLevel.MEDIUM,
+        2: RiskLevel.HIGH,
+        3: RiskLevel.HIGH,
+        4: RiskLevel.HIGH,
+        5: RiskLevel.HIGH,
+    },
+    "B": {
+        1: RiskLevel.LOW,
+        2: RiskLevel.MEDIUM,
+        3: RiskLevel.HIGH,
+        4: RiskLevel.HIGH,
+        5: RiskLevel.HIGH,
+    },
+    "C": {
+        1: RiskLevel.LOW,
+        2: RiskLevel.LOW,
+        3: RiskLevel.MEDIUM,
+        4: RiskLevel.HIGH,
+        5: RiskLevel.HIGH,
+    },
+    "D": {
+        1: RiskLevel.LOW,
+        2: RiskLevel.LOW,
+        3: RiskLevel.MEDIUM,
+        4: RiskLevel.MEDIUM,
+        5: RiskLevel.HIGH,
+    },
+    "E": {
+        1: RiskLevel.LOW,
+        2: RiskLevel.LOW,
+        3: RiskLevel.LOW,
+        4: RiskLevel.LOW,
+        5: RiskLevel.MEDIUM,
+    },
 }
 
 
@@ -95,7 +125,9 @@ class Mitigation(Base):
     __tablename__ = "mitigations"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    risk_entry_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("risk_entries.id", ondelete="CASCADE"), index=True)
+    risk_entry_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("risk_entries.id", ondelete="CASCADE"), index=True
+    )
     title: Mapped[str] = mapped_column(String(500))
     description: Mapped[str] = mapped_column(Text)
     assignee: Mapped[str | None] = mapped_column(String(255), default=None)

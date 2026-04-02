@@ -15,7 +15,12 @@ branch_labels = None
 depends_on = None
 
 _source_type_enum = sa.Enum(
-    "client", "faa", "icao", "easa", "nasa_asrs", "internal",
+    "client",
+    "faa",
+    "icao",
+    "easa",
+    "nasa_asrs",
+    "internal",
     name="sourcetype",
 )
 

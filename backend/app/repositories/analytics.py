@@ -11,25 +11,20 @@ class AnalyticsRepository:
     def __init__(self, db: AsyncSession) -> None:
         self._db = db
 
-    async def get_kpis(
-        self, organization_id: uuid.UUID
-    ) -> dict[str, int | float | None]:
-        stmt = (
-            select(
-                func.count().label("total_risks"),
-                func.count().filter(RiskEntry.status == RiskStatus.OPEN).label("open_risks"),
-                func.count().filter(RiskEntry.risk_level == "high").label("high_count"),
-                func.avg(
-                    case(
-                        (
-                            RiskEntry.status == RiskStatus.CLOSED,
-                            extract("epoch", RiskEntry.updated_at - RiskEntry.created_at) / 86400,
-                        ),
-                    )
-                ).label("avg_days_to_close"),
-            )
-            .where(RiskEntry.organization_id == organization_id)
-        )
+    async def get_kpis(self, organization_id: uuid.UUID) -> dict[str, int | float | None]:
+        stmt = select(
+            func.count().label("total_risks"),
+            func.count().filter(RiskEntry.status == RiskStatus.OPEN).label("open_risks"),
+            func.count().filter(RiskEntry.risk_level == "high").label("high_count"),
+            func.avg(
+                case(
+                    (
+                        RiskEntry.status == RiskStatus.CLOSED,
+                        extract("epoch", RiskEntry.updated_at - RiskEntry.created_at) / 86400,
+                    ),
+                )
+            ).label("avg_days_to_close"),
+        ).where(RiskEntry.organization_id == organization_id)
         result = await self._db.execute(stmt)
         row = result.one()
 
@@ -61,7 +56,9 @@ class AnalyticsRepository:
     ) -> list[dict[str, str | int]]:
         stmt = (
             select(
-                func.to_char(func.date_trunc("month", RiskEntry.created_at), "YYYY-MM").label("month"),
+                func.to_char(func.date_trunc("month", RiskEntry.created_at), "YYYY-MM").label(
+                    "month"
+                ),
                 RiskEntry.risk_level,
                 func.count().label("cnt"),
             )
@@ -82,9 +79,7 @@ class AnalyticsRepository:
 
         return [{"month": m, **counts} for m, counts in months.items()]
 
-    async def get_status_breakdown(
-        self, organization_id: uuid.UUID
-    ) -> list[dict[str, str | int]]:
+    async def get_status_breakdown(self, organization_id: uuid.UUID) -> list[dict[str, str | int]]:
         stmt = (
             select(RiskEntry.status, func.count().label("count"))
             .where(RiskEntry.organization_id == organization_id)
@@ -93,9 +88,7 @@ class AnalyticsRepository:
         result = await self._db.execute(stmt)
         return [{"status": row.status, "count": row.count} for row in result.all()]
 
-    async def get_by_function_type(
-        self, organization_id: uuid.UUID
-    ) -> list[dict[str, str | int]]:
+    async def get_by_function_type(self, organization_id: uuid.UUID) -> list[dict[str, str | int]]:
         stmt = (
             select(RiskEntry.function_type, func.count().label("count"))
             .where(RiskEntry.organization_id == organization_id)
@@ -110,16 +103,23 @@ class AnalyticsRepository:
         stmt = (
             select(
                 func.count().label("total"),
-                func.count().filter(Mitigation.status == MitigationStatus.COMPLETED).label("completed"),
-                func.count().filter(
+                func.count()
+                .filter(Mitigation.status == MitigationStatus.COMPLETED)
+                .label("completed"),
+                func.count()
+                .filter(
                     Mitigation.due_date < func.now(),
-                    Mitigation.status.notin_([MitigationStatus.COMPLETED, MitigationStatus.CANCELLED]),
-                ).label("overdue"),
+                    Mitigation.status.notin_(
+                        [MitigationStatus.COMPLETED, MitigationStatus.CANCELLED]
+                    ),
+                )
+                .label("overdue"),
                 func.avg(
                     case(
                         (
                             Mitigation.status == MitigationStatus.COMPLETED,
-                            extract("epoch", Mitigation.completed_at - Mitigation.created_at) / 86400,
+                            extract("epoch", Mitigation.completed_at - Mitigation.created_at)
+                            / 86400,
                         ),
                     )
                 ).label("avg_days"),
@@ -138,12 +138,12 @@ class AnalyticsRepository:
             "completed_count": completed,
             "overdue_count": row.overdue,
             "completion_rate": round(completed / total, 3) if total > 0 else 0.0,
-            "avg_days_to_complete": round(float(row.avg_days), 1) if row.avg_days is not None else None,
+            "avg_days_to_complete": round(float(row.avg_days), 1)
+            if row.avg_days is not None
+            else None,
         }
 
-    async def get_risk_positions(
-        self, organization_id: uuid.UUID
-    ) -> list[dict[str, str | int]]:
+    async def get_risk_positions(self, organization_id: uuid.UUID) -> list[dict[str, str | int]]:
         stmt = (
             select(
                 RiskEntry.likelihood,

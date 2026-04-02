@@ -16,7 +16,9 @@ depends_on = None
 
 _risk_status_enum = sa.Enum("open", "mitigating", "closed", "accepted", name="riskstatus")
 _risk_level_enum = sa.Enum("low", "medium", "serious", "high", name="risklevel")
-_mitigation_status_enum = sa.Enum("pending", "in_progress", "completed", "cancelled", name="mitigationstatus")
+_mitigation_status_enum = sa.Enum(
+    "pending", "in_progress", "completed", "cancelled", name="mitigationstatus"
+)
 
 
 def upgrade() -> None:
@@ -27,7 +29,13 @@ def upgrade() -> None:
     op.create_table(
         "risk_entries",
         sa.Column("id", sa.Uuid(), primary_key=True),
-        sa.Column("organization_id", sa.Uuid(), sa.ForeignKey("organizations.id"), nullable=False, index=True),
+        sa.Column(
+            "organization_id",
+            sa.Uuid(),
+            sa.ForeignKey("organizations.id"),
+            nullable=False,
+            index=True,
+        ),
         sa.Column("created_by", sa.Uuid(), sa.ForeignKey("users.id"), nullable=False),
         sa.Column("title", sa.String(500), nullable=False),
         sa.Column("description", sa.Text(), nullable=False),

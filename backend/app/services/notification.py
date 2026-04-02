@@ -33,9 +33,7 @@ class NotificationService:
         )
         return [NotificationResponse.model_validate(e) for e in entries], total
 
-    async def get_unread_count(
-        self, user_id: uuid.UUID, organization_id: uuid.UUID
-    ) -> int:
+    async def get_unread_count(self, user_id: uuid.UUID, organization_id: uuid.UUID) -> int:
         return await self._repo.count_unread(user_id, organization_id)
 
     async def mark_read(
@@ -46,9 +44,7 @@ class NotificationService:
             return NotificationResponse.model_validate(entry)
         return None
 
-    async def mark_all_read(
-        self, user_id: uuid.UUID, organization_id: uuid.UUID
-    ) -> int:
+    async def mark_all_read(self, user_id: uuid.UUID, organization_id: uuid.UUID) -> int:
         return await self._repo.mark_all_read(user_id, organization_id)
 
 
@@ -96,10 +92,7 @@ async def _dispatch_qaqc_notifications(
             if not _should_notify(config, notification_type):
                 return
 
-            reviewer_ids = [
-                uid for uid in config.reviewer_user_ids
-                if uid != triggered_by_user_id
-            ]
+            reviewer_ids = [uid for uid in config.reviewer_user_ids if uid != triggered_by_user_id]
             if not reviewer_ids:
                 return
 

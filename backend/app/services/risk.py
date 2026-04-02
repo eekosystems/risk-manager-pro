@@ -59,9 +59,7 @@ class RiskService:
         )
         return entry
 
-    async def get_risk_entry(
-        self, risk_id: uuid.UUID, organization_id: uuid.UUID
-    ) -> RiskEntry:
+    async def get_risk_entry(self, risk_id: uuid.UUID, organization_id: uuid.UUID) -> RiskEntry:
         entry = await self._repo.get_by_id(risk_id, organization_id)
         if not entry:
             raise NotFoundError("RiskEntry", str(risk_id))
@@ -113,9 +111,7 @@ class RiskService:
         )
         return entry
 
-    async def delete_risk_entry(
-        self, risk_id: uuid.UUID, organization_id: uuid.UUID
-    ) -> None:
+    async def delete_risk_entry(self, risk_id: uuid.UUID, organization_id: uuid.UUID) -> None:
         deleted = await self._repo.delete(risk_id, organization_id)
         if not deleted:
             raise NotFoundError("RiskEntry", str(risk_id))

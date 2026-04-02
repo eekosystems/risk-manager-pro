@@ -17,12 +17,8 @@ class Notification(Base):
     __tablename__ = "notifications"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    organization_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("organizations.id"), index=True
-    )
-    recipient_user_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("users.id"), index=True
-    )
+    organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), index=True)
+    recipient_user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
     triggered_by_user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
     type: Mapped[NotificationType] = mapped_column(
         Enum(NotificationType, values_callable=lambda e: [x.value for x in e]),

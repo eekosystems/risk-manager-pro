@@ -1046,9 +1046,7 @@ Layer output serves as the system description input."""
 
 # Shared baseline: Purpose & Identity through Overarching Constraints.
 # Sub-prompts get only their specific instructions appended to this baseline.
-_BASELINE_CONTEXT = GENERAL_PROMPT[:GENERAL_PROMPT.index(
-    "\nSub-Prompt 1 (Workflow Stage 1):"
-)]
+_BASELINE_CONTEXT = GENERAL_PROMPT[: GENERAL_PROMPT.index("\nSub-Prompt 1 (Workflow Stage 1):")]
 
 # --- Sub-Prompt 1: System Analysis & Mitigation Generator ---
 _SUB_PROMPT_1 = GENERAL_PROMPT[
@@ -1069,8 +1067,7 @@ _SUB_PROMPT_2 = GENERAL_PROMPT[
 PHL_PROMPT = _BASELINE_CONTEXT + _SUB_PROMPT_2
 
 # --- Sub-Prompt 3: Safety Risk Assessment (SRA) ---
-_SUB_PROMPT_3 = GENERAL_PROMPT[
-    GENERAL_PROMPT.index("\nSub-Prompt 3 (Workflow Stage 3):"):]
+_SUB_PROMPT_3 = GENERAL_PROMPT[GENERAL_PROMPT.index("\nSub-Prompt 3 (Workflow Stage 3):") :]
 
 SRA_PROMPT = _BASELINE_CONTEXT + _SUB_PROMPT_3
 

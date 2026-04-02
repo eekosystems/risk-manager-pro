@@ -62,32 +62,34 @@ class AuditQueryService:
 
         output = io.StringIO()
         writer = csv.writer(output)
-        writer.writerow([
-            "timestamp",
-            "user_id",
-            "action",
-            "resource_type",
-            "resource_id",
-            "outcome",
-            "ip_address",
-            "correlation_id",
-        ])
+        writer.writerow(
+            [
+                "timestamp",
+                "user_id",
+                "action",
+                "resource_type",
+                "resource_id",
+                "outcome",
+                "ip_address",
+                "correlation_id",
+            ]
+        )
         for entry in entries:
-            writer.writerow([
-                entry.timestamp.isoformat(),
-                str(entry.user_id),
-                entry.action,
-                entry.resource_type,
-                entry.resource_id or "",
-                entry.outcome,
-                entry.ip_address,
-                str(entry.correlation_id),
-            ])
+            writer.writerow(
+                [
+                    entry.timestamp.isoformat(),
+                    str(entry.user_id),
+                    entry.action,
+                    entry.resource_type,
+                    entry.resource_id or "",
+                    entry.outcome,
+                    entry.ip_address,
+                    str(entry.correlation_id),
+                ]
+            )
         return output.getvalue()
 
-    async def get_filter_options(
-        self, organization_id: uuid.UUID
-    ) -> dict[str, list[str]]:
+    async def get_filter_options(self, organization_id: uuid.UUID) -> dict[str, list[str]]:
         actions = await self._repo.get_distinct_actions(organization_id)
         resource_types = await self._repo.get_distinct_resource_types(organization_id)
         return {

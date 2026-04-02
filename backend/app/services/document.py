@@ -58,10 +58,8 @@ class DocumentService:
         if signatures is None:
             # text/plain has no reliable magic bytes — skip
             return
-        if not any(data[:len(sig)] == sig for sig in signatures):
-            raise ValidationError(
-                f"File content does not match declared type {content_type}"
-            )
+        if not any(data[: len(sig)] == sig for sig in signatures):
+            raise ValidationError(f"File content does not match declared type {content_type}")
 
     async def upload(
         self,

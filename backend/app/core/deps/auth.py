@@ -67,9 +67,7 @@ async def get_token_payload(request: Request) -> TokenPayload:
     return payload
 
 
-async def _get_or_create_user(
-    db: AsyncSession, token: TokenPayload, request: Request
-) -> User:
+async def _get_or_create_user(db: AsyncSession, token: TokenPayload, request: Request) -> User:
     """Look up an existing user by Entra ID or auto-provision a new one."""
     stmt = select(User).where(User.entra_id == token.oid)
     result = await db.execute(stmt)

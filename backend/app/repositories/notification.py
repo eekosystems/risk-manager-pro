@@ -46,9 +46,7 @@ class NotificationRepository:
         result = await self._db.execute(stmt)
         return list(result.scalars().all()), total
 
-    async def count_unread(
-        self, user_id: uuid.UUID, organization_id: uuid.UUID
-    ) -> int:
+    async def count_unread(self, user_id: uuid.UUID, organization_id: uuid.UUID) -> int:
         stmt = (
             select(func.count())
             .select_from(Notification)
@@ -75,9 +73,7 @@ class NotificationRepository:
             await self._db.flush()
         return notification
 
-    async def mark_all_read(
-        self, user_id: uuid.UUID, organization_id: uuid.UUID
-    ) -> int:
+    async def mark_all_read(self, user_id: uuid.UUID, organization_id: uuid.UUID) -> int:
         stmt = (
             update(Notification)
             .where(

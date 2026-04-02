@@ -19,9 +19,7 @@ class RiskRepository:
         await self._db.flush()
         return entry
 
-    async def get_by_id(
-        self, risk_id: uuid.UUID, organization_id: uuid.UUID
-    ) -> RiskEntry | None:
+    async def get_by_id(self, risk_id: uuid.UUID, organization_id: uuid.UUID) -> RiskEntry | None:
         stmt = (
             select(RiskEntry)
             .options(selectinload(RiskEntry.mitigations))
@@ -105,9 +103,7 @@ class RiskRepository:
         await self._db.flush()
         return mitigation
 
-    async def delete_mitigation(
-        self, mitigation_id: uuid.UUID, risk_entry_id: uuid.UUID
-    ) -> bool:
+    async def delete_mitigation(self, mitigation_id: uuid.UUID, risk_entry_id: uuid.UUID) -> bool:
         mitigation = await self.get_mitigation_by_id(mitigation_id, risk_entry_id)
         if not mitigation:
             return False

@@ -42,9 +42,7 @@ def _resolve_prompt(function_type: FunctionType, prompts: PromptsPayload | None)
     return prompt_map[function_type]
 
 
-def _filter_by_threshold(
-    results: list[SearchResult], threshold: float
-) -> list[SearchResult]:
+def _filter_by_threshold(results: list[SearchResult], threshold: float) -> list[SearchResult]:
     """Remove results below the relevance score threshold."""
     if not results:
         return results
@@ -285,7 +283,10 @@ class ChatService:
         )
 
     async def get_conversation(
-        self, conversation_id: uuid.UUID, organization_id: uuid.UUID, user_id: uuid.UUID | None = None
+        self,
+        conversation_id: uuid.UUID,
+        organization_id: uuid.UUID,
+        user_id: uuid.UUID | None = None,
     ) -> Conversation | None:
         return await self._repo.get_by_id(conversation_id, organization_id, user_id=user_id)
 
@@ -295,6 +296,9 @@ class ChatService:
         return await self._repo.list_for_user(user_id, organization_id, skip, limit)
 
     async def delete_conversation(
-        self, conversation_id: uuid.UUID, organization_id: uuid.UUID, user_id: uuid.UUID | None = None
+        self,
+        conversation_id: uuid.UUID,
+        organization_id: uuid.UUID,
+        user_id: uuid.UUID | None = None,
     ) -> bool:
         return await self._repo.archive(conversation_id, organization_id, user_id=user_id)

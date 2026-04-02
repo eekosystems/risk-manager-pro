@@ -211,9 +211,7 @@ async def update_mitigation(
     service: RiskService = Depends(_get_risk_service),
     audit: AuditLogger = Depends(get_audit_logger),
 ) -> DataResponse[MitigationResponse]:
-    mitigation = await service.update_mitigation(
-        risk_id, mitigation_id, organization.id, payload
-    )
+    mitigation = await service.update_mitigation(risk_id, mitigation_id, organization.id, payload)
     await audit.log(
         action="mitigation.updated",
         user=current_user,
