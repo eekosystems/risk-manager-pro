@@ -264,9 +264,8 @@ stages:
     displayName: "Deploy to Azure"
     dependsOn:
       - Infrastructure
-      - Backend
       - Frontend
-    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    condition: and(not(failed('Infrastructure')), succeeded('Frontend'), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
     jobs:
       - job: DeployBackend
         displayName: "Deploy Backend (Container App)"
