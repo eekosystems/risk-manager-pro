@@ -59,10 +59,7 @@ class MicrosoftGraphService:
     def _validate_email_format(email: str) -> None:
         """Reject values that are clearly not email addresses."""
         if not re.match(r"^[^'\";<>]{1,320}@[^'\";<>]+\.[^'\";<>]+$", email):
-            raise ValidationError(
-                code="INVALID_EMAIL",
-                message="Invalid email format",
-            )
+            raise ValidationError("Invalid email format")
 
     async def find_user_by_email(self, email: str) -> GraphUser | None:
         """Look up a user in the Entra ID directory by email or UPN."""

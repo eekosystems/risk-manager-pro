@@ -86,7 +86,7 @@ class AnalyticsRepository:
             .group_by(RiskEntry.status)
         )
         result = await self._db.execute(stmt)
-        return [{"status": row.status, "count": row.count} for row in result.all()]
+        return [{"status": row.status, "count": int(row.count)} for row in result.all()]
 
     async def get_by_function_type(self, organization_id: uuid.UUID) -> list[dict[str, str | int]]:
         stmt = (
@@ -95,7 +95,9 @@ class AnalyticsRepository:
             .group_by(RiskEntry.function_type)
         )
         result = await self._db.execute(stmt)
-        return [{"function_type": row.function_type, "count": row.count} for row in result.all()]
+        return [
+            {"function_type": row.function_type, "count": int(row.count)} for row in result.all()
+        ]
 
     async def get_mitigation_performance(
         self, organization_id: uuid.UUID
@@ -155,7 +157,7 @@ class AnalyticsRepository:
         )
         result = await self._db.execute(stmt)
         return [
-            {"likelihood": row.likelihood, "severity": row.severity, "count": row.count}
+            {"likelihood": row.likelihood, "severity": row.severity, "count": int(row.count)}
             for row in result.all()
         ]
 

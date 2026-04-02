@@ -61,7 +61,7 @@ class RedisAuthThrottle:
     """Sliding-window rate limiter backed by Redis sorted sets."""
 
     def __init__(self, threshold: int, window_seconds: int, redis_url: str) -> None:
-        import redis
+        import redis  # type: ignore[import-not-found]
 
         self._threshold = threshold
         self._window_seconds = window_seconds
