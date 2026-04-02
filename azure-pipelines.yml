@@ -37,8 +37,8 @@ stages:
   # Infrastructure — Terraform
   # ──────────────────────────────────────────────
   - stage: Infrastructure
-    displayName: "Infrastructure (Terraform)"
-    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    displayName: "Infrastructure (Terraform) — SKIPPED"
+    condition: "false"  # Disabled: deploying to existing rg-rmp-rmp-start resources
     jobs:
       - job: TerraformApply
         displayName: "Terraform Plan & Apply"
@@ -264,9 +264,8 @@ stages:
   - stage: Deploy
     displayName: "Deploy to Azure"
     dependsOn:
-      - Infrastructure
       - Frontend
-    condition: and(not(failed('Infrastructure')), succeeded('Frontend'), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    condition: and(succeeded('Frontend'), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
     jobs:
       - job: DeployBackend
         displayName: "Deploy Backend (Container App)"
