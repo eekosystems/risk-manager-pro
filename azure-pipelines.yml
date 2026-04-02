@@ -154,6 +154,7 @@ stages:
           - script: |
               cd backend
               pytest tests/ \
+                --tb=short \
                 --cov=app \
                 --cov-report=xml:coverage.xml \
                 --cov-report=term-missing \
