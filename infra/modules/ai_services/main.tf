@@ -55,7 +55,7 @@ resource "azurerm_cognitive_deployment" "embedding" {
 resource "azurerm_search_service" "main" {
   name                          = "search-${var.name_prefix}"
   resource_group_name           = var.resource_group_name
-  location                      = var.location
+  location                      = var.search_location != "" ? var.search_location : var.location
   sku                           = "basic"
   replica_count                 = 1
   partition_count               = 1
