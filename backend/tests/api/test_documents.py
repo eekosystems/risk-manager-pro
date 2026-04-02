@@ -1,7 +1,7 @@
 """Tests for document endpoints."""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 from unittest.mock import AsyncMock
 
 import pytest
