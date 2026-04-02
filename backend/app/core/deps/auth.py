@@ -151,7 +151,7 @@ async def get_current_user(
     if not user.is_active:
         raise ForbiddenError("User account is deactivated")
 
-    now = datetime.now(UTC)
+    now = datetime.utcnow()
 
     # Check session timeout — if last_activity is set and older than threshold,
     # reset the session instead of permanently locking the user out.

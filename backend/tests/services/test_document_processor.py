@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from app.models.document import Document, DocumentStatus
+from app.models.document import Document, DocumentStatus, SourceType
 from app.services.document_processor import DocumentProcessor
 
 
@@ -41,6 +41,7 @@ async def test_process_document_pipeline(
         content_type="text/plain",
         size_bytes=100,
         status=DocumentStatus.PROCESSING,
+        source_type=SourceType.CLIENT,
     )
 
     mock_storage_service.download.return_value = (
@@ -72,6 +73,7 @@ async def test_process_empty_document_fails(
         content_type="text/plain",
         size_bytes=0,
         status=DocumentStatus.PROCESSING,
+        source_type=SourceType.CLIENT,
     )
 
     mock_storage_service.download.return_value = b"   "
@@ -99,6 +101,7 @@ async def test_process_error_sets_failed_status(
         content_type="application/pdf",
         size_bytes=100,
         status=DocumentStatus.PROCESSING,
+        source_type=SourceType.CLIENT,
     )
 
     mock_storage_service.download.side_effect = RuntimeError("Storage unavailable")

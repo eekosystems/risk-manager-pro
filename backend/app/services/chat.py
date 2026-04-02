@@ -276,7 +276,7 @@ class ChatService:
                 id=assistant_msg.id,
                 role=assistant_msg.role.value,
                 content=assistant_msg.content,
-                citations=citations,
+                citations=assistant_msg.citations,
                 created_at=assistant_msg.created_at,
             ),
             title=conversation.title,

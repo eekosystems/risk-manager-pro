@@ -43,8 +43,8 @@ async def test_upload_validates_file_size(document_service: DocumentService, use
         await document_service.upload(
             user=user,
             organization_id=ORGANIZATION_ID,
-            filename="huge.pdf",
-            content_type="application/pdf",
+            filename="huge.txt",
+            content_type="text/plain",
             data=oversized_data,
         )
 
@@ -59,9 +59,9 @@ async def test_upload_stores_and_creates_document(
         id=uuid.uuid4(),
         organization_id=ORGANIZATION_ID,
         uploaded_by=user.id,
-        filename="safety-manual.pdf",
-        blob_path=f"{ORGANIZATION_ID}/doc-id/safety-manual.pdf",
-        content_type="application/pdf",
+        filename="safety-manual.txt",
+        blob_path=f"{ORGANIZATION_ID}/doc-id/safety-manual.txt",
+        content_type="text/plain",
         size_bytes=1024,
         status=DocumentStatus.UPLOADED,
     )
@@ -72,13 +72,13 @@ async def test_upload_stores_and_creates_document(
     result = await document_service.upload(
         user=user,
         organization_id=ORGANIZATION_ID,
-        filename="safety-manual.pdf",
-        content_type="application/pdf",
-        data=b"fake-pdf-content",
+        filename="safety-manual.txt",
+        content_type="text/plain",
+        data=b"fake plain text content",
     )
 
     mock_storage_service.upload.assert_awaited_once()
-    assert result.filename == "safety-manual.pdf"
+    assert result.filename == "safety-manual.txt"
 
 
 @pytest.mark.asyncio

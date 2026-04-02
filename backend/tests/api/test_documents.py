@@ -1,7 +1,7 @@
 """Tests for document endpoints."""
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock
 
 import pytest
@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from httpx import AsyncClient
 
 from app.api.v1.documents import _get_document_service
-from app.models.document import Document, DocumentStatus
+from app.models.document import Document, DocumentStatus, SourceType
 from app.models.user import User
 from tests.conftest import ORGANIZATION_ID
 
@@ -24,6 +24,7 @@ def _make_document(organization_id: uuid.UUID, user_id: uuid.UUID) -> Document:
         content_type="application/pdf",
         size_bytes=1024,
         status=DocumentStatus.UPLOADED,
+        source_type=SourceType.CLIENT,
         chunk_count=0,
         created_at=datetime.utcnow(),
         updated_at=datetime.utcnow(),
