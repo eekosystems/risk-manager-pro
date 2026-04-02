@@ -19,10 +19,10 @@ variables:
   pythonVersion: "3.12"
   nodeVersion: "20.x"
   azureServiceConnection: "azure-rmp-connection"
-  resourceGroup: "rg-rmp-dev"
-  acrName: "acrrmpdev"
-  containerAppName: "ca-rmp-dev-api"
-  backendImage: "rmp-backend"
+  resourceGroup: "rg-rmp-rmp-start"
+  acrName: "acrrmprmpstart"
+  containerAppName: "ca-rmp-rmp-start-api"
+  backendImage: "risk-manager-pro/api-rmp-start"
 
 stages:
   # ──────────────────────────────────────────────
@@ -50,7 +50,7 @@ stages:
               workingDirectory: "$(System.DefaultWorkingDirectory)/infra"
               backendServiceArm: $(azureServiceConnection)
               backendAzureRmResourceGroupName: "rmp-terraform-state"
-              backendAzureRmStorageAccountName: "rmptfstate"
+              backendAzureRmStorageAccountName: "rmpfgllctfstate"
               backendAzureRmContainerName: "tfstate"
               backendAzureRmKey: "riskmanagerpro.terraform.tfstate"
 
