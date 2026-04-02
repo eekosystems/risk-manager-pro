@@ -16,13 +16,21 @@ pr:
       - main
 
 variables:
-  pythonVersion: "3.12"
-  nodeVersion: "20.x"
-  azureServiceConnection: "azure-rmp-connection"
-  resourceGroup: "rg-rmp-rmp-start"
-  acrName: "acrrmprmpstart"
-  containerAppName: "ca-rmp-rmp-start-api"
-  backendImage: "risk-manager-pro/api-rmp-start"
+  - group: "RMP variable group"
+  - name: pythonVersion
+    value: "3.12"
+  - name: nodeVersion
+    value: "20.x"
+  - name: azureServiceConnection
+    value: "azure-rmp-connection"
+  - name: resourceGroup
+    value: "rg-rmp-rmp-start"
+  - name: acrName
+    value: "acrrmprmpstart"
+  - name: containerAppName
+    value: "ca-rmp-rmp-start-api"
+  - name: backendImage
+    value: "risk-manager-pro/api-rmp-start"
 
 stages:
   # ──────────────────────────────────────────────
