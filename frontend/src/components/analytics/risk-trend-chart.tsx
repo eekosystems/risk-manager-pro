@@ -17,7 +17,6 @@ interface RiskTrendChartProps {
 
 const LEVEL_COLORS = {
   high: "#ef4444",
-  serious: "#f97316",
   medium: "#eab308",
   low: "#22c55e",
 };
@@ -67,15 +66,6 @@ export function RiskTrendChart({ data }: RiskTrendChartProps) {
           fill={LEVEL_COLORS.high}
           fillOpacity={0.6}
           name="High"
-        />
-        <Area
-          type="monotone"
-          dataKey="serious"
-          stackId="1"
-          stroke={LEVEL_COLORS.serious}
-          fill={LEVEL_COLORS.serious}
-          fillOpacity={0.6}
-          name="Serious"
         />
         <Area
           type="monotone"

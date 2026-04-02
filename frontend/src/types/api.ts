@@ -223,7 +223,6 @@ export interface RiskKPIs {
   total_risks: number;
   open_risks: number;
   high_count: number;
-  serious_count: number;
   overdue_mitigations: number;
   avg_days_to_close: number | null;
 }
@@ -232,7 +231,6 @@ export interface RiskLevelTimeSeries {
   month: string;
   low: number;
   medium: number;
-  serious: number;
   high: number;
 }
 

@@ -27,8 +27,8 @@ export function KPICards({ kpis }: KPICardsProps) {
       color: "text-blue-500",
     },
     {
-      label: "High / Serious",
-      value: kpis.high_count + kpis.serious_count,
+      label: "High",
+      value: kpis.high_count,
       icon: TrendingUp,
       color: "text-red-500",
     },

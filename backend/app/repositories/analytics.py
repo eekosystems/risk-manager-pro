@@ -19,7 +19,6 @@ class AnalyticsRepository:
                 func.count().label("total_risks"),
                 func.count().filter(RiskEntry.status == RiskStatus.OPEN).label("open_risks"),
                 func.count().filter(RiskEntry.risk_level == "high").label("high_count"),
-                func.count().filter(RiskEntry.risk_level == "serious").label("serious_count"),
                 func.avg(
                     case(
                         (
@@ -53,7 +52,6 @@ class AnalyticsRepository:
             "total_risks": row.total_risks,
             "open_risks": row.open_risks,
             "high_count": row.high_count,
-            "serious_count": row.serious_count,
             "overdue_mitigations": overdue_count,
             "avg_days_to_close": round(float(avg_close), 1) if avg_close is not None else None,
         }
@@ -79,7 +77,7 @@ class AnalyticsRepository:
         for row in rows:
             m = row.month
             if m not in months:
-                months[m] = {"low": 0, "medium": 0, "serious": 0, "high": 0}
+                months[m] = {"low": 0, "medium": 0, "high": 0}
             months[m][row.risk_level] = row.cnt
 
         return [{"month": m, **counts} for m, counts in months.items()]

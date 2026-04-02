@@ -23,7 +23,6 @@ interface RiskMatrixProps {
 const CELL_COLORS: Record<string, string> = {
   low: "bg-green-200 hover:bg-green-300",
   medium: "bg-yellow-200 hover:bg-yellow-300",
-  serious: "bg-orange-200 hover:bg-orange-300",
   high: "bg-red-200 hover:bg-red-300",
 };
 
@@ -111,7 +110,7 @@ export function RiskMatrix({ selection, onSelect, riskPositions, readOnly }: Ris
 
       {/* Legend */}
       <div className="flex flex-wrap gap-3">
-        {(["low", "medium", "serious", "high"] as const).map((level) => {
+        {(["low", "medium", "high"] as const).map((level) => {
           const cfg = RISK_LEVEL_CONFIG[level];
           return (
             <div key={level} className="flex items-center gap-1.5">

@@ -34,17 +34,16 @@ class Likelihood(enum.StrEnum):
 class RiskLevel(enum.StrEnum):
     LOW = "low"
     MEDIUM = "medium"
-    SERIOUS = "serious"
     HIGH = "high"
 
 
 # FAA Order 8040.4B risk matrix: RISK_MATRIX[likelihood][severity] -> RiskLevel
 RISK_MATRIX: dict[str, dict[int, RiskLevel]] = {
-    "A": {1: RiskLevel.MEDIUM,  2: RiskLevel.SERIOUS, 3: RiskLevel.HIGH,    4: RiskLevel.HIGH,    5: RiskLevel.HIGH},
-    "B": {1: RiskLevel.LOW,     2: RiskLevel.MEDIUM,  3: RiskLevel.SERIOUS, 4: RiskLevel.HIGH,    5: RiskLevel.HIGH},
-    "C": {1: RiskLevel.LOW,     2: RiskLevel.LOW,     3: RiskLevel.MEDIUM,  4: RiskLevel.SERIOUS, 5: RiskLevel.HIGH},
-    "D": {1: RiskLevel.LOW,     2: RiskLevel.LOW,     3: RiskLevel.MEDIUM,  4: RiskLevel.MEDIUM,  5: RiskLevel.SERIOUS},
-    "E": {1: RiskLevel.LOW,     2: RiskLevel.LOW,     3: RiskLevel.LOW,     4: RiskLevel.LOW,     5: RiskLevel.MEDIUM},
+    "A": {1: RiskLevel.MEDIUM,  2: RiskLevel.HIGH,   3: RiskLevel.HIGH,    4: RiskLevel.HIGH,    5: RiskLevel.HIGH},
+    "B": {1: RiskLevel.LOW,     2: RiskLevel.MEDIUM, 3: RiskLevel.HIGH,    4: RiskLevel.HIGH,    5: RiskLevel.HIGH},
+    "C": {1: RiskLevel.LOW,     2: RiskLevel.LOW,    3: RiskLevel.MEDIUM,  4: RiskLevel.HIGH,    5: RiskLevel.HIGH},
+    "D": {1: RiskLevel.LOW,     2: RiskLevel.LOW,    3: RiskLevel.MEDIUM,  4: RiskLevel.MEDIUM,  5: RiskLevel.HIGH},
+    "E": {1: RiskLevel.LOW,     2: RiskLevel.LOW,    3: RiskLevel.LOW,     4: RiskLevel.LOW,     5: RiskLevel.MEDIUM},
 }
 
 

@@ -298,8 +298,7 @@ export function SRAWizard({ onComplete, onCancel }: SRAWizardProps) {
       )}
 
       {initialSelection &&
-        (initialSelection.riskLevel === "high" ||
-          initialSelection.riskLevel === "serious") && (
+        initialSelection.riskLevel === "high" && (
           <div className="rounded-xl border border-red-300 bg-red-50 p-4">
             <p className="text-sm font-bold text-red-800">
               Accountable Executive Review Required

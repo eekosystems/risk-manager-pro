@@ -50,7 +50,7 @@ export function RiskListView({ onSelectRisk, onCreateNew }: RiskListViewProps) {
 
   const openCount = risks.filter((r) => r.status === "open").length;
   const highCount = risks.filter(
-    (r) => r.risk_level === "high" || r.risk_level === "serious",
+    (r) => r.risk_level === "high",
   ).length;
 
   const riskPositions: RiskPositionCount[] = (() => {
@@ -104,7 +104,7 @@ export function RiskListView({ onSelectRisk, onCreateNew }: RiskListViewProps) {
         </div>
         <div className="rounded-2xl border border-gray-200 bg-white p-4">
           <div className="text-2xl font-bold text-red-500">{highCount}</div>
-          <div className="text-[12px] text-slate-500">High / Serious</div>
+          <div className="text-[12px] text-slate-500">High</div>
         </div>
       </div>
 
@@ -145,7 +145,6 @@ export function RiskListView({ onSelectRisk, onCreateNew }: RiskListViewProps) {
         >
           <option value="">All Risk Levels</option>
           <option value="high">High</option>
-          <option value="serious">Serious</option>
           <option value="medium">Medium</option>
           <option value="low">Low</option>
         </select>

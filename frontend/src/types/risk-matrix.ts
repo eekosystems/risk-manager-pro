@@ -8,7 +8,7 @@
 
 export type Severity = 1 | 2 | 3 | 4 | 5;
 export type Likelihood = "A" | "B" | "C" | "D" | "E";
-export type RiskLevel = "low" | "medium" | "serious" | "high";
+export type RiskLevel = "low" | "medium" | "high";
 
 export interface RiskMatrixSelection {
   severity: Severity;
@@ -37,11 +37,11 @@ export const LIKELIHOOD_LABELS: Record<Likelihood, { short: string; full: string
  * Per FAA SMS guidelines (Order 8040.4B).
  */
 export const RISK_MATRIX: Record<Likelihood, Record<Severity, RiskLevel>> = {
-  A: { 1: "medium",  2: "serious", 3: "high",    4: "high",    5: "high"    },
-  B: { 1: "low",     2: "medium",  3: "serious",  4: "high",    5: "high"    },
-  C: { 1: "low",     2: "low",     3: "medium",   4: "serious", 5: "high"    },
-  D: { 1: "low",     2: "low",     3: "medium",   4: "medium",  5: "serious" },
-  E: { 1: "low",     2: "low",     3: "low",      4: "low",     5: "medium"  },
+  A: { 1: "medium",  2: "high",   3: "high",    4: "high",    5: "high"    },
+  B: { 1: "low",     2: "medium", 3: "high",    4: "high",    5: "high"    },
+  C: { 1: "low",     2: "low",    3: "medium",  4: "high",    5: "high"    },
+  D: { 1: "low",     2: "low",    3: "medium",  4: "medium",  5: "high"    },
+  E: { 1: "low",     2: "low",    3: "low",     4: "low",     5: "medium"  },
 };
 
 export const RISK_LEVEL_CONFIG: Record<
@@ -50,7 +50,6 @@ export const RISK_LEVEL_CONFIG: Record<
 > = {
   low:     { label: "Low",     color: "text-green-800",  bg: "bg-green-100",  border: "border-green-300"  },
   medium:  { label: "Medium",  color: "text-yellow-800", bg: "bg-yellow-100", border: "border-yellow-300" },
-  serious: { label: "Serious", color: "text-orange-800", bg: "bg-orange-100", border: "border-orange-300" },
   high:    { label: "High",    color: "text-red-800",    bg: "bg-red-100",    border: "border-red-300"    },
 };
 

@@ -8,7 +8,6 @@ class RiskKPIs(BaseModel):
     total_risks: int
     open_risks: int
     high_count: int
-    serious_count: int
     overdue_mitigations: int
     avg_days_to_close: float | None
 
@@ -17,7 +16,6 @@ class RiskLevelTimeSeries(BaseModel):
     month: str
     low: int
     medium: int
-    serious: int
     high: int
 
 
