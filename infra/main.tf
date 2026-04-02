@@ -51,7 +51,6 @@ module "ai_services" {
   name_prefix             = local.name_prefix
   tags                    = var.tags
   container_app_subnet_id = module.network.container_app_subnet_id
-  search_location         = "eastus"
 }
 
 module "keyvault" {
