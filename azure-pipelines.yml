@@ -305,11 +305,14 @@ stages:
             artifact: frontend-build
             displayName: "Download frontend build"
 
-          - task: AzureStaticWebApp@0
+          - task: AzureCLI@2
             displayName: "Deploy to Azure Static Web App"
             inputs:
-              workingDirectory: $(Pipeline.Workspace)/frontend-build
-              app_location: "."
-              skip_app_build: true
-              skip_api_build: true
-              azure_static_web_apps_api_token: $(SWA_DEPLOYMENT_TOKEN)
+              azureSubscription: $(azureServiceConnection)
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                npm install -g @azure/static-web-apps-cli
+                swa deploy $(Pipeline.Workspace)/frontend-build \
+                  --deployment-token $(SWA_DEPLOYMENT_TOKEN) \
+                  --env production
