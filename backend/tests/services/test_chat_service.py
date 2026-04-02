@@ -11,6 +11,7 @@ from app.models.conversation import Conversation, FunctionType
 from app.models.message import Message, MessageRole
 from app.models.user import User
 from app.schemas.chat import ChatRequest
+from app.schemas.settings import ModelPreferencesPayload, RagSettingsPayload
 from app.services.chat import ChatService
 from app.services.rag import SearchResult
 from tests.conftest import ORGANIZATION_ID, make_test_user
@@ -141,6 +142,9 @@ async def test_process_message_includes_citations(
     mock_repo.get_messages.return_value = []
 
     mock_settings = AsyncMock()
+    mock_settings.get_effective_rag_config.return_value = RagSettingsPayload()
+    mock_settings.get_effective_model_config.return_value = ModelPreferencesPayload()
+    mock_settings.get_effective_prompts.return_value = None
 
     with (
         patch.object(chat_service, "_repo", mock_repo),
