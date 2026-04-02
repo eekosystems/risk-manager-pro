@@ -13,6 +13,7 @@ from app.schemas.settings import (
     SettingsResponse,
 )
 from app.services.prompts import (
+    DOCUMENT_INTERPRETATION_PROMPT,
     GENERAL_PROMPT,
     INDEXING_INSTRUCTIONS,
     PHL_PROMPT,
@@ -37,6 +38,7 @@ DEFAULT_PROMPTS = PromptsPayload(
     phl_prompt=PHL_PROMPT,
     sra_prompt=SRA_PROMPT,
     system_analysis_prompt=SYSTEM_ANALYSIS_PROMPT,
+    document_interpretation_prompt=DOCUMENT_INTERPRETATION_PROMPT,
     indexing_instructions=INDEXING_INSTRUCTIONS,
 )
 

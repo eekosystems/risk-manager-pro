@@ -34,10 +34,11 @@ class ModelPreferencesPayload(BaseModel):
 
 
 class PromptsPayload(BaseModel):
-    system_prompt: str = Field(..., min_length=1, max_length=50000)
-    phl_prompt: str = Field(..., min_length=1, max_length=50000)
-    sra_prompt: str = Field(..., min_length=1, max_length=50000)
-    system_analysis_prompt: str = Field(..., min_length=1, max_length=50000)
+    system_prompt: str = Field(..., min_length=1, max_length=200000)
+    phl_prompt: str = Field(..., min_length=1, max_length=200000)
+    sra_prompt: str = Field(..., min_length=1, max_length=200000)
+    system_analysis_prompt: str = Field(..., min_length=1, max_length=200000)
+    document_interpretation_prompt: str = Field(..., min_length=1, max_length=200000)
     indexing_instructions: str = Field(..., min_length=1, max_length=80000)
 
 

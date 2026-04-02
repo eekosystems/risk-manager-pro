@@ -4,5 +4,7 @@ resource "azurerm_static_web_app" "frontend" {
   location            = var.location
   sku_tier            = "Free"
   sku_size            = "Free"
-  tags                = var.tags
+  tags = merge(var.tags, {
+    "azd-service-name" = "web"
+  })
 }

@@ -20,7 +20,7 @@ COPY alembic/ alembic/
 COPY alembic.ini .
 COPY start.sh .
 
-RUN chmod +x start.sh && chown -R appuser:appuser /app
+RUN sed -i 's/\r$//' start.sh && chmod +x start.sh && chown -R appuser:appuser /app
 
 USER appuser
 

@@ -1307,6 +1307,15 @@ sources.
 Always recommend human (SMS Manager) approval of the Corrective Action Plan (CAP) \
 before implementation.`;
 
+export const DEFAULT_DOCUMENT_INTERPRETATION_PROMPT = `\
+Risk Manager Pro — Document Interpretation Layer
+Faith Group SRM/SRA Document Context Prompt
+Version 1.0 | Standalone Pre-Processing Layer | Sits Before Sub-Prompts 1-3
+
+This prompt governs how RMP reads, interprets, extracts, and applies all Faith Group \
+SRM/SRA documentation before any downstream Sub-Prompt executes its analysis. The full \
+content is managed server-side.`;
+
 export const DEFAULT_INDEXING_INSTRUCTIONS = `\
 Risk Manager Pro (RMP) — Dev Partner Handoff Package
 

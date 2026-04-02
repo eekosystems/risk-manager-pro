@@ -6,6 +6,7 @@ import {
   BarChart3,
   Copy,
   Database,
+  FileText,
   Loader2,
   MessageSquareCode,
   RotateCcw,
@@ -20,6 +21,7 @@ import {
 } from "@/api/settings";
 import { SettingsSection } from "@/components/settings/settings-section";
 import {
+  DEFAULT_DOCUMENT_INTERPRETATION_PROMPT,
   DEFAULT_INDEXING_INSTRUCTIONS,
   DEFAULT_PHL_PROMPT,
   DEFAULT_SRA_PROMPT,
@@ -32,6 +34,7 @@ const FALLBACK_PROMPTS: PromptsSettings = {
   phl_prompt: DEFAULT_PHL_PROMPT,
   sra_prompt: DEFAULT_SRA_PROMPT,
   system_analysis_prompt: DEFAULT_SYSTEM_ANALYSIS_PROMPT,
+  document_interpretation_prompt: DEFAULT_DOCUMENT_INTERPRETATION_PROMPT,
   indexing_instructions: DEFAULT_INDEXING_INSTRUCTIONS,
 };
 
@@ -72,6 +75,13 @@ const PROMPT_SECTIONS: PromptSection[] = [
     description:
       "Instructions for the System Analysis function.",
     icon: BarChart3,
+  },
+  {
+    key: "document_interpretation_prompt",
+    label: "Document Interpretation",
+    description:
+      "Governs how RMP reads, interprets, extracts, and applies Faith Group SRM/SRA documentation before Sub-Prompts execute.",
+    icon: FileText,
   },
   {
     key: "indexing_instructions",

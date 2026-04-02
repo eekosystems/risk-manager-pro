@@ -13,7 +13,7 @@ variable "location" {
 variable "project_name" {
   description = "Project name used in resource naming"
   type        = string
-  default     = "rmp"
+  default     = "rmpfg"
 }
 
 variable "azure_ad_tenant_id" {
