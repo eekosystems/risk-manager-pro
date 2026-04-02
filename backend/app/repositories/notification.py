@@ -85,4 +85,4 @@ class NotificationRepository:
         )
         result = await self._db.execute(stmt)
         await self._db.flush()
-        return result.rowcount  # type: ignore[union-attr,no-any-return]
+        return result.rowcount  # type: ignore[attr-defined,no-any-return]
