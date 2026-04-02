@@ -28,20 +28,20 @@ resource "azurerm_container_app" "backend" {
   }
 
   template {
-    min_replicas = 0
-    max_replicas = 1
+    min_replicas = 1
+    max_replicas = 2
 
     container {
       name   = "api"
       image  = "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"
-      cpu    = 0.25
-      memory = "0.5Gi"
+      cpu    = 0.5
+      memory = "1Gi"
     }
   }
 
   ingress {
     external_enabled           = true
-    target_port                = 80
+    target_port                = 8000
     transport                  = "http"
     allow_insecure_connections = false
 

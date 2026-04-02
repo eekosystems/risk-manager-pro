@@ -3,7 +3,8 @@ set -e
 
 echo "Running database migrations..."
 python -m alembic upgrade head || {
-    echo "Migration failed, attempting to stamp current state..."
+    echo "WARNING: Migration failed. Stamping current state to allow startup." >&2
+    echo "WARNING: Review migration state manually — data may be out of sync." >&2
     python -m alembic stamp head
 }
 
