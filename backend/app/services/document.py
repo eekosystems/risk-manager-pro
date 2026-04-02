@@ -14,6 +14,8 @@ from app.services.storage import BlobStorageService
 
 logger = structlog.get_logger(__name__)
 
+MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 MB
+
 ALLOWED_CONTENT_TYPES = {
     "application/pdf",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
