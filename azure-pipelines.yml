@@ -324,6 +324,12 @@ stages:
                   --role "Storage Blob Data Contributor" \
                   --scope "$STORAGE_ID" 2>/dev/null || echo "Storage role already assigned"
 
+                # Ensure Search service is reachable (RBAC protects access)
+                az search service update \
+                  --name $(searchServiceName) \
+                  --resource-group $(resourceGroup) \
+                  --public-access enabled 2>/dev/null || echo "Search public access already enabled"
+
           - task: AzureCLI@2
             displayName: "Update Container App image and env vars"
             inputs:
