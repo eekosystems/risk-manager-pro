@@ -316,5 +316,7 @@ stages:
               inlineScript: |
                 npm install -g @azure/static-web-apps-cli
                 swa deploy $(Pipeline.Workspace)/frontend-build \
-                  --deployment-token $(SWA_DEPLOYMENT_TOKEN) \
+                  --deployment-token "$SWA_TOKEN" \
                   --env production
+            env:
+              SWA_TOKEN: $(SWA_DEPLOYMENT_TOKEN)
