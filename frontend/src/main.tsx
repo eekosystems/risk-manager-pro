@@ -25,7 +25,13 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 30_000,
-      retry: 1,
+      retry: (failureCount, error) => {
+        // Never retry rate-limited or auth requests
+        const status = (error as { status?: number }).status;
+        if (status === 429 || status === 401 || status === 403) return false;
+        return failureCount < 1;
+      },
+      refetchOnWindowFocus: false,
     },
   },
 });
