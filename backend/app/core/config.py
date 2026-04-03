@@ -23,7 +23,7 @@ class Settings(BaseSettings):
         if raw.startswith("["):
             import json
 
-            return json.loads(raw)
+            return list(json.loads(raw))
         return [origin.strip() for origin in raw.split(",") if origin.strip()]
 
     # Session & Auth Security
