@@ -23,7 +23,7 @@ import { WizardStep } from "./wizard-step";
 const SRA_STEPS = [
   "Select Hazard",
   "Analyze Risk",
-  "Assess ALARP",
+  "Risk Acceptance",
   "Mitigations & Residual",
   "Review & Save",
 ];
@@ -281,7 +281,7 @@ export function SRAWizard({ onComplete, onCancel }: SRAWizardProps) {
       </Button>
     </div>,
 
-    // Step 2: Assess ALARP
+    // Step 2: Risk Acceptance
     <div key="step-2" className="space-y-4">
       {initialRiskLevel && (
         <div
@@ -304,18 +304,19 @@ export function SRAWizard({ onComplete, onCancel }: SRAWizardProps) {
               Accountable Executive Review Required
             </p>
             <p className="mt-1 text-xs text-red-600">
-              This risk level requires explicit review and acceptance by the
-              Accountable Executive before proceeding.
+              Per FAA Order 8040.4B, this risk level requires explicit review
+              and acceptance by the Accountable Executive before proceeding.
             </p>
           </div>
         )}
 
       <div className="rounded-xl border border-gray-200 bg-white p-4">
-        <h4 className="text-sm font-bold text-slate-700">ALARP Assessment</h4>
+        <h4 className="text-sm font-bold text-slate-700">Risk Acceptance Determination</h4>
         <p className="mt-2 text-xs text-slate-500">
-          Determine whether risk is As Low As Reasonably Practicable. Consider
-          the balance between cost/feasibility of further risk reduction and the
-          residual risk level.
+          Evaluate whether the initial risk meets the organization&apos;s risk
+          acceptance criteria per FAA Order 8040.4B. Compare the assessed risk
+          level against the risk acceptance thresholds defined by the
+          Accountable Executive to determine if mitigations are required.
         </p>
       </div>
 

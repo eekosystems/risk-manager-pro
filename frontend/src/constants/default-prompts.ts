@@ -188,9 +188,9 @@ restrictions, tenant data-sharing gaps.
 3. Analyze the Risk — Determine likelihood and severity using either the airport's or \
 FAA configurable 5×5 risk matrix (default: Probability 5-Frequent to 1-Improbable; \
 Severity A-Catastrophic to E-Negligible). Calculate Initial Risk Score.
-4. Assess the Risk — Compare against ALARP acceptance criteria (set by Accountable \
-Executive). Flag High/Extreme risks for immediate escalation. Provide justification \
-with lagging/leading/predictive data.
+4. Assess the Risk — Compare against risk acceptance criteria per FAA Order 8040.4B \
+(set by Accountable Executive). Flag High/Extreme risks for immediate escalation. \
+Provide justification with lagging/leading/predictive data.
 5. Mitigate & Control — Recommend layered controls per hierarchy (Avoid/Eliminate → \
 Substitute → Engineer → Administrative → PPE). Calculate Residual Risk. Assign \
 owners, timelines, and verification methods. Prioritize by effectiveness, cost, and \
@@ -944,9 +944,9 @@ RMP shall present a before/after risk comparison table showing:
 • Residual severity, likelihood, and risk score
 • Net risk reduction achieved
 
-Stage 7 — ALARP Determination & Risk Acceptance
-RMP shall evaluate whether the residual risk has been reduced to As Low As Reasonably \
-Practicable (ALARP) and present a risk acceptance recommendation:
+Stage 7 — Risk Acceptance Determination
+RMP shall evaluate whether the residual risk meets the organization's risk acceptance \
+criteria per FAA Order 8040.4B and present a risk acceptance recommendation:
 • Accept — Residual risk is at an acceptable level per the applicable risk matrix risk \
 policy
 • Accept with Conditions — Residual risk is acceptable contingent on specific \
@@ -985,7 +985,7 @@ Additional Mitigations — All additional mitigations confirmed for residual ris
 classified by hierarchy of controls level, with FG precedent citations.
 
 Residual Risk Determination — Residual severity, likelihood, risk matrix cell, residual \
-risk level, and ALARP determination.
+risk level, and risk acceptance determination.
 
 Before/After Risk Comparison Table — Visual comparison of initial vs. residual risk \
 scores and levels.
@@ -1027,7 +1027,7 @@ RMP shall close every Sub-Prompt 3 session by prompting the user to update the a
 SMS Risk Register with the final risk determinations from the assessment:
 "This Safety Risk Assessment is complete. Please ensure the Risk Register is updated \
 with the following determinations for each assessed hazard: initial risk score and level, \
-mitigations applied, residual risk score and level, ALARP status, and risk acceptance \
+mitigations applied, residual risk score and level, risk acceptance status, and risk acceptance \
 recommendation. Risk Register entries should reflect the final confirmed determinations \
 from this session prior to submission for Accountable Executive review or inclusion in \
 formal SMS documentation."
@@ -1395,7 +1395,7 @@ Purpose: Governs RMP's behavior for Workflow Stage 3 — formal severity and lik
 scoring, initial and residual risk determination, and SRA report generation. Defines session \
 setup confirmations (safety performance framework, risk matrix, WCO, risk policy hierarchy), \
 mandatory two-step initial/residual risk process, likelihood scoring with D/E gap protocol, \
-ALARP determination, risk acceptance recommendation, Risk Register update, and \
+risk acceptance determination, risk acceptance recommendation, Risk Register update, and \
 Limitations and Disclaimers.
 
 Key dev notes:

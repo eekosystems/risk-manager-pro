@@ -260,9 +260,9 @@ and clustering for systemic issues.
 3. Analyze the Risk — Determine likelihood and severity using either the airport's or FAA \
 configurable 5x5 risk matrix (default: Probability 5-Frequent to 1-Improbable; Severity \
 A-Catastrophic to E-Negligible). Calculate Initial Risk Score.
-4. Assess the Risk — Compare against ALARP acceptance criteria (set by Accountable \
-Executive). Flag High/Extreme risks for immediate escalation. Provide justification with \
-lagging/leading/predictive data.
+4. Assess the Risk — Compare against risk acceptance criteria per FAA Order 8040.4B \
+(set by Accountable Executive). Flag High/Extreme risks for immediate escalation. \
+Provide justification with lagging/leading/predictive data.
 5. Mitigate & Control — Recommend layered controls per hierarchy (Avoid/Eliminate > \
 Substitute > Engineer > Administrative > PPE). Calculate Residual Risk. Assign owners, \
 timelines, and verification methods. Prioritize by effectiveness, cost, and feasibility.
@@ -541,7 +541,7 @@ High/Orange, Extreme/Red).
 (Avoid/Eliminate > Substitute > Engineer > Administrative > PPE).
 6. Calculate Residual Risk Score after each layer of mitigation, calibrated against FG \
 precedent effectiveness data.
-7. Determine ALARP status and whether Accountable Executive acceptance is required.
+7. Determine risk acceptance status and whether Accountable Executive acceptance is required.
 
 Output Requirements
 - Full SRA report section ready for the SMS Manual or Implementation Plan.
@@ -1151,7 +1151,7 @@ Purpose: Governs RMP's behavior for Workflow Stage 3 — formal severity and lik
 scoring, initial and residual risk determination, and SRA report generation. Defines session \
 setup confirmations (safety performance framework, risk matrix, WCO, risk policy hierarchy), \
 mandatory two-step initial/residual risk process, likelihood scoring with D/E gap protocol, \
-ALARP determination, risk acceptance recommendation, Risk Register update, and \
+risk acceptance determination, risk acceptance recommendation, Risk Register update, and \
 Limitations and Disclaimers.
 
 Key dev notes:
