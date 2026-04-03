@@ -14,15 +14,16 @@ class Settings(BaseSettings):
     app_name: str = "Risk Manager Pro"
     app_version: str = "0.1.0"
     log_level: str = "INFO"
-    cors_origins: list[str] = ["http://localhost:5173"]
+    cors_origins: str = "http://localhost:5173"
 
-    @field_validator("cors_origins", mode="before")
-    @classmethod
-    def _parse_cors_origins(cls, v: object) -> object:
-        """Accept both JSON arrays and comma-separated strings."""
-        if isinstance(v, str) and not v.startswith("["):
-            return [origin.strip() for origin in v.split(",") if origin.strip()]
-        return v
+    @property
+    def cors_origins_list(self) -> list[str]:
+        """Parse CORS origins from JSON array or comma-separated string."""
+        raw = self.cors_origins.strip()
+        if raw.startswith("["):
+            import json
+            return json.loads(raw)
+        return [origin.strip() for origin in raw.split(",") if origin.strip()]
 
     # Session & Auth Security
     session_timeout_minutes: int = 60

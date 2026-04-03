@@ -106,7 +106,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     setup_logging()
 
     if settings.app_env != "development":
-        origins = settings.cors_origins
+        origins = settings.cors_origins_list
         if "*" in origins:
             raise RuntimeError(
                 "CORS_ORIGINS must not contain '*' outside of local development. "
@@ -138,7 +138,7 @@ def create_app() -> FastAPI:
     app.add_middleware(CorrelationIdMiddleware)
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.cors_origins,
+        allow_origins=settings.cors_origins_list,
         allow_credentials=True,
         allow_methods=ALLOWED_METHODS,
         allow_headers=ALLOWED_HEADERS,

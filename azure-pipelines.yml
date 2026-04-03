@@ -272,8 +272,9 @@ stages:
   - stage: Deploy
     displayName: "Deploy to Azure"
     dependsOn:
+      - Backend
       - Frontend
-    condition: and(succeeded('Frontend'), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    condition: and(succeeded('Backend'), succeeded('Frontend'), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
     jobs:
       - job: DeployBackend
         displayName: "Deploy Backend (Container App)"
@@ -342,16 +343,25 @@ stages:
                   --resource-group $(resourceGroup) \
                   --image $(acrName).azurecr.io/$(backendImage):$(Build.BuildId) \
                   --set-env-vars \
-                    DATABASE_URL="$(DATABASE_URL)" \
-                    AZURE_OPENAI_ENDPOINT="$(AZURE_OPENAI_ENDPOINT)" \
-                    AZURE_SEARCH_ENDPOINT="$(AZURE_SEARCH_ENDPOINT)" \
-                    AZURE_SEARCH_INDEX_NAME="$(AZURE_SEARCH_INDEX_NAME)" \
-                    AZURE_STORAGE_ACCOUNT_NAME="$(AZURE_STORAGE_ACCOUNT_NAME)" \
-                    AZURE_AD_TENANT_ID="$(AZURE_AD_TENANT_ID)" \
-                    AZURE_AD_CLIENT_ID="$(AZURE_AD_CLIENT_ID)" \
-                    CORS_ORIGINS="$(CORS_ORIGINS)" \
+                    DATABASE_URL="$DATABASE_URL" \
+                    AZURE_OPENAI_ENDPOINT="$AZURE_OPENAI_ENDPOINT" \
+                    AZURE_SEARCH_ENDPOINT="$AZURE_SEARCH_ENDPOINT" \
+                    AZURE_SEARCH_INDEX_NAME="$AZURE_SEARCH_INDEX_NAME" \
+                    AZURE_STORAGE_ACCOUNT_NAME="$AZURE_STORAGE_ACCOUNT_NAME" \
+                    AZURE_AD_TENANT_ID="$AZURE_AD_TENANT_ID" \
+                    AZURE_AD_CLIENT_ID="$AZURE_AD_CLIENT_ID" \
+                    CORS_ORIGINS="$CORS_ORIGINS" \
                     APP_ENV=production \
                     LOG_LEVEL=INFO
+            env:
+              DATABASE_URL: $(DATABASE_URL)
+              AZURE_OPENAI_ENDPOINT: $(AZURE_OPENAI_ENDPOINT)
+              AZURE_SEARCH_ENDPOINT: $(AZURE_SEARCH_ENDPOINT)
+              AZURE_SEARCH_INDEX_NAME: $(AZURE_SEARCH_INDEX_NAME)
+              AZURE_STORAGE_ACCOUNT_NAME: $(AZURE_STORAGE_ACCOUNT_NAME)
+              AZURE_AD_TENANT_ID: $(AZURE_AD_TENANT_ID)
+              AZURE_AD_CLIENT_ID: $(AZURE_AD_CLIENT_ID)
+              CORS_ORIGINS: $(CORS_ORIGINS)
 
           - task: AzureCLI@2
             displayName: "Run database migrations"
