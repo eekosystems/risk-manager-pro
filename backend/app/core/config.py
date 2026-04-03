@@ -22,6 +22,7 @@ class Settings(BaseSettings):
         raw = self.cors_origins.strip()
         if raw.startswith("["):
             import json
+
             return json.loads(raw)
         return [origin.strip() for origin in raw.split(",") if origin.strip()]
 
