@@ -31,6 +31,12 @@ variables:
     value: "ca-rmp-rmp-start-api"
   - name: backendImage
     value: "risk-manager-pro/api-rmp-start"
+  - name: openaiAccountName
+    value: "oai-rmp-rmp-start"
+  - name: searchServiceName
+    value: "search-rmp-rmp-start"
+  - name: storageAccountName
+    value: "strmprmpstartfg"
 
 stages:
   # ──────────────────────────────────────────────
@@ -275,7 +281,51 @@ stages:
           vmImage: "ubuntu-latest"
         steps:
           - task: AzureCLI@2
-            displayName: "Update Container App image"
+            displayName: "Ensure RBAC roles for Container App identity"
+            inputs:
+              azureSubscription: $(azureServiceConnection)
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                PRINCIPAL_ID=$(az containerapp show \
+                  --name $(containerAppName) \
+                  --resource-group $(resourceGroup) \
+                  --query "identity.principalId" -o tsv)
+
+                echo "Container App principal ID: $PRINCIPAL_ID"
+
+                # Cognitive Services OpenAI User on the OpenAI account
+                OPENAI_ID=$(az cognitiveservices account show \
+                  --name $(openaiAccountName) \
+                  --resource-group $(resourceGroup) \
+                  --query "id" -o tsv)
+                az role assignment create \
+                  --assignee "$PRINCIPAL_ID" \
+                  --role "Cognitive Services OpenAI User" \
+                  --scope "$OPENAI_ID" 2>/dev/null || echo "OpenAI role already assigned"
+
+                # Search Index Data Reader on the Search service
+                SEARCH_ID=$(az search service show \
+                  --name $(searchServiceName) \
+                  --resource-group $(resourceGroup) \
+                  --query "id" -o tsv)
+                az role assignment create \
+                  --assignee "$PRINCIPAL_ID" \
+                  --role "Search Index Data Reader" \
+                  --scope "$SEARCH_ID" 2>/dev/null || echo "Search role already assigned"
+
+                # Storage Blob Data Contributor on the Storage account
+                STORAGE_ID=$(az storage account show \
+                  --name $(storageAccountName) \
+                  --resource-group $(resourceGroup) \
+                  --query "id" -o tsv)
+                az role assignment create \
+                  --assignee "$PRINCIPAL_ID" \
+                  --role "Storage Blob Data Contributor" \
+                  --scope "$STORAGE_ID" 2>/dev/null || echo "Storage role already assigned"
+
+          - task: AzureCLI@2
+            displayName: "Update Container App image and env vars"
             inputs:
               azureSubscription: $(azureServiceConnection)
               scriptType: bash
@@ -284,7 +334,18 @@ stages:
                 az containerapp update \
                   --name $(containerAppName) \
                   --resource-group $(resourceGroup) \
-                  --image $(acrName).azurecr.io/$(backendImage):$(Build.BuildId)
+                  --image $(acrName).azurecr.io/$(backendImage):$(Build.BuildId) \
+                  --set-env-vars \
+                    DATABASE_URL="$(DATABASE_URL)" \
+                    AZURE_OPENAI_ENDPOINT="$(AZURE_OPENAI_ENDPOINT)" \
+                    AZURE_SEARCH_ENDPOINT="$(AZURE_SEARCH_ENDPOINT)" \
+                    AZURE_SEARCH_INDEX_NAME="$(AZURE_SEARCH_INDEX_NAME)" \
+                    AZURE_STORAGE_ACCOUNT_NAME="$(AZURE_STORAGE_ACCOUNT_NAME)" \
+                    AZURE_AD_TENANT_ID="$(AZURE_AD_TENANT_ID)" \
+                    AZURE_AD_CLIENT_ID="$(AZURE_AD_CLIENT_ID)" \
+                    CORS_ORIGINS="$(CORS_ORIGINS)" \
+                    APP_ENV=production \
+                    LOG_LEVEL=INFO
 
           - task: AzureCLI@2
             displayName: "Run database migrations"

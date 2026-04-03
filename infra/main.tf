@@ -97,10 +97,31 @@ module "container_app" {
   cors_origins                = "[\"https://${module.static_web_app.default_hostname}\"]"
 }
 
-# Grant Container App managed identity access to Key Vault (breaks circular dependency)
+# Grant Container App managed identity access to Key Vault
 resource "azurerm_role_assignment" "container_app_keyvault" {
   scope                = module.keyvault.vault_id
   role_definition_name = "Key Vault Secrets User"
+  principal_id         = module.container_app.identity_principal_id
+}
+
+# Grant Container App managed identity access to Azure OpenAI
+resource "azurerm_role_assignment" "container_app_openai" {
+  scope                = module.ai_services.openai_id
+  role_definition_name = "Cognitive Services OpenAI User"
+  principal_id         = module.container_app.identity_principal_id
+}
+
+# Grant Container App managed identity access to Azure AI Search
+resource "azurerm_role_assignment" "container_app_search" {
+  scope                = module.ai_services.search_id
+  role_definition_name = "Search Index Data Reader"
+  principal_id         = module.container_app.identity_principal_id
+}
+
+# Grant Container App managed identity access to Azure Blob Storage
+resource "azurerm_role_assignment" "container_app_storage" {
+  scope                = module.storage.storage_account_id
+  role_definition_name = "Storage Blob Data Contributor"
   principal_id         = module.container_app.identity_principal_id
 }
 

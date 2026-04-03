@@ -36,6 +36,47 @@ resource "azurerm_container_app" "backend" {
       image  = "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"
       cpu    = 0.5
       memory = "1Gi"
+
+      env {
+        name  = "DATABASE_URL"
+        value = var.database_url
+      }
+      env {
+        name  = "AZURE_OPENAI_ENDPOINT"
+        value = var.openai_endpoint
+      }
+      env {
+        name  = "AZURE_SEARCH_ENDPOINT"
+        value = var.search_endpoint
+      }
+      env {
+        name  = "AZURE_SEARCH_INDEX_NAME"
+        value = "rmp-documents"
+      }
+      env {
+        name  = "AZURE_STORAGE_ACCOUNT_NAME"
+        value = var.storage_account_name
+      }
+      env {
+        name  = "AZURE_AD_TENANT_ID"
+        value = var.azure_ad_tenant_id
+      }
+      env {
+        name  = "AZURE_AD_CLIENT_ID"
+        value = var.azure_ad_client_id
+      }
+      env {
+        name  = "CORS_ORIGINS"
+        value = var.cors_origins
+      }
+      env {
+        name  = "APP_ENV"
+        value = "production"
+      }
+      env {
+        name  = "LOG_LEVEL"
+        value = "INFO"
+      }
     }
   }
 
