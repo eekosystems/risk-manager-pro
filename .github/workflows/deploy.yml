@@ -130,7 +130,7 @@ jobs:
           npm ci
           npm run build
         env:
-          VITE_API_BASE_URL: ${{ vars.API_BASE_URL }}
+          VITE_API_BASE_URL: ${{ vars.API_BASE_URL }}/api/v1
           VITE_AZURE_AD_CLIENT_ID: ${{ vars.AZURE_AD_CLIENT_ID }}
           VITE_AZURE_AD_AUTHORITY: ${{ vars.AZURE_AD_AUTHORITY }}
           VITE_AZURE_AD_REDIRECT_URI: ${{ vars.FRONTEND_URL }}
