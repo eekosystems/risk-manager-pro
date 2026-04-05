@@ -6,6 +6,7 @@ Create Date: 2026-03-15
 """
 
 import sqlalchemy as sa
+from sqlalchemy.dialects.postgresql import ENUM
 
 from alembic import op
 
@@ -14,17 +15,18 @@ down_revision = "007"
 branch_labels = None
 depends_on = None
 
-_risk_status_enum = sa.Enum("open", "mitigating", "closed", "accepted", name="riskstatus", create_type=False)
-_risk_level_enum = sa.Enum("low", "medium", "serious", "high", name="risklevel", create_type=False)
-_mitigation_status_enum = sa.Enum(
+_risk_status_enum = ENUM("open", "mitigating", "closed", "accepted", name="riskstatus", create_type=False)
+_risk_level_enum = ENUM("low", "medium", "serious", "high", name="risklevel", create_type=False)
+_mitigation_status_enum = ENUM(
     "pending", "in_progress", "completed", "cancelled", name="mitigationstatus", create_type=False
 )
 
 
 def upgrade() -> None:
-    _risk_status_enum.create(op.get_bind(), checkfirst=True)
-    _risk_level_enum.create(op.get_bind(), checkfirst=True)
-    _mitigation_status_enum.create(op.get_bind(), checkfirst=True)
+    # Create enums via raw SQL to avoid SQLAlchemy's duplicate creation
+    op.execute("CREATE TYPE IF NOT EXISTS riskstatus AS ENUM ('open', 'mitigating', 'closed', 'accepted')")
+    op.execute("CREATE TYPE IF NOT EXISTS risklevel AS ENUM ('low', 'medium', 'serious', 'high')")
+    op.execute("CREATE TYPE IF NOT EXISTS mitigationstatus AS ENUM ('pending', 'in_progress', 'completed', 'cancelled')")
 
     op.create_table(
         "risk_entries",
