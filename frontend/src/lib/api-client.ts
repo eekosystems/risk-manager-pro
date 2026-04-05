@@ -75,8 +75,6 @@ apiClient.interceptors.response.use(
       if (hasAccount && !isRedirectingToLogin) {
         isRedirectingToLogin = true;
         logger.warn("[api-client] 401 response — clearing session and redirecting to login");
-        // Clear MSAL cache locally instead of going through Microsoft's logout
-        // flow, which shows a confusing "which account to sign out of?" screen.
         sessionStorage.clear();
         window.location.href = "/login";
       }
