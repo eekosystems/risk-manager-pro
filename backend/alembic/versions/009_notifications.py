@@ -6,6 +6,7 @@ Create Date: 2026-03-16
 """
 
 import sqlalchemy as sa
+from sqlalchemy.dialects.postgresql import ENUM
 
 from alembic import op
 
@@ -16,12 +17,18 @@ depends_on = None
 
 
 def upgrade() -> None:
-    notification_type = sa.Enum(
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE notificationtype AS ENUM ('chat_response', 'risk_created');
+        EXCEPTION WHEN duplicate_object THEN null;
+        END $$
+    """)
+    notification_type = ENUM(
         "chat_response",
         "risk_created",
         name="notificationtype",
+        create_type=False,
     )
-    notification_type.create(op.get_bind(), checkfirst=True)
 
     op.create_table(
         "notifications",
