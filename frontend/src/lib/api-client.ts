@@ -65,19 +65,20 @@ apiClient.interceptors.request.use(async (config) => {
   return config;
 });
 
+let isRedirectingToLogin = false;
+
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (axios.isAxiosError(error) && error.response?.status === 401) {
-      // Only trigger logout if user has an active session — otherwise this is
-      // just an unauthenticated request before login and should not redirect.
       const hasAccount = msalInstance && msalInstance.getAllAccounts().length > 0;
-      if (hasAccount && msalInstance) {
-        logger.warn("[api-client] 401 response — redirecting to login");
-        msalInstance.logoutRedirect({
-          account: msalInstance.getActiveAccount(),
-          postLogoutRedirectUri: window.location.origin,
-        });
+      if (hasAccount && !isRedirectingToLogin) {
+        isRedirectingToLogin = true;
+        logger.warn("[api-client] 401 response — clearing session and redirecting to login");
+        // Clear MSAL cache locally instead of going through Microsoft's logout
+        // flow, which shows a confusing "which account to sign out of?" screen.
+        sessionStorage.clear();
+        window.location.href = "/login";
       }
     }
     return Promise.reject(error);
