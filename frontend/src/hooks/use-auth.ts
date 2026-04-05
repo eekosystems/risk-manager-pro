@@ -22,7 +22,9 @@ export function useAuth(): AuthState {
   }, [instance]);
 
   const logout = useCallback(async () => {
-    await instance.logoutRedirect();
+    await instance.logoutRedirect({
+      account: instance.getActiveAccount(),
+    });
   }, [instance]);
 
   return {

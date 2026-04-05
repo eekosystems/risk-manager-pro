@@ -75,6 +75,7 @@ apiClient.interceptors.response.use(
       if (hasAccount && msalInstance) {
         logger.warn("[api-client] 401 response — redirecting to login");
         msalInstance.logoutRedirect({
+          account: msalInstance.getActiveAccount(),
           postLogoutRedirectUri: window.location.origin,
         });
       }

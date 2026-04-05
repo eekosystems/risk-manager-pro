@@ -16,6 +16,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   const handleInactivityTimeout = useCallback(async () => {
     await instance.logoutRedirect({
+      account: instance.getActiveAccount(),
       postLogoutRedirectUri: "/login",
     });
   }, [instance]);
