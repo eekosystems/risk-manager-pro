@@ -14,10 +14,10 @@ down_revision = "007"
 branch_labels = None
 depends_on = None
 
-_risk_status_enum = sa.Enum("open", "mitigating", "closed", "accepted", name="riskstatus")
-_risk_level_enum = sa.Enum("low", "medium", "serious", "high", name="risklevel")
+_risk_status_enum = sa.Enum("open", "mitigating", "closed", "accepted", name="riskstatus", create_type=False)
+_risk_level_enum = sa.Enum("low", "medium", "serious", "high", name="risklevel", create_type=False)
 _mitigation_status_enum = sa.Enum(
-    "pending", "in_progress", "completed", "cancelled", name="mitigationstatus"
+    "pending", "in_progress", "completed", "cancelled", name="mitigationstatus", create_type=False
 )
 
 
