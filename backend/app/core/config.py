@@ -24,7 +24,7 @@ class Settings(BaseSettings):
             import json
 
             return list(json.loads(raw))
-        return [origin.strip() for origin in raw.split(",") if origin.strip()]
+        return [origin.strip().rstrip("/") for origin in raw.split(",") if origin.strip()]
 
     # Session & Auth Security
     session_timeout_minutes: int = 60
@@ -97,6 +97,10 @@ class Settings(BaseSettings):
     @property
     def azure_ad_issuer(self) -> str:
         return f"https://login.microsoftonline.com/{self.azure_ad_tenant_id}/v2.0"
+
+    @property
+    def azure_ad_issuer_v1(self) -> str:
+        return f"https://sts.windows.net/{self.azure_ad_tenant_id}/"
 
     @property
     def azure_ad_jwks_url(self) -> str:

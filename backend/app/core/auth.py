@@ -82,7 +82,10 @@ class EntraIDAuth:
                     settings.azure_ad_client_id,
                     f"api://{settings.azure_ad_client_id}",
                 ],
-                issuer=settings.azure_ad_issuer,
+                issuer=[
+                    settings.azure_ad_issuer,
+                    settings.azure_ad_issuer_v1,
+                ],
             )
 
             return TokenPayload(
