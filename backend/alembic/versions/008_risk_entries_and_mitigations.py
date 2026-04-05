@@ -23,10 +23,24 @@ _mitigation_status_enum = ENUM(
 
 
 def upgrade() -> None:
-    # Create enums via raw SQL to avoid SQLAlchemy's duplicate creation
-    op.execute("CREATE TYPE IF NOT EXISTS riskstatus AS ENUM ('open', 'mitigating', 'closed', 'accepted')")
-    op.execute("CREATE TYPE IF NOT EXISTS risklevel AS ENUM ('low', 'medium', 'serious', 'high')")
-    op.execute("CREATE TYPE IF NOT EXISTS mitigationstatus AS ENUM ('pending', 'in_progress', 'completed', 'cancelled')")
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE riskstatus AS ENUM ('open', 'mitigating', 'closed', 'accepted');
+        EXCEPTION WHEN duplicate_object THEN null;
+        END $$
+    """)
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE risklevel AS ENUM ('low', 'medium', 'serious', 'high');
+        EXCEPTION WHEN duplicate_object THEN null;
+        END $$
+    """)
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE mitigationstatus AS ENUM ('pending', 'in_progress', 'completed', 'cancelled');
+        EXCEPTION WHEN duplicate_object THEN null;
+        END $$
+    """)
 
     op.create_table(
         "risk_entries",
