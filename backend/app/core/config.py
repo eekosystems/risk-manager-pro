@@ -84,14 +84,14 @@ class Settings(BaseSettings):
             raise ValueError(
                 "DATABASE_URL is required. Set it via environment variable or .env file."
             )
-        # asyncpg doesn't support ?sslmode=... — convert to ?ssl=...
         url = self.database_url
+        # asyncpg doesn't support ?sslmode=... — convert to ?ssl=...
         if "sslmode=" in url:
             url = url.replace("sslmode=require", "ssl=require")
             url = url.replace("sslmode=verify-full", "ssl=verify-full")
             url = url.replace("sslmode=verify-ca", "ssl=verify-ca")
             url = url.replace("sslmode=prefer", "ssl=prefer")
-            self.database_url = url
+        self.database_url = url
         return self
 
     @property

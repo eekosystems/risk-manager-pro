@@ -7,10 +7,21 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
+import os
+
 from app.core.config import settings
 
+_db_url = settings.database_url
+# Container Apps may not resolve VNet private DNS — use IP directly if provided
+_private_ip = os.environ.get("DB_PRIVATE_IP", "")
+if _private_ip and _db_url:
+    last_at = _db_url.rfind("@")
+    if last_at != -1:
+        colon_after = _db_url.index(":", last_at)
+        _db_url = _db_url[: last_at + 1] + _private_ip + _db_url[colon_after:]
+
 engine = create_async_engine(
-    settings.database_url,
+    _db_url,
     echo=False,
     pool_size=20,
     max_overflow=10,

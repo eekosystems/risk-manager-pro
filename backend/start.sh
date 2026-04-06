@@ -1,5 +1,4 @@
 #!/bin/sh
-set -e
 
 # Reset stale alembic stamp if core tables are missing (e.g. after stamp-without-migrate)
 python -c "
@@ -30,7 +29,7 @@ echo "Running database migrations..."
 python -m alembic upgrade head || {
     echo "WARNING: Migration failed. Stamping current state to allow startup." >&2
     echo "WARNING: Review migration state manually — data may be out of sync." >&2
-    python -m alembic stamp head
+    python -m alembic stamp head || echo "WARNING: Stamp also failed, starting anyway..." >&2
 }
 
 echo "Starting application server..."

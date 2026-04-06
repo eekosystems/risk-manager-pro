@@ -130,7 +130,8 @@ async def _check_storage(request: Request) -> str:
     try:
         storage = request.app.state.services.storage_service
         client = await storage._get_client()
-        await client.get_account_information()
+        container = client.get_container_client(settings.azure_storage_container_name)
+        await container.get_container_properties()
         return "ok"
     except Exception as e:  # Deliberately broad: any failure means service is unhealthy
         logger.warning("health_check_storage_failed", error=str(e))
