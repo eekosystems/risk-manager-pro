@@ -1,3 +1,4 @@
+import os
 import uuid
 from collections.abc import AsyncGenerator
 from datetime import datetime
@@ -6,8 +7,6 @@ from sqlalchemy import func
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-
-import os
 
 from app.core.config import settings
 
