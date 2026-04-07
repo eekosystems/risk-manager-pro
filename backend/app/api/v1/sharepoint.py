@@ -97,13 +97,14 @@ async def crawl_sharepoint(
 
     repo = DocumentRepository(db)
     existing_docs, _ = await repo.list_for_organization(organization.id, skip=0, limit=10000)
-    existing_filenames = {doc.filename for doc in existing_docs}
+    existing_keys = {(doc.filename, doc.folder_path or "") for doc in existing_docs}
 
     queued_count = 0
     skipped: list[str] = []
 
     for file in files:
-        if file.name in existing_filenames:
+        file_key = (file.name, file.folder_path or "")
+        if file_key in existing_keys:
             skipped.append(file.name)
             continue
 
