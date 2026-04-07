@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from typing import Any
 from urllib.parse import urlparse
 
 import httpx
-import msal
+import msal  # type: ignore[import-untyped]
 import structlog
 
 from app.core.config import settings
@@ -66,14 +67,15 @@ class SharePointCrawler:
         if "access_token" not in result:
             error = result.get("error_description", result.get("error", "Unknown error"))
             raise RuntimeError(f"Failed to acquire SharePoint token: {error}")
-        return result["access_token"]
+        token: str = result["access_token"]
+        return token
 
     async def _ensure_client(self) -> httpx.AsyncClient:
         if self._client is None:
             self._client = httpx.AsyncClient(timeout=60.0)
         return self._client
 
-    async def _graph_get(self, url: str) -> dict:
+    async def _graph_get(self, url: str) -> dict[str, Any]:
         """Make an authenticated GET request to Microsoft Graph."""
         client = await self._ensure_client()
         token = await self._get_token()
@@ -91,7 +93,8 @@ class SharePointCrawler:
             raise RuntimeError(
                 f"Graph API request failed (HTTP {response.status_code}): {response.text[:200]}"
             )
-        return response.json()
+        result: dict[str, Any] = response.json()
+        return result
 
     async def _get_site_id(self) -> str:
         """Resolve the SharePoint site URL to a Graph site ID."""
@@ -110,15 +113,16 @@ class SharePointCrawler:
 
         url = f"{GRAPH_BASE_URL}/sites/{hostname}:{site_path}"
         data = await self._graph_get(url)
-        self._site_id = data["id"]
-        logger.info("sharepoint_site_resolved", site_id=self._site_id, hostname=hostname)
-        return self._site_id
+        site_id: str = data["id"]
+        self._site_id = site_id
+        logger.info("sharepoint_site_resolved", site_id=site_id, hostname=hostname)
+        return site_id
 
-    async def list_drives(self) -> list[dict]:
+    async def list_drives(self) -> list[dict[str, Any]]:
         """List document libraries (drives) in the SharePoint site."""
         site_id = await self._get_site_id()
         data = await self._graph_get(f"{GRAPH_BASE_URL}/sites/{site_id}/drives")
-        drives = data.get("value", [])
+        drives: list[dict[str, Any]] = data.get("value", [])
         logger.info("sharepoint_drives_listed", count=len(drives))
         return drives
 
@@ -158,7 +162,7 @@ class SharePointCrawler:
                                 drive_id=drive_id,
                             )
                         )
-            url = data.get("@odata.nextLink")
+            url = data.get("@odata.nextLink", "")
 
         return files
 
