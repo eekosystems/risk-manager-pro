@@ -128,6 +128,19 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await service_registry.startup()
     app.state.services = service_registry
 
+    # One-time: promote all users to org_admin (remove after first deploy)
+    try:
+        from sqlalchemy import text as _text
+
+        from app.core.database import async_session_factory as _sf
+
+        async with _sf() as _db:
+            await _db.execute(_text("UPDATE organization_memberships SET role = 'org_admin'"))
+            await _db.commit()
+            logger.info("startup_role_promotion_complete")
+    except Exception:
+        logger.warning("startup_role_promotion_skipped", exc_info=True)
+
     from app.core.tasks import drain_all_tasks
 
     yield
