@@ -17,10 +17,10 @@ import {
 import { MitigationList } from "./mitigation-list";
 
 const STATUS_LABELS: Record<RiskStatus, { label: string; className: string }> = {
-  open: { label: "Open", className: "text-blue-600 bg-blue-50" },
-  mitigating: { label: "Mitigating", className: "text-amber-600 bg-amber-50" },
-  closed: { label: "Closed", className: "text-green-600 bg-green-50" },
-  accepted: { label: "Accepted", className: "text-purple-600 bg-purple-50" },
+  open: { label: "Open", className: "text-brand-600 bg-brand-50" },
+  mitigating: { label: "Mitigating", className: "text-accent-600 bg-accent-50" },
+  closed: { label: "Closed", className: "text-brand-400 bg-brand-50" },
+  accepted: { label: "Accepted", className: "text-brand-800 bg-brand-50" },
 };
 
 interface RiskDetailViewProps {

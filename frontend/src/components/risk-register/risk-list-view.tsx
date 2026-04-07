@@ -22,10 +22,10 @@ import {
 } from "@/types/risk-matrix";
 
 const STATUS_LABELS: Record<RiskStatus, { label: string; className: string }> = {
-  open: { label: "Open", className: "text-blue-600 bg-blue-50" },
-  mitigating: { label: "Mitigating", className: "text-amber-600 bg-amber-50" },
-  closed: { label: "Closed", className: "text-green-600 bg-green-50" },
-  accepted: { label: "Accepted", className: "text-purple-600 bg-purple-50" },
+  open: { label: "Open", className: "text-brand-600 bg-brand-50" },
+  mitigating: { label: "Mitigating", className: "text-accent-600 bg-accent-50" },
+  closed: { label: "Closed", className: "text-brand-400 bg-brand-50" },
+  accepted: { label: "Accepted", className: "text-brand-800 bg-brand-50" },
 };
 
 interface RiskListViewProps {
@@ -99,11 +99,11 @@ export function RiskListView({ onSelectRisk, onCreateNew }: RiskListViewProps) {
           <div className="text-[12px] text-slate-500">Total Risks</div>
         </div>
         <div className="rounded-2xl border border-gray-200 bg-white p-4">
-          <div className="text-2xl font-bold text-blue-500">{openCount}</div>
+          <div className="text-2xl font-bold text-brand-600">{openCount}</div>
           <div className="text-[12px] text-slate-500">Open</div>
         </div>
         <div className="rounded-2xl border border-gray-200 bg-white p-4">
-          <div className="text-2xl font-bold text-red-500">{highCount}</div>
+          <div className="text-2xl font-bold text-brand-600">{highCount}</div>
           <div className="text-[12px] text-slate-500">High</div>
         </div>
       </div>

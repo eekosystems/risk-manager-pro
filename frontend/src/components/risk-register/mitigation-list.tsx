@@ -30,17 +30,17 @@ const STATUS_CONFIG: Record<
   in_progress: {
     label: "In Progress",
     icon: Loader2,
-    className: "text-blue-600 bg-blue-50",
+    className: "text-brand-600 bg-brand-50",
   },
   completed: {
     label: "Completed",
     icon: CheckCircle2,
-    className: "text-green-600 bg-green-50",
+    className: "text-brand-400 bg-brand-50",
   },
   cancelled: {
     label: "Cancelled",
     icon: XCircle,
-    className: "text-red-600 bg-red-50",
+    className: "text-accent-600 bg-accent-50",
   },
 };
 
