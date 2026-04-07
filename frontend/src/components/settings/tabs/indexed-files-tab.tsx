@@ -6,12 +6,21 @@ import {
   Clock,
   FileText,
   Loader2,
+  RefreshCw,
   Search,
   Trash2,
   Upload,
 } from "lucide-react";
 
-import { deleteDocument, getDocuments, uploadDocument } from "@/api/documents";
+import {
+  type CrawlSharePointParams,
+  type SharePointCrawlResult,
+  crawlSharePoint,
+  deleteDocument,
+  getDocuments,
+  getSharePointDrives,
+  uploadDocument,
+} from "@/api/documents";
 import type { DocumentItem, DocumentStatus, SourceType } from "@/types/api";
 
 function formatBytes(bytes: number): string {
@@ -31,11 +40,11 @@ function formatDate(iso: string): string {
 }
 
 const SOURCE_TYPE_LABELS: Record<SourceType, { label: string; className: string }> = {
-  client: { label: "Client", className: "text-blue-600 bg-blue-50" },
-  faa: { label: "FAA", className: "text-indigo-600 bg-indigo-50" },
-  icao: { label: "ICAO", className: "text-purple-600 bg-purple-50" },
-  easa: { label: "EASA", className: "text-violet-600 bg-violet-50" },
-  nasa_asrs: { label: "NASA ASRS", className: "text-teal-600 bg-teal-50" },
+  client: { label: "Client", className: "text-brand-600 bg-brand-50" },
+  faa: { label: "FAA", className: "text-brand-800 bg-brand-50" },
+  icao: { label: "ICAO", className: "text-accent-700 bg-accent-50" },
+  easa: { label: "EASA", className: "text-accent-600 bg-accent-50" },
+  nasa_asrs: { label: "NASA ASRS", className: "text-brand-500 bg-brand-50" },
   internal: { label: "Internal", className: "text-gray-600 bg-gray-50" },
 };
 
@@ -46,17 +55,17 @@ const STATUS_CONFIG: Record<
   indexed: {
     icon: CheckCircle2,
     label: "Indexed",
-    className: "text-green-500 bg-green-50",
+    className: "text-brand-500 bg-brand-50",
   },
   processing: {
     icon: Loader2,
     label: "Processing",
-    className: "text-amber-500 bg-amber-50",
+    className: "text-accent-500 bg-accent-50",
   },
   uploaded: {
     icon: Clock,
     label: "Uploaded",
-    className: "text-blue-500 bg-blue-50",
+    className: "text-brand-400 bg-brand-50",
   },
   failed: {
     icon: AlertTriangle,
@@ -70,12 +79,20 @@ export function IndexedFilesTab() {
   const [searchQuery, setSearchQuery] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [selectedSourceType, setSelectedSourceType] = useState<SourceType>("client");
+  const [crawlResult, setCrawlResult] = useState<SharePointCrawlResult | null>(null);
 
   const { data: files = [], isLoading } = useQuery({
     queryKey: ["documents"],
     queryFn: getDocuments,
     refetchInterval: 10_000,
     retry: false,
+  });
+
+  const { data: drives = [] } = useQuery({
+    queryKey: ["sharepoint-drives"],
+    queryFn: getSharePointDrives,
+    retry: false,
+    staleTime: 60_000,
   });
 
   const deleteMutation = useMutation({
@@ -93,6 +110,14 @@ export function IndexedFilesTab() {
     },
   });
 
+  const crawlMutation = useMutation({
+    mutationFn: crawlSharePoint,
+    onSuccess: (result) => {
+      setCrawlResult(result);
+      void queryClient.invalidateQueries({ queryKey: ["documents"] });
+    },
+  });
+
   function handleFileUpload() {
     const input = document.createElement("input");
     input.type = "file";
@@ -104,6 +129,14 @@ export function IndexedFilesTab() {
       }
     };
     input.click();
+  }
+
+  function handleSharePointSync() {
+    setCrawlResult(null);
+    const params: CrawlSharePointParams = {
+      sourceType: selectedSourceType,
+    };
+    crawlMutation.mutate(params);
   }
 
   const filteredFiles = files.filter((file: DocumentItem) =>
@@ -148,35 +181,23 @@ export function IndexedFilesTab() {
       {/* Stats */}
       <div className="mb-6 grid grid-cols-3 gap-4">
         <div className="rounded-2xl border border-gray-200 bg-white p-4">
-          <div className="text-2xl font-bold text-brand-500">{indexedCount}</div>
+          <div className="text-2xl font-bold text-brand-600">{indexedCount}</div>
           <div className="text-[12px] text-slate-500">Indexed Documents</div>
         </div>
         <div className="rounded-2xl border border-gray-200 bg-white p-4">
-          <div className="text-2xl font-bold text-brand-500">{files.length}</div>
+          <div className="text-2xl font-bold text-brand-600">{files.length}</div>
           <div className="text-[12px] text-slate-500">Total Documents</div>
         </div>
         <div className="rounded-2xl border border-gray-200 bg-white p-4">
-          <div className="text-2xl font-bold text-brand-500">
+          <div className="text-2xl font-bold text-brand-600">
             {formatBytes(totalSize)}
           </div>
           <div className="text-[12px] text-slate-500">Total Size</div>
         </div>
       </div>
 
-      {/* Upload + Search */}
+      {/* Source Type + Actions */}
       <div className="mb-4 flex items-center gap-3">
-        <button
-          onClick={handleFileUpload}
-          disabled={uploadMutation.isPending}
-          className="flex items-center gap-2 rounded-xl gradient-brand px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-brand-500/20 transition-all hover:shadow-lg hover:shadow-brand-500/30 disabled:opacity-50"
-        >
-          {uploadMutation.isPending ? (
-            <Loader2 size={16} className="animate-spin" />
-          ) : (
-            <Upload size={16} />
-          )}
-          Upload Document
-        </button>
         <select
           value={selectedSourceType}
           onChange={(e) => setSelectedSourceType(e.target.value as SourceType)}
@@ -190,6 +211,30 @@ export function IndexedFilesTab() {
             ),
           )}
         </select>
+        <button
+          onClick={handleFileUpload}
+          disabled={uploadMutation.isPending}
+          className="flex items-center gap-2 rounded-xl bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-brand-500/20 transition-all hover:bg-brand-600 hover:shadow-lg hover:shadow-brand-500/30 disabled:opacity-50"
+        >
+          {uploadMutation.isPending ? (
+            <Loader2 size={16} className="animate-spin" />
+          ) : (
+            <Upload size={16} />
+          )}
+          Upload File
+        </button>
+        <button
+          onClick={handleSharePointSync}
+          disabled={crawlMutation.isPending}
+          className="flex items-center gap-2 rounded-xl border border-brand-200 bg-white px-4 py-2.5 text-sm font-semibold text-brand-700 transition-all hover:bg-brand-50 disabled:opacity-50"
+        >
+          {crawlMutation.isPending ? (
+            <Loader2 size={16} className="animate-spin" />
+          ) : (
+            <RefreshCw size={16} />
+          )}
+          Sync from SharePoint
+        </button>
         <div className="relative flex-1">
           <Search
             size={16}
@@ -205,12 +250,60 @@ export function IndexedFilesTab() {
         </div>
       </div>
 
+      {/* Crawl result banner */}
+      {crawlResult && (
+        <div className="mb-4 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-brand-800">
+              <span className="font-semibold">SharePoint sync complete:</span>{" "}
+              {crawlResult.files_discovered} files found, {crawlResult.files_queued} queued
+              for processing
+              {crawlResult.skipped_files.length > 0 && (
+                <span className="text-brand-600">
+                  {" "}({crawlResult.skipped_files.length} already imported)
+                </span>
+              )}
+            </div>
+            <button
+              onClick={() => setCrawlResult(null)}
+              className="text-brand-400 hover:text-brand-600"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Crawl error banner */}
+      {crawlMutation.isError && (
+        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+          <div className="text-sm text-red-700">
+            <span className="font-semibold">SharePoint sync failed:</span>{" "}
+            {crawlMutation.error instanceof Error
+              ? crawlMutation.error.message
+              : "Check that SharePoint credentials are configured on the server."}
+          </div>
+        </div>
+      )}
+
+      {/* SharePoint drives info */}
+      {drives.length > 0 && (
+        <div className="mb-4 flex items-center gap-2 text-[12px] text-slate-400">
+          <span>SharePoint libraries:</span>
+          {drives.map((d) => (
+            <span key={d.id} className="rounded-full bg-gray-100 px-2 py-0.5 text-slate-600">
+              {d.name}
+            </span>
+          ))}
+        </div>
+      )}
+
       {/* File list */}
       <div className="rounded-2xl border border-gray-200 bg-white">
         {filteredFiles.length === 0 ? (
           <div className="p-8 text-center text-sm text-slate-400">
             {files.length === 0
-              ? "No documents uploaded yet. Upload your first document to get started."
+              ? "No documents uploaded yet. Upload a file or sync from SharePoint to get started."
               : "No files found matching your search."}
           </div>
         ) : (

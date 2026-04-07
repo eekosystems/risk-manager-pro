@@ -35,3 +35,43 @@ export async function getDocuments(): Promise<DocumentItem[]> {
 export async function deleteDocument(documentId: string): Promise<void> {
   await apiClient.delete(`/documents/${documentId}`);
 }
+
+// SharePoint
+
+export interface SharePointDrive {
+  id: string;
+  name: string;
+  web_url: string;
+}
+
+export interface SharePointCrawlResult {
+  files_discovered: number;
+  files_queued: number;
+  skipped_files: string[];
+}
+
+export interface CrawlSharePointParams {
+  driveName?: string;
+  sourceType?: SourceType;
+}
+
+export async function getSharePointDrives(): Promise<SharePointDrive[]> {
+  const response = await apiClient.get<DataResponse<{ drives: SharePointDrive[] }>>(
+    "/sharepoint/drives",
+  );
+  return response.data.data.drives;
+}
+
+export async function crawlSharePoint(
+  params: CrawlSharePointParams = {},
+): Promise<SharePointCrawlResult> {
+  const queryParts: string[] = [];
+  if (params.driveName) queryParts.push(`drive_name=${encodeURIComponent(params.driveName)}`);
+  if (params.sourceType) queryParts.push(`source_type=${encodeURIComponent(params.sourceType)}`);
+  const query = queryParts.length > 0 ? `?${queryParts.join("&")}` : "";
+
+  const response = await apiClient.post<DataResponse<SharePointCrawlResult>>(
+    `/sharepoint/crawl${query}`,
+  );
+  return response.data.data;
+}
