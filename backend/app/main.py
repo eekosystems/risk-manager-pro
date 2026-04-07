@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from app.services.openai_client import AzureOpenAIClient
     from app.services.rag import RAGService
     from app.services.search_indexer import SearchIndexer
+    from app.services.sharepoint_crawler import SharePointCrawler
     from app.services.storage import BlobStorageService
 
 logger = structlog.get_logger(__name__)
@@ -39,12 +40,14 @@ class ServiceRegistry:
         self._storage_service: BlobStorageService | None = None
         self._search_indexer: SearchIndexer | None = None
         self._graph_service: MicrosoftGraphService | None = None
+        self._sharepoint_crawler: SharePointCrawler | None = None
 
     async def startup(self) -> None:
         from app.services.microsoft_graph import MicrosoftGraphService
         from app.services.openai_client import AzureOpenAIClient
         from app.services.rag import RAGService
         from app.services.search_indexer import SearchIndexer
+        from app.services.sharepoint_crawler import SharePointCrawler
         from app.services.storage import BlobStorageService
 
         self._openai_client = AzureOpenAIClient()
@@ -52,9 +55,12 @@ class ServiceRegistry:
         self._storage_service = BlobStorageService()
         self._search_indexer = SearchIndexer()
         self._graph_service = MicrosoftGraphService()
+        self._sharepoint_crawler = SharePointCrawler()
         logger.info("service_registry_initialized")
 
     async def shutdown(self) -> None:
+        if self._sharepoint_crawler:
+            await self._sharepoint_crawler.close()
         if self._graph_service:
             await self._graph_service.close()
         if self._search_indexer:
@@ -96,6 +102,12 @@ class ServiceRegistry:
         if self._graph_service is None:
             raise RuntimeError("ServiceRegistry not initialized — call startup() first")
         return self._graph_service
+
+    @property
+    def sharepoint_crawler(self) -> SharePointCrawler:
+        if self._sharepoint_crawler is None:
+            raise RuntimeError("ServiceRegistry not initialized — call startup() first")
+        return self._sharepoint_crawler
 
 
 service_registry = ServiceRegistry()

@@ -71,6 +71,12 @@ class Settings(BaseSettings):
     embedding_batch_size: int = 16
     search_index_batch_size: int = 100
 
+    # SharePoint / Document Crawler
+    sharepoint_tenant_id: str = ""
+    sharepoint_client_id: str = ""
+    sharepoint_client_secret: str = ""
+    sharepoint_site_url: str = "https://faithgroupllc.sharepoint.com/sites/RiskManagerPro"
+
     # HTTP timeouts
     graph_api_timeout: float = 30.0
 

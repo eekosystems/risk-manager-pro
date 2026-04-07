@@ -9,6 +9,7 @@ from app.api.v1.notifications import router as notifications_router
 from app.api.v1.organizations import router as organizations_router
 from app.api.v1.risks import router as risks_router
 from app.api.v1.settings import router as settings_router
+from app.api.v1.sharepoint import router as sharepoint_router
 from app.api.v1.users import router as users_router
 
 api_router = APIRouter(prefix="/api/v1")
@@ -22,3 +23,4 @@ api_router.include_router(settings_router)
 api_router.include_router(analytics_router)
 api_router.include_router(audit_router)
 api_router.include_router(notifications_router)
+api_router.include_router(sharepoint_router)
