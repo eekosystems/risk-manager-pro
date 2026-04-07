@@ -72,6 +72,8 @@ export async function crawlSharePoint(
 
   const response = await apiClient.post<DataResponse<SharePointCrawlResult>>(
     `/sharepoint/crawl${query}`,
+    undefined,
+    { timeout: 300_000 },
   );
   return response.data.data;
 }
