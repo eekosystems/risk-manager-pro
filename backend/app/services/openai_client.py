@@ -52,7 +52,7 @@ class AzureOpenAIClient:
                 model=settings.azure_openai_deployment_name,
                 messages=messages,  # type: ignore[arg-type]
                 temperature=temperature,
-                max_tokens=max_tokens,
+                max_completion_tokens=max_tokens,
             )
             content = response.choices[0].message.content or ""
             logger.info(
@@ -61,9 +61,12 @@ class AzureOpenAIClient:
             )
             return content
         except APIStatusError as e:
-            if e.status_code >= 500:
-                logger.error("openai_server_error", status=e.status_code)
-                raise
+            logger.error(
+                "openai_api_error",
+                status=e.status_code,
+                message=str(e.message),
+                body=str(e.body) if e.body else None,
+            )
             raise
 
     async def chat_completion_stream(
@@ -77,7 +80,7 @@ class AzureOpenAIClient:
             model=settings.azure_openai_deployment_name,
             messages=messages,  # type: ignore[arg-type]
             temperature=temperature,
-            max_tokens=max_tokens,
+            max_completion_tokens=max_tokens,
             stream=True,
         )
         async for chunk in stream:  # type: ignore[union-attr]
