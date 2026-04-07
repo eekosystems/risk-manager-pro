@@ -1,33 +1,21 @@
 import { clsx } from "clsx";
 import {
-  AlertTriangle,
-  BarChart3,
   ChevronRight,
   FileText,
-
-  ScrollText,
-  Shield,
-  ShieldAlert,
+  MessageSquare,
   User,
-  Workflow,
 } from "lucide-react";
 
 import { RecentDocuments } from "@/components/layout/panel/recent-documents";
-import { CoreFunctionsNav } from "@/components/layout/sidebar/core-functions-nav";
+import { ConversationHistory } from "@/components/layout/sidebar/conversation-history";
 import { OrganizationSwitcher } from "@/components/layout/sidebar/organization-switcher";
 import { UserCard } from "@/components/layout/sidebar/user-card";
-import { FUNCTIONS } from "@/constants/functions";
-import type { FunctionType, OrganizationSummary } from "@/types/api";
-
-import type { AppView } from "./app-layout";
+import type { OrganizationSummary } from "@/types/api";
 
 interface LeftSidebarProps {
   isOpen: boolean;
   onToggle: () => void;
-  activeFunction: FunctionType;
-  onFunctionSelect: (fn: FunctionType) => void;
-  currentView: AppView;
-  onViewChange: (view: AppView) => void;
+  onConversationSelect: (id: string) => void;
   activeOrganization: OrganizationSummary | null;
   organizations: OrganizationSummary[];
   onOrganizationSelect: (org: OrganizationSummary) => void;
@@ -36,10 +24,7 @@ interface LeftSidebarProps {
 export function LeftSidebar({
   isOpen,
   onToggle,
-  activeFunction,
-  onFunctionSelect,
-  currentView,
-  onViewChange,
+  onConversationSelect,
   activeOrganization,
   organizations,
   onOrganizationSelect,
@@ -79,203 +64,37 @@ export function LeftSidebar({
             />
           )}
 
-          <nav aria-label="Core functions" className="flex-1 overflow-y-auto px-3 py-4">
-            <CoreFunctionsNav
-              activeFunction={activeFunction}
-              onFunctionSelect={onFunctionSelect}
-            />
+          <div className="flex-1 overflow-y-auto px-3 py-4">
+            <ConversationHistory onConversationSelect={onConversationSelect} />
+          </div>
 
-            {/* Analytics + Risk Register nav */}
-            <div className="mt-2 space-y-1">
-              <button
-                onClick={() => onViewChange("analytics")}
-                className={clsx(
-                  "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all",
-                  currentView === "analytics"
-                    ? "gradient-brand text-white shadow-md shadow-brand-500/30"
-                    : "text-gray-600 hover:bg-brand-50 hover:text-brand-500",
-                )}
-              >
-                <BarChart3 size={18} />
-                Analytics
-              </button>
-              <button
-                onClick={() => onViewChange("risk-register")}
-                className={clsx(
-                  "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all",
-                  currentView === "risk-register"
-                    ? "gradient-brand text-white shadow-md shadow-brand-500/30"
-                    : "text-gray-600 hover:bg-brand-50 hover:text-brand-500",
-                )}
-              >
-                <ShieldAlert size={18} />
-                Risk Register
-              </button>
-              <button
-                onClick={() => onViewChange("audit-log")}
-                className={clsx(
-                  "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all",
-                  currentView === "audit-log"
-                    ? "gradient-brand text-white shadow-md shadow-brand-500/30"
-                    : "text-gray-600 hover:bg-brand-50 hover:text-brand-500",
-                )}
-              >
-                <ScrollText size={18} />
-                Audit Log
-              </button>
-            </div>
-
-            {/* Workflows section */}
-            <div className="mt-4">
-              <div className="mb-1.5 flex items-center gap-2 px-3">
-                <Workflow size={12} className="text-gray-400" />
-                <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
-                  Workflows
-                </span>
-              </div>
-              <div className="space-y-1">
-                <button
-                  onClick={() => onViewChange("phl-workflow")}
-                  className={clsx(
-                    "flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all",
-                    currentView === "phl-workflow"
-                      ? "gradient-brand text-white shadow-md shadow-brand-500/30"
-                      : "text-gray-600 hover:bg-brand-50 hover:text-brand-500",
-                  )}
-                >
-                  <AlertTriangle size={16} />
-                  PHL Wizard
-                </button>
-                <button
-                  onClick={() => onViewChange("sra-workflow")}
-                  className={clsx(
-                    "flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all",
-                    currentView === "sra-workflow"
-                      ? "gradient-brand text-white shadow-md shadow-brand-500/30"
-                      : "text-gray-600 hover:bg-brand-50 hover:text-brand-500",
-                  )}
-                >
-                  <Shield size={16} />
-                  SRA Wizard
-                </button>
-              </div>
-            </div>
-
+          <div className="mt-auto border-t border-gray-100 px-3 pt-3">
             <RecentDocuments />
-          </nav>
+          </div>
 
           <UserCard />
         </div>
       ) : (
         <div className="flex flex-col items-center h-full py-3">
-          {/* Collapsed nav icons */}
-          <nav aria-label="Core functions" className="flex flex-col items-center gap-1">
-            {FUNCTIONS.map((fn) => (
-              <button
-                key={fn.id}
-                onClick={() => onFunctionSelect(fn.id)}
-                aria-label={fn.name}
-                title={fn.name}
-                className={clsx(
-                  "flex h-10 w-10 items-center justify-center rounded-lg transition-all",
-                  activeFunction === fn.id && currentView === "chat"
-                    ? "gradient-brand text-white shadow-md shadow-brand-500/30"
-                    : "text-gray-400 hover:bg-brand-50 hover:text-brand-500",
-                )}
-              >
-                <fn.icon size={20} />
-              </button>
-            ))}
+          {/* Collapsed section icons */}
+          <nav className="flex flex-col items-center gap-1">
+            <button
+              onClick={onToggle}
+              aria-label="Recent sessions"
+              title="Recent sessions"
+              className="flex h-10 w-10 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-brand-50 hover:text-brand-500"
+            >
+              <MessageSquare size={20} />
+            </button>
+            <button
+              onClick={onToggle}
+              aria-label="Recent documents"
+              title="Recent documents"
+              className="flex h-10 w-10 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-brand-50 hover:text-brand-500"
+            >
+              <FileText size={20} />
+            </button>
           </nav>
-
-          <div className="mx-3 my-3 h-px w-8 bg-gray-200" />
-
-          {/* Analytics icon */}
-          <button
-            onClick={() => onViewChange("analytics")}
-            aria-label="Analytics"
-            title="Analytics"
-            className={clsx(
-              "flex h-10 w-10 items-center justify-center rounded-lg transition-all",
-              currentView === "analytics"
-                ? "gradient-brand text-white shadow-md shadow-brand-500/30"
-                : "text-gray-400 hover:bg-brand-50 hover:text-brand-500",
-            )}
-          >
-            <BarChart3 size={20} />
-          </button>
-
-          {/* Risk Register icon */}
-          <button
-            onClick={() => onViewChange("risk-register")}
-            aria-label="Risk Register"
-            title="Risk Register"
-            className={clsx(
-              "flex h-10 w-10 items-center justify-center rounded-lg transition-all",
-              currentView === "risk-register"
-                ? "gradient-brand text-white shadow-md shadow-brand-500/30"
-                : "text-gray-400 hover:bg-brand-50 hover:text-brand-500",
-            )}
-          >
-            <ShieldAlert size={20} />
-          </button>
-
-          {/* Audit Log icon */}
-          <button
-            onClick={() => onViewChange("audit-log")}
-            aria-label="Audit Log"
-            title="Audit Log"
-            className={clsx(
-              "flex h-10 w-10 items-center justify-center rounded-lg transition-all",
-              currentView === "audit-log"
-                ? "gradient-brand text-white shadow-md shadow-brand-500/30"
-                : "text-gray-400 hover:bg-brand-50 hover:text-brand-500",
-            )}
-          >
-            <ScrollText size={20} />
-          </button>
-
-          <div className="mx-3 my-3 h-px w-8 bg-gray-200" />
-
-          {/* Workflow icons */}
-          <button
-            onClick={() => onViewChange("phl-workflow")}
-            aria-label="PHL Wizard"
-            title="PHL Wizard"
-            className={clsx(
-              "flex h-10 w-10 items-center justify-center rounded-lg transition-all",
-              currentView === "phl-workflow"
-                ? "gradient-brand text-white shadow-md shadow-brand-500/30"
-                : "text-gray-400 hover:bg-brand-50 hover:text-brand-500",
-            )}
-          >
-            <AlertTriangle size={20} />
-          </button>
-          <button
-            onClick={() => onViewChange("sra-workflow")}
-            aria-label="SRA Wizard"
-            title="SRA Wizard"
-            className={clsx(
-              "flex h-10 w-10 items-center justify-center rounded-lg transition-all",
-              currentView === "sra-workflow"
-                ? "gradient-brand text-white shadow-md shadow-brand-500/30"
-                : "text-gray-400 hover:bg-brand-50 hover:text-brand-500",
-            )}
-          >
-            <Shield size={20} />
-          </button>
-
-          <div className="mx-3 my-3 h-px w-8 bg-gray-200" />
-
-          {/* Documents icon */}
-          <button
-            onClick={onToggle}
-            aria-label="Recent documents"
-            title="Recent documents"
-            className="flex h-10 w-10 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-brand-50 hover:text-brand-500"
-          >
-            <FileText size={20} />
-          </button>
 
           {/* User icon at bottom */}
           <div className="mt-auto">

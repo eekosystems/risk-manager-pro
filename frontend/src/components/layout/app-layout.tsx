@@ -39,14 +39,10 @@ export function AppLayout({ children }: AppLayoutProps) {
       <LeftSidebar
         isOpen={leftOpen}
         onToggle={() => setLeftOpen(!leftOpen)}
-        activeFunction={activeFunction}
-        onFunctionSelect={(fn) => {
-          setActiveFunction(fn);
-          setConversationId(null);
+        onConversationSelect={(id) => {
+          setConversationId(id);
           setCurrentView("chat");
         }}
-        currentView={currentView}
-        onViewChange={setCurrentView}
         activeOrganization={activeOrganization}
         organizations={organizations}
         onOrganizationSelect={(org) => {
@@ -87,10 +83,14 @@ export function AppLayout({ children }: AppLayoutProps) {
       <RightPanel
         isOpen={rightOpen}
         onToggle={() => setRightOpen(!rightOpen)}
-        onConversationSelect={(id) => {
-          setConversationId(id);
+        activeFunction={activeFunction}
+        onFunctionSelect={(fn) => {
+          setActiveFunction(fn);
+          setConversationId(null);
           setCurrentView("chat");
         }}
+        currentView={currentView}
+        onViewChange={setCurrentView}
       />
 
       {/* Settings Modal */}

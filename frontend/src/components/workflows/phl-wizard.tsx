@@ -297,8 +297,8 @@ export function PHLWizard({ onComplete, onCancel }: PHLWizardProps) {
   ];
 
   return (
-    <div className="flex h-full">
-      <div className="flex flex-1 flex-col">
+    <div className="flex h-full overflow-hidden">
+      <div className="flex min-h-0 flex-1 flex-col">
         <WizardStep
           steps={PHL_STEPS}
           currentStep={workflow.currentStep}
