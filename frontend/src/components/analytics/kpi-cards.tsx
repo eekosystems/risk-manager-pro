@@ -18,31 +18,31 @@ export function KPICards({ kpis }: KPICardsProps) {
       label: "Total Risks",
       value: kpis.total_risks,
       icon: ShieldAlert,
-      color: "text-brand-500",
+      color: "text-brand-600",
     },
     {
       label: "Open",
       value: kpis.open_risks,
       icon: AlertTriangle,
-      color: "text-brand-700",
+      color: "text-brand-600",
     },
     {
       label: "High",
       value: kpis.high_count,
       icon: TrendingUp,
-      color: "text-accent-500",
+      color: "text-brand-600",
     },
     {
       label: "Overdue Mitigations",
       value: kpis.overdue_mitigations,
       icon: Clock,
-      color: "text-brand-800",
+      color: "text-brand-600",
     },
     {
       label: "Avg Days to Close",
       value: kpis.avg_days_to_close != null ? `${kpis.avg_days_to_close}d` : "--",
       icon: CheckCircle2,
-      color: "text-brand-400",
+      color: "text-brand-600",
     },
   ];
 
