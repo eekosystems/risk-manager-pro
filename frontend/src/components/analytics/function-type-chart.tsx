@@ -58,7 +58,7 @@ export function FunctionTypeChart({ data }: FunctionTypeChartProps) {
             fontSize: 12,
           }}
         />
-        <Bar dataKey="count" fill="#6366f1" radius={[6, 6, 0, 0]} name="Risks" />
+        <Bar dataKey="count" fill="#4A9BA5" radius={[6, 6, 0, 0]} name="Risks" />
       </BarChart>
     </ResponsiveContainer>
   );

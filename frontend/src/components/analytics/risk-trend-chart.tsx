@@ -16,9 +16,9 @@ interface RiskTrendChartProps {
 }
 
 const LEVEL_COLORS = {
-  high: "#ef4444",
-  medium: "#eab308",
-  low: "#22c55e",
+  high: "#C4A73D",
+  medium: "#4A9BA5",
+  low: "#B3DFE5",
 };
 
 export function RiskTrendChart({ data }: RiskTrendChartProps) {

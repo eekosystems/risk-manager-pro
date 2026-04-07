@@ -35,10 +35,10 @@ export function MitigationStats({ data }: MitigationStatsProps) {
       <div className="rounded-xl border border-gray-200 bg-white p-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Clock size={14} className="text-amber-500" />
+            <Clock size={14} className="text-accent-500" />
             <span className="text-xs font-medium text-slate-600">Overdue</span>
           </div>
-          <span className={`text-lg font-bold ${data.overdue_count > 0 ? "text-amber-500" : "text-green-500"}`}>
+          <span className={`text-lg font-bold ${data.overdue_count > 0 ? "text-accent-500" : "text-brand-400"}`}>
             {data.overdue_count}
           </span>
         </div>
@@ -48,7 +48,7 @@ export function MitigationStats({ data }: MitigationStatsProps) {
       <div className="rounded-xl border border-gray-200 bg-white p-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <CheckCircle2 size={14} className="text-green-500" />
+            <CheckCircle2 size={14} className="text-brand-400" />
             <span className="text-xs font-medium text-slate-600">Avg Days to Complete</span>
           </div>
           <span className="text-lg font-bold text-slate-700">

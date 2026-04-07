@@ -17,6 +17,18 @@ export default {
           800: "#264D54",
           900: "#1A3439",
         },
+        accent: {
+          50: "#FBF8EE",
+          100: "#F5EDCC",
+          200: "#EBDB9A",
+          300: "#E0C868",
+          400: "#D4B63F",
+          500: "#C4A73D",
+          600: "#A38A2F",
+          700: "#826E25",
+          800: "#61531C",
+          900: "#413813",
+        },
       },
       fontFamily: {
         sans: ['"Plus Jakarta Sans"', "system-ui", "sans-serif"],

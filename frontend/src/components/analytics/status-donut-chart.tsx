@@ -7,10 +7,10 @@ interface StatusDonutChartProps {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  open: "#3b82f6",
-  mitigating: "#f59e0b",
-  closed: "#22c55e",
-  accepted: "#8b5cf6",
+  open: "#4A9BA5",
+  mitigating: "#C4A73D",
+  closed: "#8DD4DC",
+  accepted: "#316670",
 };
 
 const STATUS_LABELS: Record<string, string> = {

@@ -24,25 +24,25 @@ export function KPICards({ kpis }: KPICardsProps) {
       label: "Open",
       value: kpis.open_risks,
       icon: AlertTriangle,
-      color: "text-blue-500",
+      color: "text-brand-700",
     },
     {
       label: "High",
       value: kpis.high_count,
       icon: TrendingUp,
-      color: "text-red-500",
+      color: "text-accent-500",
     },
     {
       label: "Overdue Mitigations",
       value: kpis.overdue_mitigations,
       icon: Clock,
-      color: "text-amber-500",
+      color: "text-brand-800",
     },
     {
       label: "Avg Days to Close",
       value: kpis.avg_days_to_close != null ? `${kpis.avg_days_to_close}d` : "--",
       icon: CheckCircle2,
-      color: "text-green-500",
+      color: "text-brand-400",
     },
   ];
 
