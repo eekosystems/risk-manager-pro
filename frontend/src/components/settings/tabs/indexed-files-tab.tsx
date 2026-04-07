@@ -1,10 +1,14 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
   CheckCircle2,
+  ChevronDown,
+  ChevronRight,
   Clock,
   FileText,
+  Folder,
+  FolderOpen,
   Loader2,
   RefreshCw,
   Search,
@@ -74,12 +78,212 @@ const STATUS_CONFIG: Record<
   },
 };
 
+// --- Tree helpers ---
+
+interface FolderNode {
+  name: string;
+  path: string;
+  files: DocumentItem[];
+  children: Map<string, FolderNode>;
+}
+
+function buildTree(files: DocumentItem[]): FolderNode {
+  const root: FolderNode = { name: "", path: "", files: [], children: new Map() };
+
+  for (const file of files) {
+    const folderPath = file.folder_path ?? "";
+    if (!folderPath || folderPath === "/") {
+      root.files.push(file);
+      continue;
+    }
+
+    const parts = folderPath.replace(/^\/+|\/+$/g, "").split("/");
+    let current = root;
+    let builtPath = "";
+
+    for (const part of parts) {
+      builtPath = builtPath ? `${builtPath}/${part}` : part;
+      if (!current.children.has(part)) {
+        current.children.set(part, {
+          name: part,
+          path: builtPath,
+          files: [],
+          children: new Map(),
+        });
+      }
+      current = current.children.get(part)!;
+    }
+    current.files.push(file);
+  }
+
+  return root;
+}
+
+function countFilesInNode(node: FolderNode): number {
+  let count = node.files.length;
+  for (const child of node.children.values()) {
+    count += countFilesInNode(child);
+  }
+  return count;
+}
+
+// --- File row component ---
+
+function FileRow({
+  file,
+  depth,
+  deleteConfirm,
+  onDelete,
+  isDeleting,
+  isLast,
+}: {
+  file: DocumentItem;
+  depth: number;
+  deleteConfirm: string | null;
+  onDelete: (id: string) => void;
+  isDeleting: boolean;
+  isLast: boolean;
+}) {
+  const statusConfig = STATUS_CONFIG[file.status];
+  const StatusIcon = statusConfig.icon;
+
+  return (
+    <div
+      className={`flex items-center gap-3 px-5 py-3 ${!isLast ? "border-b border-gray-100" : ""}`}
+      style={{ paddingLeft: `${20 + depth * 24}px` }}
+    >
+      <FileText size={16} className="shrink-0 text-brand-400" />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="truncate text-sm font-medium text-slate-800">
+            {file.filename}
+          </span>
+          <span
+            className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${statusConfig.className}`}
+          >
+            <StatusIcon
+              size={10}
+              className={file.status === "processing" ? "animate-spin" : ""}
+            />
+            {statusConfig.label}
+          </span>
+          {file.source_type && (
+            <span
+              className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${SOURCE_TYPE_LABELS[file.source_type]?.className ?? "text-gray-600 bg-gray-50"}`}
+            >
+              {SOURCE_TYPE_LABELS[file.source_type]?.label ?? file.source_type}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-3 text-[11px] text-slate-400">
+          <span>{formatBytes(file.size_bytes)}</span>
+          <span>{file.content_type}</span>
+          <span className="flex items-center gap-1">
+            <Clock size={9} />
+            {formatDate(file.created_at)}
+          </span>
+        </div>
+      </div>
+      <button
+        onClick={() => onDelete(file.id)}
+        disabled={isDeleting}
+        className={`shrink-0 rounded-lg p-2 transition-colors ${
+          deleteConfirm === file.id
+            ? "bg-red-50 text-red-500 hover:bg-red-100"
+            : "text-gray-300 hover:bg-red-50 hover:text-red-500"
+        }`}
+        title={
+          deleteConfirm === file.id
+            ? "Click again to confirm delete"
+            : "Delete from index"
+        }
+      >
+        <Trash2 size={14} />
+      </button>
+    </div>
+  );
+}
+
+// --- Folder row component ---
+
+function FolderRow({
+  node,
+  depth,
+  expanded,
+  onToggle,
+  deleteConfirm,
+  onDelete,
+  isDeleting,
+}: {
+  node: FolderNode;
+  depth: number;
+  expanded: Set<string>;
+  onToggle: (path: string) => void;
+  deleteConfirm: string | null;
+  onDelete: (id: string) => void;
+  isDeleting: boolean;
+}) {
+  const isOpen = expanded.has(node.path);
+  const fileCount = countFilesInNode(node);
+  const FolderIcon = isOpen ? FolderOpen : Folder;
+  const ChevronIcon = isOpen ? ChevronDown : ChevronRight;
+
+  const sortedChildren = [...node.children.values()].sort((a, b) =>
+    a.name.localeCompare(b.name),
+  );
+
+  return (
+    <>
+      <button
+        onClick={() => onToggle(node.path)}
+        className="flex w-full items-center gap-2 border-b border-gray-100 px-5 py-2.5 text-left transition-colors hover:bg-gray-50"
+        style={{ paddingLeft: `${12 + depth * 24}px` }}
+      >
+        <ChevronIcon size={14} className="shrink-0 text-slate-400" />
+        <FolderIcon size={16} className="shrink-0 text-accent-500" />
+        <span className="text-sm font-semibold text-slate-700">{node.name}</span>
+        <span className="text-[11px] text-slate-400">({fileCount})</span>
+      </button>
+      {isOpen && (
+        <>
+          {sortedChildren.map((child) => (
+            <FolderRow
+              key={child.path}
+              node={child}
+              depth={depth + 1}
+              expanded={expanded}
+              onToggle={onToggle}
+              deleteConfirm={deleteConfirm}
+              onDelete={onDelete}
+              isDeleting={isDeleting}
+            />
+          ))}
+          {node.files.map((file, i) => (
+            <FileRow
+              key={file.id}
+              file={file}
+              depth={depth + 1}
+              deleteConfirm={deleteConfirm}
+              onDelete={onDelete}
+              isDeleting={isDeleting}
+              isLast={i === node.files.length - 1 && sortedChildren.length === 0}
+            />
+          ))}
+        </>
+      )}
+    </>
+  );
+}
+
+// --- Main component ---
+
 export function IndexedFilesTab() {
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [selectedSourceType, setSelectedSourceType] = useState<SourceType>("client");
   const [crawlResult, setCrawlResult] = useState<SharePointCrawlResult | null>(null);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const { data: files = [], isLoading } = useQuery({
     queryKey: ["documents"],
@@ -118,6 +322,22 @@ export function IndexedFilesTab() {
     },
   });
 
+  const filteredFiles = useMemo(
+    () =>
+      searchQuery
+        ? files.filter((f: DocumentItem) =>
+            f.filename.toLowerCase().includes(searchQuery.toLowerCase()),
+          )
+        : files,
+    [files, searchQuery],
+  );
+
+  const tree = useMemo(() => buildTree(filteredFiles), [filteredFiles]);
+  const hasTree = tree.children.size > 0;
+
+  const indexedCount = files.filter((f: DocumentItem) => f.status === "indexed").length;
+  const totalSize = files.reduce((sum: number, f: DocumentItem) => sum + f.size_bytes, 0);
+
   function handleFileUpload() {
     const input = document.createElement("input");
     input.type = "file";
@@ -133,23 +353,9 @@ export function IndexedFilesTab() {
 
   function handleSharePointSync() {
     setCrawlResult(null);
-    const params: CrawlSharePointParams = {
-      sourceType: selectedSourceType,
-    };
+    const params: CrawlSharePointParams = { sourceType: selectedSourceType };
     crawlMutation.mutate(params);
   }
-
-  const filteredFiles = files.filter((file: DocumentItem) =>
-    file.filename.toLowerCase().includes(searchQuery.toLowerCase()),
-  );
-
-  const indexedCount = files.filter(
-    (f: DocumentItem) => f.status === "indexed",
-  ).length;
-  const totalSize = files.reduce(
-    (sum: number, f: DocumentItem) => sum + f.size_bytes,
-    0,
-  );
 
   function handleDelete(id: string) {
     if (deleteConfirm === id) {
@@ -160,6 +366,32 @@ export function IndexedFilesTab() {
     }
   }
 
+  function toggleFolder(path: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(path)) {
+        next.delete(path);
+      } else {
+        next.add(path);
+      }
+      return next;
+    });
+  }
+
+  function expandAll() {
+    const paths = new Set<string>();
+    function walk(node: FolderNode) {
+      if (node.path) paths.add(node.path);
+      for (const child of node.children.values()) walk(child);
+    }
+    walk(tree);
+    setExpanded(paths);
+  }
+
+  function collapseAll() {
+    setExpanded(new Set());
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -168,6 +400,9 @@ export function IndexedFilesTab() {
     );
   }
 
+  const sortedRootChildren = [...tree.children.values()].sort((a, b) =>
+    a.name.localeCompare(b.name),
+  );
 
   return (
     <div className="max-w-5xl">
@@ -298,7 +533,26 @@ export function IndexedFilesTab() {
         </div>
       )}
 
-      {/* File list */}
+      {/* Expand/Collapse controls */}
+      {hasTree && (
+        <div className="mb-2 flex items-center gap-2">
+          <button
+            onClick={expandAll}
+            className="text-[12px] font-medium text-brand-600 hover:text-brand-800"
+          >
+            Expand all
+          </button>
+          <span className="text-slate-300">|</span>
+          <button
+            onClick={collapseAll}
+            className="text-[12px] font-medium text-brand-600 hover:text-brand-800"
+          >
+            Collapse all
+          </button>
+        </div>
+      )}
+
+      {/* File tree */}
       <div className="rounded-2xl border border-gray-200 bg-white">
         {filteredFiles.length === 0 ? (
           <div className="p-8 text-center text-sm text-slate-400">
@@ -307,73 +561,33 @@ export function IndexedFilesTab() {
               : "No files found matching your search."}
           </div>
         ) : (
-          filteredFiles.map((file: DocumentItem, index: number) => {
-            const statusConfig = STATUS_CONFIG[file.status];
-            const StatusIcon = statusConfig.icon;
-            return (
-              <div
+          <>
+            {/* Folders */}
+            {sortedRootChildren.map((child) => (
+              <FolderRow
+                key={child.path}
+                node={child}
+                depth={0}
+                expanded={expanded}
+                onToggle={toggleFolder}
+                deleteConfirm={deleteConfirm}
+                onDelete={handleDelete}
+                isDeleting={deleteMutation.isPending}
+              />
+            ))}
+            {/* Root-level files (no folder) */}
+            {tree.files.map((file, i) => (
+              <FileRow
                 key={file.id}
-                className={`flex items-center gap-4 px-5 py-4 ${
-                  index < filteredFiles.length - 1
-                    ? "border-b border-gray-100"
-                    : ""
-                }`}
-              >
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50">
-                  <FileText size={18} className="text-brand-500" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="truncate text-sm font-semibold text-slate-800">
-                      {file.filename}
-                    </span>
-                    <span
-                      className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${statusConfig.className}`}
-                    >
-                      <StatusIcon
-                        size={10}
-                        className={
-                          file.status === "processing" ? "animate-spin" : ""
-                        }
-                      />
-                      {statusConfig.label}
-                    </span>
-                    {file.source_type && (
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${SOURCE_TYPE_LABELS[file.source_type]?.className ?? "text-gray-600 bg-gray-50"}`}
-                      >
-                        {SOURCE_TYPE_LABELS[file.source_type]?.label ?? file.source_type}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-3 text-[12px] text-slate-400">
-                    <span>{formatBytes(file.size_bytes)}</span>
-                    <span>{file.content_type}</span>
-                    <span className="flex items-center gap-1">
-                      <Clock size={10} />
-                      {formatDate(file.created_at)}
-                    </span>
-                  </div>
-                </div>
-                <button
-                  onClick={() => handleDelete(file.id)}
-                  disabled={deleteMutation.isPending}
-                  className={`rounded-lg p-2 transition-colors ${
-                    deleteConfirm === file.id
-                      ? "bg-red-50 text-red-500 hover:bg-red-100"
-                      : "text-gray-300 hover:bg-red-50 hover:text-red-500"
-                  }`}
-                  title={
-                    deleteConfirm === file.id
-                      ? "Click again to confirm delete"
-                      : "Delete from index"
-                  }
-                >
-                  <Trash2 size={16} />
-                </button>
-              </div>
-            );
-          })
+                file={file}
+                depth={0}
+                deleteConfirm={deleteConfirm}
+                onDelete={handleDelete}
+                isDeleting={deleteMutation.isPending}
+                isLast={i === tree.files.length - 1}
+              />
+            ))}
+          </>
         )}
       </div>
     </div>

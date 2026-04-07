@@ -98,6 +98,7 @@ export interface ConversationDetail {
 export interface DocumentItem {
   id: string;
   filename: string;
+  folder_path: string | null;
   content_type: string;
   size_bytes: number;
   status: DocumentStatus;

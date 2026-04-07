@@ -19,12 +19,14 @@ class DocumentRepository:
         content_type: str,
         size_bytes: int,
         source_type: SourceType = SourceType.CLIENT,
+        folder_path: str | None = None,
     ) -> Document:
         document = Document(
             organization_id=organization_id,
             uploaded_by=uploaded_by,
             filename=filename,
             blob_path=blob_path,
+            folder_path=folder_path,
             content_type=content_type,
             size_bytes=size_bytes,
             source_type=source_type,

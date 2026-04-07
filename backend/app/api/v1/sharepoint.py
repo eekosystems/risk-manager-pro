@@ -120,6 +120,7 @@ async def crawl_sharepoint(
             content_type=file.content_type,
             size_bytes=len(data),
             source_type=source_type,
+            folder_path=file.folder_path,
         )
         await db.commit()
 

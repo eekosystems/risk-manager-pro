@@ -36,6 +36,7 @@ class SharePointFile:
     content_type: str
     web_url: str
     drive_id: str
+    folder_path: str
 
 
 class SharePointCrawler:
@@ -160,6 +161,7 @@ class SharePointCrawler:
                                 content_type=content_type,
                                 web_url=item.get("webUrl", ""),
                                 drive_id=drive_id,
+                                folder_path=folder_path or "/",
                             )
                         )
             url = data.get("@odata.nextLink", "")

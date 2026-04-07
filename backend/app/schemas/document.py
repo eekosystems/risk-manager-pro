@@ -9,6 +9,7 @@ from app.models.document import DocumentStatus, SourceType
 class DocumentResponse(BaseModel):
     id: uuid.UUID
     filename: str
+    folder_path: str | None = None
     content_type: str
     size_bytes: int
     status: DocumentStatus
@@ -22,6 +23,7 @@ class DocumentResponse(BaseModel):
 class DocumentListItem(BaseModel):
     id: uuid.UUID
     filename: str
+    folder_path: str | None = None
     content_type: str
     size_bytes: int
     status: DocumentStatus
@@ -34,6 +36,7 @@ class DocumentListItem(BaseModel):
 class DocumentDetail(BaseModel):
     id: uuid.UUID
     filename: str
+    folder_path: str | None = None
     content_type: str
     size_bytes: int
     status: DocumentStatus

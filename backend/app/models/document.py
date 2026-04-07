@@ -32,6 +32,7 @@ class Document(Base):
     uploaded_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
     filename: Mapped[str] = mapped_column(String(500))
     blob_path: Mapped[str] = mapped_column(String(1000))
+    folder_path: Mapped[str | None] = mapped_column(String(1000), default=None)
     content_type: Mapped[str] = mapped_column(String(100))
     size_bytes: Mapped[int] = mapped_column(BigInteger)
     status: Mapped[DocumentStatus] = mapped_column(
