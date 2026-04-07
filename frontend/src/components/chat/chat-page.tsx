@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { CreateRiskModal } from "@/components/risk-register/create-risk-modal";
 import { useConversation, useSendMessage } from "@/hooks/use-chat";
@@ -10,17 +10,40 @@ import type { ChatMessage, CreateRiskEntryRequest, FunctionType } from "@/types/
 import { ChatInput } from "./chat-input";
 import { MessageList } from "./message-list";
 
-const WELCOME_MESSAGE: ChatMessage = {
-  id: "welcome",
-  role: "assistant",
-  content:
+const WELCOME_MESSAGES: Record<FunctionType, string> = {
+  phl:
+    "You're now in **Preliminary Hazard List (PHL)** mode. I'll help you " +
+    "systematically identify potential hazards arising from system changes, " +
+    "new operations, or modified procedures. Describe the system or change " +
+    "you'd like to analyze, or use the PHL Wizard from the sidebar for a " +
+    "step-by-step guided workflow.",
+  sra:
+    "You're now in **Safety Risk Assessment (SRA)** mode. I'll guide you through " +
+    "a structured risk evaluation following AC 150/5200-37A, including severity and " +
+    "likelihood scoring, risk acceptance criteria, and mitigation planning. " +
+    "Describe the hazard you'd like to assess, or use the SRA Wizard for a " +
+    "guided workflow.",
+  system:
+    "You're now in **System Analysis** mode. I'll help you analyze system changes, " +
+    "evaluate their safety impacts, and identify dependencies across your operations. " +
+    "Describe the system or change you'd like to analyze and I'll assist with a " +
+    "structured breakdown.",
+  general:
     "Welcome to Risk Manager Pro. I'm your AI-powered aviation safety assistant, " +
-    "ready to help you develop Preliminary Hazard Lists, Safety Risk Assessments, " +
-    "and System Analyses. Select a function from the sidebar or ask me anything " +
-    "about aviation safety.",
-  citations: null,
-  created_at: new Date().toISOString(),
+    "ready to help with any questions about aviation safety, regulatory compliance, " +
+    "or your indexed documentation. Select a core function from the sidebar to focus " +
+    "on a specific workflow, or ask me anything.",
 };
+
+function buildWelcomeMessage(functionType: FunctionType): ChatMessage {
+  return {
+    id: `welcome-${functionType}`,
+    role: "assistant",
+    content: WELCOME_MESSAGES[functionType],
+    citations: null,
+    created_at: new Date().toISOString(),
+  };
+}
 
 interface ChatPageProps {
   activeFunction: FunctionType;
@@ -33,8 +56,9 @@ export function ChatPage({
   conversationId,
   setConversationId,
 }: ChatPageProps) {
+  const welcomeMessage = useMemo(() => buildWelcomeMessage(activeFunction), [activeFunction]);
   const [localMessages, setLocalMessages] = useState<ChatMessage[]>([
-    WELCOME_MESSAGE,
+    welcomeMessage,
   ]);
   const [isTyping, setIsTyping] = useState(false);
   const [showRiskModal, setShowRiskModal] = useState(false);
@@ -53,9 +77,9 @@ export function ChatPage({
 
   useEffect(() => {
     if (!conversationId) {
-      setLocalMessages([WELCOME_MESSAGE]);
+      setLocalMessages([buildWelcomeMessage(activeFunction)]);
     }
-  }, [conversationId]);
+  }, [conversationId, activeFunction]);
 
   const handleSend = useCallback(
     (message: string, files: File[]) => {
