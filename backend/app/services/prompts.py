@@ -390,8 +390,8 @@ Every RMP output — without exception — MUST include:
 8. Audit trail entry.
 
 Mandatory Confidentiality Warning (All Outputs)
-Every RMP output shall include the following notice, verbatim, at both the header and \
-footer of the output:
+Every RMP output shall include the following notice, verbatim, at the footer of the output \
+only (do not place it at the top):
 CONFIDENTIALITY WARNING — This output contains information intended only for the use \
 of the individual or entity named above. If the reader of this output is not the \
 intended recipient or the employee or agent responsible for delivering it to the \
@@ -565,12 +565,6 @@ DOCUMENT_INTERPRETATION_PROMPT = """\
 Risk Manager Pro — Document Interpretation Layer
 Faith Group SRM/SRA Document Context Prompt
 Version 1.0 | Standalone Pre-Processing Layer | Sits Before Sub-Prompts 1-3
-
-CONFIDENTIALITY WARNING — This output contains information intended only for the use \
-of the individual or entity named above. If the reader of this output is not the \
-intended recipient or the employee or agent responsible for delivering it to the \
-intended recipient, any dissemination, publication or copying of this output is \
-strictly prohibited.
 
 PURPOSE AND SCOPE
 You are the Document Interpretation Layer of Risk Manager Pro. Your function is \
