@@ -4,7 +4,7 @@ import {
   BarChart3,
   ChevronRight,
   FileText,
-  FolderSearch,
+
   ScrollText,
   Shield,
   ShieldAlert,
@@ -12,7 +12,6 @@ import {
   Workflow,
 } from "lucide-react";
 
-import { IndexedSources } from "@/components/layout/panel/indexed-sources";
 import { RecentDocuments } from "@/components/layout/panel/recent-documents";
 import { CoreFunctionsNav } from "@/components/layout/sidebar/core-functions-nav";
 import { OrganizationSwitcher } from "@/components/layout/sidebar/organization-switcher";
@@ -163,7 +162,6 @@ export function LeftSidebar({
             </div>
 
             <RecentDocuments />
-            <IndexedSources />
           </nav>
 
           <UserCard />
@@ -277,16 +275,6 @@ export function LeftSidebar({
             className="flex h-10 w-10 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-brand-50 hover:text-brand-500"
           >
             <FileText size={20} />
-          </button>
-
-          {/* Sources icon */}
-          <button
-            onClick={onToggle}
-            aria-label="Indexed sources"
-            title="Indexed sources"
-            className="flex h-10 w-10 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-brand-50 hover:text-brand-500"
-          >
-            <FolderSearch size={20} />
           </button>
 
           {/* User icon at bottom */}
