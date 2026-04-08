@@ -194,9 +194,7 @@ async def reindex_document(
         raise NotFoundError("Document", str(document_id))
 
     await indexer.delete_by_document(document_id)
-    await repo.update_status(
-        document_id, DocumentStatus.UPLOADED, organization_id=organization.id
-    )
+    await repo.update_status(document_id, DocumentStatus.UPLOADED, organization_id=organization.id)
     await db.commit()
 
     registry = request.app.state.services

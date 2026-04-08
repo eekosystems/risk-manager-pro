@@ -87,9 +87,7 @@ class SearchIndexer:
             result = await client.delete_documents(documents=batch)
             deleted += sum(1 for r in result if r.succeeded)
 
-        logger.info(
-            "chunks_deleted", document_id=str(document_id), deleted=deleted
-        )
+        logger.info("chunks_deleted", document_id=str(document_id), deleted=deleted)
         return deleted
 
     async def close(self) -> None:

@@ -182,9 +182,7 @@ async def sync_folder(
 
     repo = DocumentRepository(db)
     existing_docs, _ = await repo.list_for_organization(organization.id, skip=0, limit=10000)
-    existing_by_key = {
-        (doc.filename, doc.folder_path or ""): doc for doc in existing_docs
-    }
+    existing_by_key = {(doc.filename, doc.folder_path or ""): doc for doc in existing_docs}
 
     updated = 0
     new_count = 0
