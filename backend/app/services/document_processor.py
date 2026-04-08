@@ -52,6 +52,38 @@ class DocumentProcessor:
         return data.decode("utf-8", errors="replace")
 
     @staticmethod
+    def _extract_text_xlsx(data: bytes) -> str:
+        from openpyxl import load_workbook
+
+        wb = load_workbook(io.BytesIO(data), read_only=True, data_only=True)
+        rows: list[str] = []
+        for sheet in wb.worksheets:
+            rows.append(f"--- {sheet.title} ---")
+            for row in sheet.iter_rows(values_only=True):
+                cells = [str(c) if c is not None else "" for c in row]
+                if any(cells):
+                    rows.append("\t".join(cells))
+        wb.close()
+        return "\n".join(rows)
+
+    @staticmethod
+    def _extract_text_pptx(data: bytes) -> str:
+        from pptx import Presentation
+
+        prs = Presentation(io.BytesIO(data))
+        slides: list[str] = []
+        for i, slide in enumerate(prs.slides, 1):
+            parts = [f"--- Slide {i} ---"]
+            for shape in slide.shapes:
+                if shape.has_text_frame:
+                    for para in shape.text_frame.paragraphs:
+                        text = para.text.strip()
+                        if text:
+                            parts.append(text)
+            slides.append("\n".join(parts))
+        return "\n\n".join(slides)
+
+    @staticmethod
     def _extract_text(data: bytes, content_type: str) -> str:
         if content_type == "application/pdf":
             return DocumentProcessor._extract_text_pdf(data)
@@ -59,8 +91,17 @@ class DocumentProcessor:
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         ):
             return DocumentProcessor._extract_text_docx(data)
-        elif content_type == "text/plain":
+        elif content_type in ("text/plain", "text/csv"):
             return DocumentProcessor._extract_text_plain(data)
+        elif content_type == "application/msword":
+            # Old .doc format — attempt plain text extraction as fallback
+            return DocumentProcessor._extract_text_plain(data)
+        elif content_type == ("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"):
+            return DocumentProcessor._extract_text_xlsx(data)
+        elif content_type == (
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        ):
+            return DocumentProcessor._extract_text_pptx(data)
         else:
             raise ValueError(f"Unsupported content type: {content_type}")
 

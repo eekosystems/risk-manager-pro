@@ -19,13 +19,19 @@ MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 MB
 ALLOWED_CONTENT_TYPES = {
     "application/pdf",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/msword",
     "text/plain",
+    "text/csv",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
 }
 
 # Magic byte signatures for file content validation
 _FILE_SIGNATURES: dict[str, list[bytes]] = {
     "application/pdf": [b"%PDF"],
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [b"PK\x03\x04"],
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [b"PK\x03\x04"],
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation": [b"PK\x03\x04"],
 }
 
 _SAFE_FILENAME_RE = re.compile(r"[^a-zA-Z0-9._\-]")
