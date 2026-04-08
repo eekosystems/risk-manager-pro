@@ -43,6 +43,18 @@ export async function reindexDocument(documentId: string): Promise<DocumentItem>
   return response.data.data;
 }
 
+export interface ProcessAllResult {
+  queued: number;
+  already_indexed: number;
+}
+
+export async function processAllDocuments(): Promise<ProcessAllResult> {
+  const response = await apiClient.post<DataResponse<ProcessAllResult>>(
+    "/documents/process-all",
+  );
+  return response.data.data;
+}
+
 // SharePoint
 
 export interface SharePointDrive {

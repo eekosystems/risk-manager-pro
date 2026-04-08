@@ -25,6 +25,7 @@ import {
   deleteDocument,
   getDocuments,
   getSharePointDrives,
+  processAllDocuments,
   reindexDocument,
   syncFolder,
   uploadDocument,
@@ -418,10 +419,19 @@ export function IndexedFilesTab() {
     }
   }
 
+  const [processAllResult, setProcessAllResult] = useState<{ queued: number } | null>(null);
+
+  const processAllMutation = useMutation({
+    mutationFn: processAllDocuments,
+    onSuccess: (result) => {
+      setProcessAllResult(result);
+      void queryClient.invalidateQueries({ queryKey: ["documents"] });
+    },
+  });
+
   function handleReindexAll() {
-    for (const file of files) {
-      reindexMutation.mutate(file.id);
-    }
+    setProcessAllResult(null);
+    processAllMutation.mutate();
   }
 
   const [syncResult, setSyncResult] = useState<SyncFolderResult | null>(null);
@@ -596,15 +606,15 @@ export function IndexedFilesTab() {
         {files.length > 0 && (
           <button
             onClick={handleReindexAll}
-            disabled={reindexMutation.isPending}
+            disabled={processAllMutation.isPending}
             className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition-all hover:bg-gray-50 disabled:opacity-50"
           >
-            {reindexMutation.isPending ? (
+            {processAllMutation.isPending ? (
               <Loader2 size={16} className="animate-spin" />
             ) : (
               <RefreshCw size={16} />
             )}
-            Reindex All
+            Process All
           </button>
         )}
         <div className="relative flex-1">
@@ -654,6 +664,25 @@ export function IndexedFilesTab() {
             {crawlMutation.error instanceof Error
               ? crawlMutation.error.message
               : "Check that SharePoint credentials are configured on the server."}
+          </div>
+        </div>
+      )}
+
+      {/* Process all result banner */}
+      {processAllResult && (
+        <div className="mb-4 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-brand-800">
+              <span className="font-semibold">Processing queued:</span>{" "}
+              {processAllResult.queued} documents will be processed in the background.
+              Watch the status update automatically.
+            </div>
+            <button
+              onClick={() => setProcessAllResult(null)}
+              className="text-brand-400 hover:text-brand-600"
+            >
+              ✕
+            </button>
           </div>
         </div>
       )}

@@ -4,6 +4,7 @@ import uuid
 import structlog
 from azure.core.exceptions import AzureError
 from fastapi import APIRouter, Depends, Query, Request, UploadFile
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import async_session_factory, get_db
@@ -221,3 +222,66 @@ async def reindex_document(
         data=DocumentResponse.model_validate(document),
         meta=MetaResponse(request_id=str(document_id)),
     )
+
+
+class ProcessAllResult(BaseModel):
+    queued: int
+    already_indexed: int
+
+
+@router.post("/process-all", response_model=DataResponse[ProcessAllResult])
+async def process_all_uploaded(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    organization: Organization = Depends(get_current_organization),
+    db: AsyncSession = Depends(get_db),
+    audit: AuditLogger = Depends(get_audit_logger),
+) -> DataResponse[ProcessAllResult]:
+    """Queue all unprocessed (uploaded) documents for background processing."""
+    from app.models.document import DocumentStatus
+
+    repo = DocumentRepository(db)
+    docs, _ = await repo.list_for_organization(organization.id, skip=0, limit=10000)
+
+    unprocessed = [d for d in docs if d.status in (DocumentStatus.UPLOADED, DocumentStatus.FAILED)]
+    already = len(docs) - len(unprocessed)
+
+    if unprocessed:
+        registry = request.app.state.services
+        doc_ids = [d.id for d in unprocessed]
+        task = asyncio.create_task(_process_all_background(doc_ids, registry))
+        track_task(task)
+
+    await audit.log(
+        action="document.process_all",
+        user=current_user,
+        resource_type="document",
+        resource_id=str(organization.id),
+        organization_id=organization.id,
+    )
+
+    return DataResponse(
+        data=ProcessAllResult(queued=len(unprocessed), already_indexed=already),
+        meta=MetaResponse(request_id=""),
+    )
+
+
+async def _process_all_background(
+    doc_ids: list[uuid.UUID],
+    registry: object,
+) -> None:
+    """Process documents one at a time in the background."""
+    for doc_id in doc_ids:
+        try:
+            async with async_session_factory() as db:
+                repo = DocumentRepository(db)
+                processor = DocumentProcessor(
+                    storage=registry.storage_service,  # type: ignore[attr-defined]
+                    openai_client=registry.openai_client,  # type: ignore[attr-defined]
+                    indexer=registry.search_indexer,  # type: ignore[attr-defined]
+                    repo=repo,
+                )
+                await processor.process(doc_id)
+                await db.commit()
+        except Exception:
+            logger.error("process_all_doc_failed", document_id=str(doc_id), exc_info=True)
