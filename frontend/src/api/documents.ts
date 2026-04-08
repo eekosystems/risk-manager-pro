@@ -28,7 +28,7 @@ export async function uploadDocument(
 
 export async function getDocuments(): Promise<DocumentItem[]> {
   const response =
-    await apiClient.get<PaginatedResponse<DocumentItem>>("/documents?limit=500");
+    await apiClient.get<PaginatedResponse<DocumentItem>>("/documents?limit=100");
   return response.data.data;
 }
 
