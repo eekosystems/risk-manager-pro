@@ -10,6 +10,7 @@ import structlog
 from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel
 
+from app.core.config import settings
 from app.core.database import async_session_factory, get_db
 from app.core.deps import (
     get_audit_logger,
@@ -235,9 +236,11 @@ async def _crawl_background(
 
     logger.info("crawl_download_phase_complete", downloaded=len(doc_ids), total=len(files))
 
-    # Phase 2 — process each document (slow, but files are already visible)
-    for doc_id in doc_ids:
-        await _process_doc(doc_id, registry)
+    # Phase 2 — process concurrently in batches
+    concurrency = settings.processing_concurrency
+    for i in range(0, len(doc_ids), concurrency):
+        batch = doc_ids[i : i + concurrency]
+        await asyncio.gather(*[_process_doc(doc_id, registry) for doc_id in batch])
 
 
 async def _sync_folder_background(
@@ -297,9 +300,11 @@ async def _sync_folder_background(
         total=len(to_update) + len(to_create),
     )
 
-    # Phase 2 — process all documents
-    for doc_id in doc_ids:
-        await _process_doc(doc_id, registry)
+    # Phase 2 — process concurrently in batches
+    concurrency = settings.processing_concurrency
+    for i in range(0, len(doc_ids), concurrency):
+        batch = doc_ids[i : i + concurrency]
+        await asyncio.gather(*[_process_doc(doc_id, registry) for doc_id in batch])
 
 
 async def _process_doc(document_id: uuid.UUID, registry: ServiceRegistry) -> None:

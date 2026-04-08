@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, Query, Request, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.database import async_session_factory, get_db
 from app.core.deps import (
     get_audit_logger,
@@ -266,22 +267,28 @@ async def process_all_uploaded(
     )
 
 
+async def _process_one(doc_id: uuid.UUID, registry: object) -> None:
+    try:
+        async with async_session_factory() as db:
+            repo = DocumentRepository(db)
+            processor = DocumentProcessor(
+                storage=registry.storage_service,  # type: ignore[attr-defined]
+                openai_client=registry.openai_client,  # type: ignore[attr-defined]
+                indexer=registry.search_indexer,  # type: ignore[attr-defined]
+                repo=repo,
+            )
+            await processor.process(doc_id)
+            await db.commit()
+    except Exception:
+        logger.error("process_all_doc_failed", document_id=str(doc_id), exc_info=True)
+
+
 async def _process_all_background(
     doc_ids: list[uuid.UUID],
     registry: object,
 ) -> None:
-    """Process documents one at a time in the background."""
-    for doc_id in doc_ids:
-        try:
-            async with async_session_factory() as db:
-                repo = DocumentRepository(db)
-                processor = DocumentProcessor(
-                    storage=registry.storage_service,  # type: ignore[attr-defined]
-                    openai_client=registry.openai_client,  # type: ignore[attr-defined]
-                    indexer=registry.search_indexer,  # type: ignore[attr-defined]
-                    repo=repo,
-                )
-                await processor.process(doc_id)
-                await db.commit()
-        except Exception:
-            logger.error("process_all_doc_failed", document_id=str(doc_id), exc_info=True)
+    """Process documents concurrently in batches."""
+    concurrency = settings.processing_concurrency
+    for i in range(0, len(doc_ids), concurrency):
+        batch = doc_ids[i : i + concurrency]
+        await asyncio.gather(*[_process_one(doc_id, registry) for doc_id in batch])
