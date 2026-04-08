@@ -68,17 +68,29 @@ class SearchIndexer:
         )
         return indexed
 
-    async def delete_by_document(self, document_id: uuid.UUID) -> None:
+    async def delete_by_document(self, document_id: uuid.UUID) -> int:
+        """Delete all indexed chunks for a document. Returns count of deleted chunks."""
         client = await self._get_client()
         search_results = await client.search(
             search_text="*",
             filter=f"document_id eq '{document_id}'",
             select=["chunk_id"],
         )
+        to_delete: list[dict[str, str]] = []
         async for result in search_results:
-            await client.delete_documents(documents=[{"chunk_id": result["chunk_id"]}])
+            to_delete.append({"chunk_id": result["chunk_id"]})
 
-        logger.info("chunks_deleted", document_id=str(document_id))
+        deleted = 0
+        batch_size = settings.search_index_batch_size
+        for start in range(0, len(to_delete), batch_size):
+            batch = to_delete[start : start + batch_size]
+            result = await client.delete_documents(documents=batch)
+            deleted += sum(1 for r in result if r.succeeded)
+
+        logger.info(
+            "chunks_deleted", document_id=str(document_id), deleted=deleted
+        )
+        return deleted
 
     async def close(self) -> None:
         if self._client:

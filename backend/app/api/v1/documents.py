@@ -11,6 +11,7 @@ from app.core.deps import (
     get_audit_logger,
     get_current_organization,
     get_current_user,
+    get_search_indexer,
     get_storage_service,
 )
 from app.core.tasks import track_task
@@ -169,4 +170,56 @@ async def delete_document(
         resource_type="document",
         resource_id=str(document_id),
         organization_id=organization.id,
+    )
+
+
+@router.post("/{document_id}/reindex", response_model=DataResponse[DocumentResponse])
+async def reindex_document(
+    document_id: uuid.UUID,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    organization: Organization = Depends(get_current_organization),
+    db: AsyncSession = Depends(get_db),
+    indexer: SearchIndexer = Depends(get_search_indexer),
+    audit: AuditLogger = Depends(get_audit_logger),
+) -> DataResponse[DocumentResponse]:
+    """Clear existing chunks and reprocess a single document."""
+    from app.models.document import DocumentStatus
+
+    repo = DocumentRepository(db)
+    document = await repo.get_by_id(document_id, organization.id)
+    if not document:
+        from app.core.exceptions import NotFoundError
+
+        raise NotFoundError("Document", str(document_id))
+
+    await indexer.delete_by_document(document_id)
+    await repo.update_status(
+        document_id, DocumentStatus.UPLOADED, organization_id=organization.id
+    )
+    await db.commit()
+
+    registry = request.app.state.services
+    task = asyncio.create_task(
+        _process_document_background(
+            document_id=document_id,
+            storage=registry.storage_service,
+            openai_client=registry.openai_client,
+            search_indexer=registry.search_indexer,
+        )
+    )
+    track_task(task)
+
+    await audit.log(
+        action="document.reindexed",
+        user=current_user,
+        resource_type="document",
+        resource_id=str(document_id),
+        organization_id=organization.id,
+    )
+
+    await db.refresh(document)
+    return DataResponse(
+        data=DocumentResponse.model_validate(document),
+        meta=MetaResponse(request_id=str(document_id)),
     )

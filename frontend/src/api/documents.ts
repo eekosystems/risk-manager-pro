@@ -36,6 +36,13 @@ export async function deleteDocument(documentId: string): Promise<void> {
   await apiClient.delete(`/documents/${documentId}`);
 }
 
+export async function reindexDocument(documentId: string): Promise<DocumentItem> {
+  const response = await apiClient.post<DataResponse<DocumentItem>>(
+    `/documents/${documentId}/reindex`,
+  );
+  return response.data.data;
+}
+
 // SharePoint
 
 export interface SharePointDrive {

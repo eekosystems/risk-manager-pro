@@ -23,6 +23,7 @@ import {
   deleteDocument,
   getDocuments,
   getSharePointDrives,
+  reindexDocument,
   uploadDocument,
 } from "@/api/documents";
 import type { DocumentItem, DocumentStatus, SourceType } from "@/types/api";
@@ -134,18 +135,24 @@ function FileRow({
   depth,
   deleteConfirm,
   onDelete,
+  onReindex,
   isDeleting,
+  isReindexing,
   isLast,
 }: {
   file: DocumentItem;
   depth: number;
   deleteConfirm: string | null;
   onDelete: (id: string) => void;
+  onReindex: (id: string) => void;
   isDeleting: boolean;
+  isReindexing: boolean;
   isLast: boolean;
 }) {
   const statusConfig = STATUS_CONFIG[file.status];
   const StatusIcon = statusConfig.icon;
+  const isFailed = file.status === "failed";
+  const isProcessing = file.status === "processing";
 
   return (
     <div
@@ -163,7 +170,7 @@ function FileRow({
           >
             <StatusIcon
               size={10}
-              className={file.status === "processing" ? "animate-spin" : ""}
+              className={isProcessing ? "animate-spin" : ""}
             />
             {statusConfig.label}
           </span>
@@ -185,9 +192,21 @@ function FileRow({
         </div>
       </div>
       <button
+        onClick={() => onReindex(file.id)}
+        disabled={isReindexing || isProcessing}
+        className={`shrink-0 rounded-lg p-1.5 transition-colors ${
+          isFailed
+            ? "text-red-400 hover:bg-accent-50 hover:text-accent-600"
+            : "text-gray-300 hover:bg-brand-50 hover:text-brand-500"
+        } disabled:opacity-30`}
+        title={isFailed ? "Retry" : "Reindex"}
+      >
+        <RefreshCw size={13} className={isReindexing ? "animate-spin" : ""} />
+      </button>
+      <button
         onClick={() => onDelete(file.id)}
         disabled={isDeleting}
-        className={`shrink-0 rounded-lg p-2 transition-colors ${
+        className={`shrink-0 rounded-lg p-1.5 transition-colors ${
           deleteConfirm === file.id
             ? "bg-red-50 text-red-500 hover:bg-red-100"
             : "text-gray-300 hover:bg-red-50 hover:text-red-500"
@@ -198,13 +217,21 @@ function FileRow({
             : "Delete from index"
         }
       >
-        <Trash2 size={14} />
+        <Trash2 size={13} />
       </button>
     </div>
   );
 }
 
 // --- Folder row component ---
+
+function collectFileIds(node: FolderNode): string[] {
+  const ids = node.files.map((f) => f.id);
+  for (const child of node.children.values()) {
+    ids.push(...collectFileIds(child));
+  }
+  return ids;
+}
 
 function FolderRow({
   node,
@@ -213,7 +240,10 @@ function FolderRow({
   onToggle,
   deleteConfirm,
   onDelete,
+  onReindex,
+  onReindexMany,
   isDeleting,
+  isReindexing,
 }: {
   node: FolderNode;
   depth: number;
@@ -221,7 +251,10 @@ function FolderRow({
   onToggle: (path: string) => void;
   deleteConfirm: string | null;
   onDelete: (id: string) => void;
+  onReindex: (id: string) => void;
+  onReindexMany: (ids: string[]) => void;
   isDeleting: boolean;
+  isReindexing: boolean;
 }) {
   const isOpen = expanded.has(node.path);
   const fileCount = countFilesInNode(node);
@@ -234,16 +267,26 @@ function FolderRow({
 
   return (
     <>
-      <button
-        onClick={() => onToggle(node.path)}
-        className="flex w-full items-center gap-2 border-b border-gray-100 px-5 py-2.5 text-left transition-colors hover:bg-gray-50"
-        style={{ paddingLeft: `${12 + depth * 24}px` }}
-      >
-        <ChevronIcon size={14} className="shrink-0 text-slate-400" />
-        <FolderIcon size={16} className="shrink-0 text-accent-500" />
-        <span className="text-sm font-semibold text-slate-700">{node.name}</span>
-        <span className="text-[11px] text-slate-400">({fileCount})</span>
-      </button>
+      <div className="flex items-center border-b border-gray-100">
+        <button
+          onClick={() => onToggle(node.path)}
+          className="flex flex-1 items-center gap-2 px-5 py-2.5 text-left transition-colors hover:bg-gray-50"
+          style={{ paddingLeft: `${12 + depth * 24}px` }}
+        >
+          <ChevronIcon size={14} className="shrink-0 text-slate-400" />
+          <FolderIcon size={16} className="shrink-0 text-accent-500" />
+          <span className="text-sm font-semibold text-slate-700">{node.name}</span>
+          <span className="text-[11px] text-slate-400">({fileCount})</span>
+        </button>
+        <button
+          onClick={() => onReindexMany(collectFileIds(node))}
+          disabled={isReindexing}
+          className="mr-3 shrink-0 rounded-lg p-1.5 text-gray-300 transition-colors hover:bg-brand-50 hover:text-brand-500 disabled:opacity-30"
+          title="Reindex folder"
+        >
+          <RefreshCw size={13} />
+        </button>
+      </div>
       {isOpen && (
         <>
           {sortedChildren.map((child) => (
@@ -255,7 +298,10 @@ function FolderRow({
               onToggle={onToggle}
               deleteConfirm={deleteConfirm}
               onDelete={onDelete}
+              onReindex={onReindex}
+              onReindexMany={onReindexMany}
               isDeleting={isDeleting}
+              isReindexing={isReindexing}
             />
           ))}
           {node.files.map((file, i) => (
@@ -265,7 +311,9 @@ function FolderRow({
               depth={depth + 1}
               deleteConfirm={deleteConfirm}
               onDelete={onDelete}
+              onReindex={onReindex}
               isDeleting={isDeleting}
+              isReindexing={isReindexing}
               isLast={i === node.files.length - 1 && sortedChildren.length === 0}
             />
           ))}
@@ -321,6 +369,29 @@ export function IndexedFilesTab() {
       void queryClient.invalidateQueries({ queryKey: ["documents"] });
     },
   });
+
+  const reindexMutation = useMutation({
+    mutationFn: reindexDocument,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["documents"] });
+    },
+  });
+
+  function handleReindex(id: string) {
+    reindexMutation.mutate(id);
+  }
+
+  function handleReindexMany(ids: string[]) {
+    for (const id of ids) {
+      reindexMutation.mutate(id);
+    }
+  }
+
+  function handleReindexAll() {
+    for (const file of files) {
+      reindexMutation.mutate(file.id);
+    }
+  }
 
   const filteredFiles = useMemo(
     () =>
@@ -470,6 +541,20 @@ export function IndexedFilesTab() {
           )}
           Sync from SharePoint
         </button>
+        {files.length > 0 && (
+          <button
+            onClick={handleReindexAll}
+            disabled={reindexMutation.isPending}
+            className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition-all hover:bg-gray-50 disabled:opacity-50"
+          >
+            {reindexMutation.isPending ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <RefreshCw size={16} />
+            )}
+            Reindex All
+          </button>
+        )}
         <div className="relative flex-1">
           <Search
             size={16}
@@ -572,7 +657,10 @@ export function IndexedFilesTab() {
                 onToggle={toggleFolder}
                 deleteConfirm={deleteConfirm}
                 onDelete={handleDelete}
+                onReindex={handleReindex}
+                onReindexMany={handleReindexMany}
                 isDeleting={deleteMutation.isPending}
+                isReindexing={reindexMutation.isPending}
               />
             ))}
             {/* Root-level files (no folder) */}
@@ -583,7 +671,9 @@ export function IndexedFilesTab() {
                 depth={0}
                 deleteConfirm={deleteConfirm}
                 onDelete={handleDelete}
+                onReindex={handleReindex}
                 isDeleting={deleteMutation.isPending}
+                isReindexing={reindexMutation.isPending}
                 isLast={i === tree.files.length - 1}
               />
             ))}
