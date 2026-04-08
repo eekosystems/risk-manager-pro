@@ -53,7 +53,7 @@ class DocumentProcessor:
 
     @staticmethod
     def _extract_text_xlsx(data: bytes) -> str:
-        from openpyxl import load_workbook
+        from openpyxl import load_workbook  # type: ignore[import-untyped]
 
         wb = load_workbook(io.BytesIO(data), read_only=True, data_only=True)
         rows: list[str] = []

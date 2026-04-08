@@ -84,8 +84,8 @@ class SearchIndexer:
         batch_size = settings.search_index_batch_size
         for start in range(0, len(to_delete), batch_size):
             batch = to_delete[start : start + batch_size]
-            result = await client.delete_documents(documents=batch)
-            deleted += sum(1 for r in result if r.succeeded)
+            del_result = await client.delete_documents(documents=batch)
+            deleted += sum(1 for r in del_result if r.succeeded)
 
         logger.info("chunks_deleted", document_id=str(document_id), deleted=deleted)
         return deleted
