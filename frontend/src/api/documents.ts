@@ -69,6 +69,27 @@ export async function getSharePointDrives(): Promise<SharePointDrive[]> {
   return response.data.data.drives;
 }
 
+export interface SyncFolderResult {
+  folder_path: string;
+  files_found: number;
+  files_updated: number;
+  files_new: number;
+}
+
+export async function syncFolder(
+  folderPath: string,
+  sourceType?: SourceType,
+): Promise<SyncFolderResult> {
+  const queryParts = [`folder_path=${encodeURIComponent(folderPath)}`];
+  if (sourceType) queryParts.push(`source_type=${encodeURIComponent(sourceType)}`);
+  const response = await apiClient.post<DataResponse<SyncFolderResult>>(
+    `/sharepoint/sync-folder?${queryParts.join("&")}`,
+    undefined,
+    { timeout: 300_000 },
+  );
+  return response.data.data;
+}
+
 export async function crawlSharePoint(
   params: CrawlSharePointParams = {},
 ): Promise<SharePointCrawlResult> {

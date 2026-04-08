@@ -15,6 +15,7 @@ from app.core.deps import (
     get_audit_logger,
     get_current_organization,
     get_current_user,
+    get_search_indexer,
     get_storage_service,
 )
 from app.core.tasks import track_task
@@ -43,6 +44,13 @@ class CrawlResult(BaseModel):
     files_discovered: int
     files_queued: int
     skipped_files: list[str]
+
+
+class SyncFolderResult(BaseModel):
+    folder_path: str
+    files_found: int
+    files_updated: int
+    files_new: int
 
 
 class DriveInfo(BaseModel):
@@ -148,6 +156,99 @@ async def crawl_sharepoint(
         files_discovered=len(files),
         files_queued=queued_count,
         skipped_files=skipped,
+    )
+    return DataResponse(data=result, meta=MetaResponse(request_id=""))
+
+
+@router.post("/sync-folder", response_model=DataResponse[SyncFolderResult])
+async def sync_folder(
+    request: Request,
+    folder_path: str = Query(..., description="Folder path to re-sync from SharePoint"),
+    source_type: SourceType = Query(SourceType.CLIENT, alias="source_type"),
+    current_user: User = Depends(get_current_user),
+    organization: Organization = Depends(get_current_organization),
+    db: AsyncSession = Depends(get_db),
+    storage: BlobStorageService = Depends(get_storage_service),
+    indexer: SearchIndexer = Depends(get_search_indexer),
+    audit: AuditLogger = Depends(get_audit_logger),
+) -> DataResponse[SyncFolderResult]:
+    """Re-download files in a folder from SharePoint and reprocess them."""
+    from app.models.document import DocumentStatus
+
+    crawler: SharePointCrawler = request.app.state.services.sharepoint_crawler
+    registry = request.app.state.services
+
+    sp_files: list[SharePointFile] = await crawler.discover_folder(folder_path)
+
+    repo = DocumentRepository(db)
+    existing_docs, _ = await repo.list_for_organization(organization.id, skip=0, limit=10000)
+    existing_by_key = {
+        (doc.filename, doc.folder_path or ""): doc for doc in existing_docs
+    }
+
+    updated = 0
+    new_count = 0
+
+    for file in sp_files:
+        file_key = (file.name, file.folder_path or "")
+        data = await crawler.download_file(file)
+        existing = existing_by_key.get(file_key)
+
+        if existing:
+            await indexer.delete_by_document(existing.id)
+            await storage.upload(existing.blob_path, data, file.content_type)
+            await repo.update_status(
+                existing.id, DocumentStatus.UPLOADED, organization_id=organization.id
+            )
+            await db.commit()
+            task = asyncio.create_task(
+                _process_sharepoint_doc(
+                    document_id=existing.id,
+                    storage=registry.storage_service,
+                    openai_client=registry.openai_client,
+                    search_indexer=registry.search_indexer,
+                )
+            )
+            track_task(task)
+            updated += 1
+        else:
+            blob_path = f"{organization.id}/{uuid.uuid4()}/{file.name}"
+            await storage.upload(blob_path, data, file.content_type)
+            document = await repo.create(
+                organization_id=organization.id,
+                uploaded_by=current_user.id,
+                filename=file.name,
+                blob_path=blob_path,
+                content_type=file.content_type,
+                size_bytes=len(data),
+                source_type=source_type,
+                folder_path=file.folder_path,
+            )
+            await db.commit()
+            task = asyncio.create_task(
+                _process_sharepoint_doc(
+                    document_id=document.id,
+                    storage=registry.storage_service,
+                    openai_client=registry.openai_client,
+                    search_indexer=registry.search_indexer,
+                )
+            )
+            track_task(task)
+            new_count += 1
+
+    await audit.log(
+        action="sharepoint.sync_folder",
+        user=current_user,
+        resource_type="sharepoint",
+        resource_id=folder_path,
+        organization_id=organization.id,
+    )
+
+    result = SyncFolderResult(
+        folder_path=folder_path,
+        files_found=len(sp_files),
+        files_updated=updated,
+        files_new=new_count,
     )
     return DataResponse(data=result, meta=MetaResponse(request_id=""))
 

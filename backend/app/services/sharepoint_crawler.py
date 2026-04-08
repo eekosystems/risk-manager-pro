@@ -188,6 +188,21 @@ class SharePointCrawler:
         logger.info("sharepoint_discovery_complete", total_files=len(files))
         return files
 
+    async def discover_folder(self, folder_path: str) -> list[SharePointFile]:
+        """Discover files in a specific folder path across all drives."""
+        drives = await self.list_drives()
+        files: list[SharePointFile] = []
+        for drive in drives:
+            drive_id = drive["id"]
+            drive_files = await self._list_folder_items(drive_id, folder_path)
+            files.extend(drive_files)
+        logger.info(
+            "sharepoint_folder_scanned",
+            folder_path=folder_path,
+            file_count=len(files),
+        )
+        return files
+
     async def download_file(self, file: SharePointFile) -> bytes:
         """Download a file's content from SharePoint."""
         client = await self._ensure_client()

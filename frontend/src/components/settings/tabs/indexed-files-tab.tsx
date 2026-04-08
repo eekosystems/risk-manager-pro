@@ -6,6 +6,7 @@ import {
   ChevronDown,
   ChevronRight,
   Clock,
+  CloudDownload,
   FileText,
   Folder,
   FolderOpen,
@@ -19,11 +20,13 @@ import {
 import {
   type CrawlSharePointParams,
   type SharePointCrawlResult,
+  type SyncFolderResult,
   crawlSharePoint,
   deleteDocument,
   getDocuments,
   getSharePointDrives,
   reindexDocument,
+  syncFolder,
   uploadDocument,
 } from "@/api/documents";
 import type { DocumentItem, DocumentStatus, SourceType } from "@/types/api";
@@ -242,8 +245,10 @@ function FolderRow({
   onDelete,
   onReindex,
   onReindexMany,
+  onSyncFolder,
   isDeleting,
   isReindexing,
+  isSyncing,
 }: {
   node: FolderNode;
   depth: number;
@@ -253,8 +258,10 @@ function FolderRow({
   onDelete: (id: string) => void;
   onReindex: (id: string) => void;
   onReindexMany: (ids: string[]) => void;
+  onSyncFolder: (path: string) => void;
   isDeleting: boolean;
   isReindexing: boolean;
+  isSyncing: boolean;
 }) {
   const isOpen = expanded.has(node.path);
   const fileCount = countFilesInNode(node);
@@ -279,6 +286,14 @@ function FolderRow({
           <span className="text-[11px] text-slate-400">({fileCount})</span>
         </button>
         <button
+          onClick={() => onSyncFolder(node.path)}
+          disabled={isSyncing}
+          className="shrink-0 rounded-lg p-1.5 text-gray-300 transition-colors hover:bg-accent-50 hover:text-accent-600 disabled:opacity-30"
+          title="Re-sync from SharePoint"
+        >
+          <CloudDownload size={13} className={isSyncing ? "animate-pulse" : ""} />
+        </button>
+        <button
           onClick={() => onReindexMany(collectFileIds(node))}
           disabled={isReindexing}
           className="mr-3 shrink-0 rounded-lg p-1.5 text-gray-300 transition-colors hover:bg-brand-50 hover:text-brand-500 disabled:opacity-30"
@@ -300,8 +315,10 @@ function FolderRow({
               onDelete={onDelete}
               onReindex={onReindex}
               onReindexMany={onReindexMany}
+              onSyncFolder={onSyncFolder}
               isDeleting={isDeleting}
               isReindexing={isReindexing}
+              isSyncing={isSyncing}
             />
           ))}
           {node.files.map((file, i) => (
@@ -391,6 +408,21 @@ export function IndexedFilesTab() {
     for (const file of files) {
       reindexMutation.mutate(file.id);
     }
+  }
+
+  const [syncResult, setSyncResult] = useState<SyncFolderResult | null>(null);
+
+  const syncFolderMutation = useMutation({
+    mutationFn: (folderPath: string) => syncFolder(folderPath, selectedSourceType),
+    onSuccess: (result) => {
+      setSyncResult(result);
+      void queryClient.invalidateQueries({ queryKey: ["documents"] });
+    },
+  });
+
+  function handleSyncFolder(path: string) {
+    setSyncResult(null);
+    syncFolderMutation.mutate(path);
   }
 
   const filteredFiles = useMemo(
@@ -606,6 +638,25 @@ export function IndexedFilesTab() {
         </div>
       )}
 
+      {/* Folder sync result banner */}
+      {syncResult && (
+        <div className="mb-4 rounded-xl border border-accent-200 bg-accent-50 px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-accent-800">
+              <span className="font-semibold">Folder sync complete ({syncResult.folder_path}):</span>{" "}
+              {syncResult.files_found} files found, {syncResult.files_updated} updated,{" "}
+              {syncResult.files_new} new
+            </div>
+            <button
+              onClick={() => setSyncResult(null)}
+              className="text-accent-400 hover:text-accent-600"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* SharePoint drives info */}
       {drives.length > 0 && (
         <div className="mb-4 flex items-center gap-2 text-[12px] text-slate-400">
@@ -659,8 +710,10 @@ export function IndexedFilesTab() {
                 onDelete={handleDelete}
                 onReindex={handleReindex}
                 onReindexMany={handleReindexMany}
+                onSyncFolder={handleSyncFolder}
                 isDeleting={deleteMutation.isPending}
                 isReindexing={reindexMutation.isPending}
+                isSyncing={syncFolderMutation.isPending}
               />
             ))}
             {/* Root-level files (no folder) */}
