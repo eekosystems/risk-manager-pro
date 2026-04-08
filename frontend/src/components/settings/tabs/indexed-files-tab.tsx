@@ -246,9 +246,9 @@ function FolderRow({
   onReindex,
   onReindexMany,
   onSyncFolder,
+  syncingFolder,
   isDeleting,
   isReindexing,
-  isSyncing,
 }: {
   node: FolderNode;
   depth: number;
@@ -259,9 +259,9 @@ function FolderRow({
   onReindex: (id: string) => void;
   onReindexMany: (ids: string[]) => void;
   onSyncFolder: (path: string) => void;
+  syncingFolder: string | null;
   isDeleting: boolean;
   isReindexing: boolean;
-  isSyncing: boolean;
 }) {
   const isOpen = expanded.has(node.path);
   const fileCount = countFilesInNode(node);
@@ -285,14 +285,28 @@ function FolderRow({
           <span className="text-sm font-semibold text-slate-700">{node.name}</span>
           <span className="text-[11px] text-slate-400">({fileCount})</span>
         </button>
-        <button
-          onClick={() => onSyncFolder(node.path)}
-          disabled={isSyncing}
-          className="shrink-0 rounded-lg p-1.5 text-gray-300 transition-colors hover:bg-accent-50 hover:text-accent-600 disabled:opacity-30"
-          title="Re-sync from SharePoint"
-        >
-          <CloudDownload size={13} className={isSyncing ? "animate-pulse" : ""} />
-        </button>
+        {(() => {
+          const isSyncingThis = syncingFolder === node.path;
+          const isSyncingAny = syncingFolder !== null;
+          return (
+            <button
+              onClick={() => onSyncFolder(node.path)}
+              disabled={isSyncingAny}
+              className={`shrink-0 rounded-lg p-1.5 transition-colors ${
+                isSyncingThis
+                  ? "bg-accent-50 text-accent-600"
+                  : "text-gray-300 hover:bg-accent-50 hover:text-accent-600"
+              } disabled:opacity-30`}
+              title={isSyncingThis ? "Syncing..." : "Re-sync from SharePoint"}
+            >
+              {isSyncingThis ? (
+                <Loader2 size={13} className="animate-spin" />
+              ) : (
+                <CloudDownload size={13} />
+              )}
+            </button>
+          );
+        })()}
         <button
           onClick={() => onReindexMany(collectFileIds(node))}
           disabled={isReindexing}
@@ -316,9 +330,9 @@ function FolderRow({
               onReindex={onReindex}
               onReindexMany={onReindexMany}
               onSyncFolder={onSyncFolder}
+              syncingFolder={syncingFolder}
               isDeleting={isDeleting}
               isReindexing={isReindexing}
-              isSyncing={isSyncing}
             />
           ))}
           {node.files.map((file, i) => (
@@ -411,17 +425,23 @@ export function IndexedFilesTab() {
   }
 
   const [syncResult, setSyncResult] = useState<SyncFolderResult | null>(null);
+  const [syncingFolder, setSyncingFolder] = useState<string | null>(null);
 
   const syncFolderMutation = useMutation({
     mutationFn: (folderPath: string) => syncFolder(folderPath, selectedSourceType),
     onSuccess: (result) => {
       setSyncResult(result);
+      setSyncingFolder(null);
       void queryClient.invalidateQueries({ queryKey: ["documents"] });
+    },
+    onError: () => {
+      setSyncingFolder(null);
     },
   });
 
   function handleSyncFolder(path: string) {
     setSyncResult(null);
+    setSyncingFolder(path);
     syncFolderMutation.mutate(path);
   }
 
@@ -711,9 +731,9 @@ export function IndexedFilesTab() {
                 onReindex={handleReindex}
                 onReindexMany={handleReindexMany}
                 onSyncFolder={handleSyncFolder}
+                syncingFolder={syncingFolder}
                 isDeleting={deleteMutation.isPending}
                 isReindexing={reindexMutation.isPending}
-                isSyncing={syncFolderMutation.isPending}
               />
             ))}
             {/* Root-level files (no folder) */}
