@@ -15,8 +15,6 @@ from app.core.deps import (
     get_audit_logger,
     get_current_organization,
     get_current_user,
-    get_search_indexer,
-    get_storage_service,
 )
 from app.core.tasks import track_task
 from app.models.document import SourceType
@@ -27,13 +25,11 @@ from app.services.document_processor import DocumentProcessor
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
+    from app.main import ServiceRegistry
     from app.models.organization import Organization
     from app.models.user import User
     from app.services.audit import AuditLogger
-    from app.services.openai_client import AzureOpenAIClient
-    from app.services.search_indexer import SearchIndexer
     from app.services.sharepoint_crawler import SharePointCrawler, SharePointFile
-    from app.services.storage import BlobStorageService
 
 logger = structlog.get_logger(__name__)
 
@@ -94,10 +90,9 @@ async def crawl_sharepoint(
     current_user: User = Depends(get_current_user),
     organization: Organization = Depends(get_current_organization),
     db: AsyncSession = Depends(get_db),
-    storage: BlobStorageService = Depends(get_storage_service),
     audit: AuditLogger = Depends(get_audit_logger),
 ) -> DataResponse[CrawlResult]:
-    """Crawl SharePoint and queue discovered documents for processing."""
+    """Discover files on SharePoint and queue them for background download + processing."""
     crawler: SharePointCrawler = request.app.state.services.sharepoint_crawler
     registry = request.app.state.services
 
@@ -107,42 +102,26 @@ async def crawl_sharepoint(
     existing_docs, _ = await repo.list_for_organization(organization.id, skip=0, limit=10000)
     existing_keys = {(doc.filename, doc.folder_path or "") for doc in existing_docs}
 
-    queued_count = 0
+    to_import: list[SharePointFile] = []
     skipped: list[str] = []
 
     for file in files:
-        file_key = (file.name, file.folder_path or "")
-        if file_key in existing_keys:
+        if (file.name, file.folder_path or "") in existing_keys:
             skipped.append(file.name)
-            continue
+        else:
+            to_import.append(file)
 
-        blob_path = f"{organization.id}/{uuid.uuid4()}/{file.name}"
-        data = await crawler.download_file(file)
-
-        await storage.upload(blob_path, data, file.content_type)
-
-        document = await repo.create(
-            organization_id=organization.id,
-            uploaded_by=current_user.id,
-            filename=file.name,
-            blob_path=blob_path,
-            content_type=file.content_type,
-            size_bytes=len(data),
-            source_type=source_type,
-            folder_path=file.folder_path,
-        )
-        await db.commit()
-
+    if to_import:
         task = asyncio.create_task(
-            _process_sharepoint_doc(
-                document_id=document.id,
-                storage=registry.storage_service,
-                openai_client=registry.openai_client,
-                search_indexer=registry.search_indexer,
+            _crawl_background(
+                files=to_import,
+                organization_id=organization.id,
+                user_id=current_user.id,
+                source_type=source_type,
+                registry=registry,
             )
         )
         track_task(task)
-        queued_count += 1
 
     await audit.log(
         action="sharepoint.crawl",
@@ -154,7 +133,7 @@ async def crawl_sharepoint(
 
     result = CrawlResult(
         files_discovered=len(files),
-        files_queued=queued_count,
+        files_queued=len(to_import),
         skipped_files=skipped,
     )
     return DataResponse(data=result, meta=MetaResponse(request_id=""))
@@ -168,13 +147,9 @@ async def sync_folder(
     current_user: User = Depends(get_current_user),
     organization: Organization = Depends(get_current_organization),
     db: AsyncSession = Depends(get_db),
-    storage: BlobStorageService = Depends(get_storage_service),
-    indexer: SearchIndexer = Depends(get_search_indexer),
     audit: AuditLogger = Depends(get_audit_logger),
 ) -> DataResponse[SyncFolderResult]:
-    """Re-download files in a folder from SharePoint and reprocess them."""
-    from app.models.document import DocumentStatus
-
+    """Discover files in a folder and queue background re-download + reprocess."""
     crawler: SharePointCrawler = request.app.state.services.sharepoint_crawler
     registry = request.app.state.services
 
@@ -184,55 +159,28 @@ async def sync_folder(
     existing_docs, _ = await repo.list_for_organization(organization.id, skip=0, limit=10000)
     existing_by_key = {(doc.filename, doc.folder_path or ""): doc for doc in existing_docs}
 
-    updated = 0
-    new_count = 0
+    to_update: list[tuple[SharePointFile, uuid.UUID, str]] = []
+    to_create: list[SharePointFile] = []
 
     for file in sp_files:
-        file_key = (file.name, file.folder_path or "")
-        data = await crawler.download_file(file)
-        existing = existing_by_key.get(file_key)
-
+        existing = existing_by_key.get((file.name, file.folder_path or ""))
         if existing:
-            await indexer.delete_by_document(existing.id)
-            await storage.upload(existing.blob_path, data, file.content_type)
-            await repo.update_status(
-                existing.id, DocumentStatus.UPLOADED, organization_id=organization.id
-            )
-            await db.commit()
-            task = asyncio.create_task(
-                _process_sharepoint_doc(
-                    document_id=existing.id,
-                    storage=registry.storage_service,
-                    openai_client=registry.openai_client,
-                    search_indexer=registry.search_indexer,
-                )
-            )
-            track_task(task)
-            updated += 1
+            to_update.append((file, existing.id, existing.blob_path))
         else:
-            blob_path = f"{organization.id}/{uuid.uuid4()}/{file.name}"
-            await storage.upload(blob_path, data, file.content_type)
-            document = await repo.create(
+            to_create.append(file)
+
+    if to_update or to_create:
+        task = asyncio.create_task(
+            _sync_folder_background(
+                to_update=to_update,
+                to_create=to_create,
                 organization_id=organization.id,
-                uploaded_by=current_user.id,
-                filename=file.name,
-                blob_path=blob_path,
-                content_type=file.content_type,
-                size_bytes=len(data),
+                user_id=current_user.id,
                 source_type=source_type,
-                folder_path=file.folder_path,
+                registry=registry,
             )
-            await db.commit()
-            task = asyncio.create_task(
-                _process_sharepoint_doc(
-                    document_id=document.id,
-                    storage=registry.storage_service,
-                    openai_client=registry.openai_client,
-                    search_indexer=registry.search_indexer,
-                )
-            )
-            track_task(task)
-            new_count += 1
+        )
+        track_task(task)
 
     await audit.log(
         action="sharepoint.sync_folder",
@@ -245,24 +193,103 @@ async def sync_folder(
     result = SyncFolderResult(
         folder_path=folder_path,
         files_found=len(sp_files),
-        files_updated=updated,
-        files_new=new_count,
+        files_updated=len(to_update),
+        files_new=len(to_create),
     )
     return DataResponse(data=result, meta=MetaResponse(request_id=""))
 
 
-async def _process_sharepoint_doc(
-    document_id: uuid.UUID,
-    storage: BlobStorageService,
-    openai_client: AzureOpenAIClient,
-    search_indexer: SearchIndexer,
+async def _crawl_background(
+    files: list[SharePointFile],
+    organization_id: uuid.UUID,
+    user_id: uuid.UUID,
+    source_type: SourceType,
+    registry: ServiceRegistry,
 ) -> None:
-    """Process a SharePoint document in a background task."""
+    """Download and process new files from SharePoint in the background."""
+    crawler = registry.sharepoint_crawler
+    for file in files:
+        try:
+            data = await crawler.download_file(file)
+            async with async_session_factory() as db:
+                repo = DocumentRepository(db)
+                blob_path = f"{organization_id}/{uuid.uuid4()}/{file.name}"
+                await registry.storage_service.upload(blob_path, data, file.content_type)
+                document = await repo.create(
+                    organization_id=organization_id,
+                    uploaded_by=user_id,
+                    filename=file.name,
+                    blob_path=blob_path,
+                    content_type=file.content_type,
+                    size_bytes=len(data),
+                    source_type=source_type,
+                    folder_path=file.folder_path,
+                )
+                await db.commit()
+                await _process_doc(document.id, registry)
+        except Exception:
+            logger.error("crawl_file_failed", filename=file.name, exc_info=True)
+
+
+async def _sync_folder_background(
+    to_update: list[tuple[SharePointFile, uuid.UUID, str]],
+    to_create: list[SharePointFile],
+    organization_id: uuid.UUID,
+    user_id: uuid.UUID,
+    source_type: SourceType,
+    registry: ServiceRegistry,
+) -> None:
+    """Re-download and reprocess folder files in the background."""
+    from app.models.document import DocumentStatus
+
+    crawler = registry.sharepoint_crawler
+
+    for file, doc_id, blob_path in to_update:
+        try:
+            data = await crawler.download_file(file)
+            await registry.search_indexer.delete_by_document(doc_id)
+            await registry.storage_service.upload(blob_path, data, file.content_type)
+            async with async_session_factory() as db:
+                repo = DocumentRepository(db)
+                await repo.update_status(doc_id, DocumentStatus.UPLOADED)
+                await db.commit()
+            await _process_doc(doc_id, registry)
+        except Exception:
+            logger.error("sync_update_failed", filename=file.name, exc_info=True)
+
+    for file in to_create:
+        try:
+            data = await crawler.download_file(file)
+            async with async_session_factory() as db:
+                repo = DocumentRepository(db)
+                blob_path = f"{organization_id}/{uuid.uuid4()}/{file.name}"
+                await registry.storage_service.upload(blob_path, data, file.content_type)
+                document = await repo.create(
+                    organization_id=organization_id,
+                    uploaded_by=user_id,
+                    filename=file.name,
+                    blob_path=blob_path,
+                    content_type=file.content_type,
+                    size_bytes=len(data),
+                    source_type=source_type,
+                    folder_path=file.folder_path,
+                )
+                await db.commit()
+                await _process_doc(document.id, registry)
+        except Exception:
+            logger.error("sync_create_failed", filename=file.name, exc_info=True)
+
+
+async def _process_doc(document_id: uuid.UUID, registry: ServiceRegistry) -> None:
+    """Run the document processing pipeline."""
     async with async_session_factory() as db:
         try:
             repo = DocumentRepository(db)
             processor = DocumentProcessor(
-                storage=storage, openai_client=openai_client, indexer=search_indexer, repo=repo
+                storage=registry.storage_service,
+                openai_client=registry.openai_client,
+                indexer=registry.search_indexer,
+                repo=repo,
             )
             await processor.process(document_id)
             await db.commit()
