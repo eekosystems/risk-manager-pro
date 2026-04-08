@@ -206,8 +206,11 @@ async def _crawl_background(
     source_type: SourceType,
     registry: ServiceRegistry,
 ) -> None:
-    """Download and process new files from SharePoint in the background."""
+    """Phase 1: download all files. Phase 2: process them."""
     crawler = registry.sharepoint_crawler
+    doc_ids: list[uuid.UUID] = []
+
+    # Phase 1 — download and create DB records (fast, files appear in UI immediately)
     for file in files:
         try:
             data = await crawler.download_file(file)
@@ -226,9 +229,15 @@ async def _crawl_background(
                     folder_path=file.folder_path,
                 )
                 await db.commit()
-                await _process_doc(document.id, registry)
+                doc_ids.append(document.id)
         except Exception:
             logger.error("crawl_file_failed", filename=file.name, exc_info=True)
+
+    logger.info("crawl_download_phase_complete", downloaded=len(doc_ids), total=len(files))
+
+    # Phase 2 — process each document (slow, but files are already visible)
+    for doc_id in doc_ids:
+        await _process_doc(doc_id, registry)
 
 
 async def _sync_folder_background(
@@ -239,11 +248,13 @@ async def _sync_folder_background(
     source_type: SourceType,
     registry: ServiceRegistry,
 ) -> None:
-    """Re-download and reprocess folder files in the background."""
+    """Phase 1: re-download all files. Phase 2: reprocess them."""
     from app.models.document import DocumentStatus
 
     crawler = registry.sharepoint_crawler
+    doc_ids: list[uuid.UUID] = []
 
+    # Phase 1a — re-download existing files
     for file, doc_id, blob_path in to_update:
         try:
             data = await crawler.download_file(file)
@@ -253,10 +264,11 @@ async def _sync_folder_background(
                 repo = DocumentRepository(db)
                 await repo.update_status(doc_id, DocumentStatus.UPLOADED)
                 await db.commit()
-            await _process_doc(doc_id, registry)
+            doc_ids.append(doc_id)
         except Exception:
             logger.error("sync_update_failed", filename=file.name, exc_info=True)
 
+    # Phase 1b — download new files
     for file in to_create:
         try:
             data = await crawler.download_file(file)
@@ -275,9 +287,19 @@ async def _sync_folder_background(
                     folder_path=file.folder_path,
                 )
                 await db.commit()
-                await _process_doc(document.id, registry)
+                doc_ids.append(document.id)
         except Exception:
             logger.error("sync_create_failed", filename=file.name, exc_info=True)
+
+    logger.info(
+        "sync_download_phase_complete",
+        downloaded=len(doc_ids),
+        total=len(to_update) + len(to_create),
+    )
+
+    # Phase 2 — process all documents
+    for doc_id in doc_ids:
+        await _process_doc(doc_id, registry)
 
 
 async def _process_doc(document_id: uuid.UUID, registry: ServiceRegistry) -> None:
