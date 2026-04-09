@@ -247,8 +247,7 @@ async def process_all_uploaded(
     unprocessed = [
         d
         for d in docs
-        if d.status
-        in (DocumentStatus.UPLOADED, DocumentStatus.FAILED, DocumentStatus.PROCESSING)
+        if d.status in (DocumentStatus.UPLOADED, DocumentStatus.FAILED, DocumentStatus.PROCESSING)
     ]
     already = len(docs) - len(unprocessed)
 

@@ -15,7 +15,9 @@ down_revision = "007"
 branch_labels = None
 depends_on = None
 
-_risk_status_enum = ENUM("open", "mitigating", "closed", "accepted", name="riskstatus", create_type=False)
+_risk_status_enum = ENUM(
+    "open", "mitigating", "closed", "accepted", name="riskstatus", create_type=False
+)
 _risk_level_enum = ENUM("low", "medium", "serious", "high", name="risklevel", create_type=False)
 _mitigation_status_enum = ENUM(
     "pending", "in_progress", "completed", "cancelled", name="mitigationstatus", create_type=False
