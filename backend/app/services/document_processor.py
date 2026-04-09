@@ -4,6 +4,9 @@ import uuid
 
 import structlog
 import tiktoken
+from azure.ai.documentintelligence import DocumentIntelligenceClient
+from azure.ai.documentintelligence.models import AnalyzeDocumentRequest, DocumentContentFormat
+from azure.core.credentials import AzureKeyCredential
 
 from app.core.config import settings
 from app.models.document import DocumentStatus
@@ -84,9 +87,34 @@ class DocumentProcessor:
         return "\n\n".join(slides)
 
     @staticmethod
+    def _extract_text_ocr(data: bytes) -> str:
+        """Use Azure AI Document Intelligence to OCR a scanned PDF."""
+        if not settings.azure_doc_intelligence_endpoint:
+            raise ValueError(
+                "No text extracted and Azure Document Intelligence is not configured for OCR"
+            )
+
+        client = DocumentIntelligenceClient(
+            endpoint=settings.azure_doc_intelligence_endpoint,
+            credential=AzureKeyCredential(settings.azure_doc_intelligence_key),
+        )
+
+        poller = client.begin_analyze_document(
+            "prebuilt-read",
+            AnalyzeDocumentRequest(bytes_source=data),
+            output_content_format=DocumentContentFormat.MARKDOWN,
+        )
+        result = poller.result()
+        return result.content or ""
+
+    @staticmethod
     def _extract_text(data: bytes, content_type: str) -> str:
         if content_type == "application/pdf":
-            return DocumentProcessor._extract_text_pdf(data)
+            text = DocumentProcessor._extract_text_pdf(data)
+            if not text.strip():
+                logger.info("pdf_no_text_layer_falling_back_to_ocr")
+                text = DocumentProcessor._extract_text_ocr(data)
+            return text
         elif content_type == (
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         ):

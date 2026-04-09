@@ -78,6 +78,10 @@ class Settings(BaseSettings):
     sharepoint_client_secret: str = ""
     sharepoint_site_url: str = "https://faithgroupllc.sharepoint.com/sites/RiskManagerPro"
 
+    # Azure AI Document Intelligence (OCR fallback for scanned PDFs)
+    azure_doc_intelligence_endpoint: str = ""
+    azure_doc_intelligence_key: str = ""
+
     # HTTP timeouts
     graph_api_timeout: float = 30.0
 

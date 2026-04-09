@@ -244,8 +244,19 @@ async def process_all_uploaded(
     repo = DocumentRepository(db)
     docs, _ = await repo.list_for_organization(organization.id, skip=0, limit=10000)
 
-    unprocessed = [d for d in docs if d.status in (DocumentStatus.UPLOADED, DocumentStatus.FAILED)]
+    unprocessed = [
+        d
+        for d in docs
+        if d.status
+        in (DocumentStatus.UPLOADED, DocumentStatus.FAILED, DocumentStatus.PROCESSING)
+    ]
     already = len(docs) - len(unprocessed)
+
+    # Reset stuck "processing" docs back to "uploaded" so the pipeline picks them up
+    for d in unprocessed:
+        if d.status == DocumentStatus.PROCESSING:
+            await repo.update_status(d.id, DocumentStatus.UPLOADED, organization_id=organization.id)
+    await db.commit()
 
     if unprocessed:
         registry = request.app.state.services
