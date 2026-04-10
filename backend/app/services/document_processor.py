@@ -137,7 +137,7 @@ class DocumentProcessor:
     @staticmethod
     def _render_pdf_pages(data: bytes) -> list[bytes]:
         """Render each PDF page as a PNG image using PyMuPDF."""
-        import fitz  # pymupdf
+        import fitz  # type: ignore[import-untyped]  # pymupdf
 
         doc = fitz.open(stream=data, filetype="pdf")
         images: list[bytes] = []
