@@ -85,11 +85,10 @@ def _build_context_block(results: list[SearchResult]) -> str:
     sections: list[str] = []
     for i, r in enumerate(results, 1):
         tier = _compute_match_tier(i, r.score, len(results))
-        type_label = _SOURCE_TYPE_LABELS.get(r.source_type, "Document")
-        source_label = f"[Source {i}: {r.source} ({type_label})"
+        source_label = f"[Source {i}: {r.source}"
         if r.section:
             source_label += f" — {r.section}"
-        source_label += f" | Match: {tier}]"
+        source_label += f" | {tier}]"
         sections.append(f"{source_label}\n{r.content}")
 
     return "\n\n---\n\n".join(sections)
@@ -183,16 +182,22 @@ class ChatService:
         system_prompt = _resolve_prompt(function_type, prompts_config)
 
         reasoning_instructions = (
-            "When answering, follow this structure:\n"
-            "1. **Reasoning:** Briefly explain your logic — which sources you relied on, "
+            "When answering, follow this structure using markdown headers (not numbered lists):\n\n"
+            "### Reasoning\n"
+            "Briefly explain your logic — which sources you relied on, "
             "why they are relevant to the question, and how you arrived at your conclusion. "
-            "Reference sources by number (e.g. [Source 1]) and quote key passages.\n"
-            "2. **Answer:** Provide your analysis or recommendation.\n"
-            "3. **Sources Used:** List each source you cited with its match level "
-            "(High, Moderate, or Low — shown next to each source above).\n\n"
-            "Do NOT display numerical scores or percentages for relevance. "
-            "Use only the match tier labels (High, Moderate, Low). "
-            "If a source has low relevance or doesn't directly support your answer, "
+            "Reference sources by number (e.g. [Source 1]) and quote key passages.\n\n"
+            "### Answer\n"
+            "Provide your analysis or recommendation.\n\n"
+            "### Sources Used\n"
+            "List each source you cited with its match level.\n\n"
+            "Formatting rules:\n"
+            "- Use markdown headers (###) for sections, NEVER numbered top-level sections.\n"
+            "- For risk levels, use bold colored labels: **High**, **Medium**, **Low**. "
+            "Do NOT put colors in parentheses like '(Red)' or '(Yellow)' — just use the label.\n"
+            "- Do NOT display numerical scores or percentages for relevance. "
+            "Use only the match tier labels (High, Moderate, Low).\n"
+            "- If a source has low relevance or doesn't directly support your answer, "
             "say so rather than forcing a connection."
         )
 

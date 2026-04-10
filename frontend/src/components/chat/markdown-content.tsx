@@ -78,9 +78,19 @@ const components: Components = {
     </a>
   ),
   hr: () => <hr className="my-3 border-gray-200" />,
-  strong: ({ children }) => (
-    <strong className="font-semibold text-gray-900">{children}</strong>
-  ),
+  strong: ({ children }) => {
+    const text = typeof children === "string" ? children : "";
+    if (/^high$/i.test(text)) {
+      return <strong className="font-semibold text-red-600">{children}</strong>;
+    }
+    if (/^medium$/i.test(text)) {
+      return <strong className="font-semibold text-amber-500">{children}</strong>;
+    }
+    if (/^low$/i.test(text)) {
+      return <strong className="font-semibold text-green-600">{children}</strong>;
+    }
+    return <strong className="font-semibold text-gray-900">{children}</strong>;
+  },
 };
 
 interface MarkdownContentProps {
