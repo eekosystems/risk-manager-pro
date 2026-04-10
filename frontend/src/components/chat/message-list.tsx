@@ -56,7 +56,14 @@ export function MessageList({ messages, isTyping, onSaveAsRisk }: MessageListPro
                 )}
               >
                 {msg.role === "assistant" ? (
-                  <MarkdownContent content={msg.content} />
+                  <MarkdownContent
+                    content={msg.content}
+                    citations={msg.citations ?? undefined}
+                    onCitationClick={(idx) => {
+                      const c = msg.citations?.[idx];
+                      if (c) setSelected({ citation: c, index: idx });
+                    }}
+                  />
                 ) : (
                   <div className="whitespace-pre-wrap text-sm leading-relaxed">
                     {msg.content}

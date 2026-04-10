@@ -1,8 +1,25 @@
+import { useMemo } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
-import rehypeSanitize from "rehype-sanitize";
+import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
 
-const components: Components = {
+import type { Citation } from "@/types/api";
+
+/* ------------------------------------------------------------------ */
+/*  Sanitization schema — extend default to allow fragment hrefs      */
+/* ------------------------------------------------------------------ */
+const sanitizeSchema = {
+  ...defaultSchema,
+  protocols: {
+    ...defaultSchema.protocols,
+    href: [...(defaultSchema.protocols?.href ?? []), "#"],
+  },
+};
+
+/* ------------------------------------------------------------------ */
+/*  Static components (no dependency on props)                        */
+/* ------------------------------------------------------------------ */
+const baseComponents: Partial<Components> = {
   h1: ({ children }) => (
     <h1 className="mb-3 mt-4 text-lg font-bold text-gray-900">{children}</h1>
   ),
@@ -29,9 +46,7 @@ const components: Components = {
   code: ({ children, className }) => {
     const isBlock = className?.includes("language-");
     if (isBlock) {
-      return (
-        <code className="text-[13px]">{children}</code>
-      );
+      return <code className="text-[13px]">{children}</code>;
     }
     return (
       <code className="rounded bg-gray-100 px-1.5 py-0.5 text-[13px] font-mono text-brand-700">
@@ -67,19 +82,8 @@ const components: Components = {
       {children}
     </td>
   ),
-  a: ({ children, href }) => (
-    <a
-      href={href}
-      className="font-medium text-brand-600 underline decoration-brand-300 hover:text-brand-700"
-      target="_blank"
-      rel="noopener noreferrer"
-    >
-      {children}
-    </a>
-  ),
   hr: () => <hr className="my-3 border-gray-200" />,
   strong: ({ children, node }) => {
-    // Extract text from HAST node (most reliable) with React children fallback
     let text = "";
     if (node?.children) {
       for (const child of node.children) {
@@ -103,18 +107,127 @@ const components: Components = {
   },
 };
 
-interface MarkdownContentProps {
-  content: string;
+/* ------------------------------------------------------------------ */
+/*  Inline citation tooltip                                           */
+/* ------------------------------------------------------------------ */
+const TIER_DOT: Record<string, string> = {
+  High: "#10b981",
+  Moderate: "#f59e0b",
+  Low: "#9ca3af",
+};
+
+function CitationTooltip({
+  citation,
+  children,
+  onClick,
+}: {
+  citation: Citation;
+  children: React.ReactNode;
+  onClick: () => void;
+}) {
+  const tier = citation.match_tier ?? "Moderate";
+  const dotColor = TIER_DOT[tier] ?? TIER_DOT.Moderate;
+  const name =
+    citation.source.length > 50
+      ? citation.source.slice(0, 47) + "..."
+      : citation.source;
+
+  return (
+    <span className="group/cite relative inline">
+      <button
+        type="button"
+        onClick={onClick}
+        className="inline cursor-pointer rounded px-0.5 font-medium text-brand-600 transition-colors hover:bg-brand-50 hover:text-brand-700"
+      >
+        {children}
+      </button>
+      <span className="pointer-events-none invisible absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2 rounded-lg bg-gray-900 px-3 py-2 text-left text-xs leading-relaxed text-white shadow-xl group-hover/cite:visible">
+        <span className="block max-w-[240px] truncate font-medium">{name}</span>
+        {citation.section && (
+          <span className="block text-gray-400">{citation.section}</span>
+        )}
+        <span className="flex items-center gap-1.5 text-gray-400">
+          <span
+            className="inline-block h-1.5 w-1.5 rounded-full"
+            style={{ backgroundColor: dotColor }}
+          />
+          {tier} Match
+        </span>
+        <span className="absolute -bottom-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 bg-gray-900" />
+      </span>
+    </span>
+  );
 }
 
-export function MarkdownContent({ content }: MarkdownContentProps) {
+/* ------------------------------------------------------------------ */
+/*  Pre-process markdown: convert [Source N] → clickable links        */
+/* ------------------------------------------------------------------ */
+function preprocessCitations(content: string): string {
+  return content.replace(
+    /\[Source (\d+)\]/g,
+    "[\\[Source $1\\]](#citation-$1)",
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Public component                                                  */
+/* ------------------------------------------------------------------ */
+interface MarkdownContentProps {
+  content: string;
+  citations?: Citation[] | undefined;
+  onCitationClick?: ((index: number) => void) | undefined;
+}
+
+export function MarkdownContent({
+  content,
+  citations,
+  onCitationClick,
+}: MarkdownContentProps) {
+  const processed = citations?.length
+    ? preprocessCitations(content)
+    : content;
+
+  const components: Components = useMemo(
+    () => ({
+      ...baseComponents,
+      a: ({ children, href }) => {
+        const match = href?.match(/^#citation-(\d+)$/);
+        if (match && citations) {
+          const idx = parseInt(match[1]!, 10) - 1;
+          const citation = citations[idx];
+          if (citation) {
+            return (
+              <CitationTooltip
+                citation={citation}
+                onClick={() => onCitationClick?.(idx)}
+              >
+                {children}
+              </CitationTooltip>
+            );
+          }
+        }
+        return (
+          <a
+            href={href}
+            className="font-medium text-brand-600 underline decoration-brand-300 hover:text-brand-700"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {children}
+          </a>
+        );
+      },
+    }),
+    [citations, onCitationClick],
+  );
+
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
-      rehypePlugins={[rehypeSanitize]}
+      rehypePlugins={[[rehypeSanitize, sanitizeSchema]]}
       components={components}
     >
-      {content}
+      {processed}
     </ReactMarkdown>
   );
 }
