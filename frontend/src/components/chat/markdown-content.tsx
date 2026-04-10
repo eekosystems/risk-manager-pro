@@ -1,20 +1,8 @@
 import { useMemo } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
-import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
 
 import type { Citation } from "@/types/api";
-
-/* ------------------------------------------------------------------ */
-/*  Sanitization schema — extend default to allow fragment hrefs      */
-/* ------------------------------------------------------------------ */
-const sanitizeSchema = {
-  ...defaultSchema,
-  protocols: {
-    ...defaultSchema.protocols,
-    href: [...(defaultSchema.protocols?.href ?? []), "#"],
-  },
-};
 
 /* ------------------------------------------------------------------ */
 /*  Static components (no dependency on props)                        */
@@ -224,7 +212,6 @@ export function MarkdownContent({
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
-      rehypePlugins={[[rehypeSanitize, sanitizeSchema]]}
       components={components}
     >
       {processed}
