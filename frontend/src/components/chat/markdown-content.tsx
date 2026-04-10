@@ -79,11 +79,14 @@ const components: Components = {
   ),
   hr: () => <hr className="my-3 border-gray-200" />,
   strong: ({ children }) => {
-    const text = typeof children === "string" ? children : "";
+    // react-markdown v9 may pass children as a string or array
+    const text = (
+      Array.isArray(children) ? children.join("") : String(children ?? "")
+    ).trim();
     if (/^high$/i.test(text)) {
       return <strong className="font-semibold text-red-600">{children}</strong>;
     }
-    if (/^medium$/i.test(text)) {
+    if (/^medium|moderate$/i.test(text)) {
       return <strong className="font-semibold text-amber-500">{children}</strong>;
     }
     if (/^low$/i.test(text)) {
