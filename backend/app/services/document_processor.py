@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import io
 import uuid
 
@@ -134,6 +135,46 @@ class DocumentProcessor:
             raise ValueError(f"Unsupported content type: {content_type}")
 
     @staticmethod
+    def _render_pdf_pages(data: bytes) -> list[bytes]:
+        """Render each PDF page as a PNG image using PyMuPDF."""
+        import fitz  # pymupdf
+
+        doc = fitz.open(stream=data, filetype="pdf")
+        images: list[bytes] = []
+        for page in doc:
+            # Render at 150 DPI for good quality without huge size
+            pix = page.get_pixmap(dpi=150)
+            images.append(pix.tobytes("png"))
+        doc.close()
+        return images
+
+    async def _describe_pdf_pages(self, data: bytes) -> str:
+        """Render PDF pages to images and describe visual content via GPT-4o vision."""
+        page_images = await asyncio.to_thread(self._render_pdf_pages, data)
+        if not page_images:
+            return ""
+
+        prompt = (
+            "Describe all visual elements on this page: images, photos, diagrams, charts, "
+            "maps, logos, tables, and any other non-text content. Be specific about what "
+            "you see (e.g., aircraft type, airport layout features, risk matrix values). "
+            "If there are no visual elements beyond plain text, respond with NONE."
+        )
+
+        descriptions: list[str] = []
+        for i, img_bytes in enumerate(page_images, 1):
+            try:
+                img_b64 = base64.b64encode(img_bytes).decode("ascii")
+                description = await self._openai.describe_image(img_b64, prompt)
+                if description.strip().upper() != "NONE":
+                    descriptions.append(f"[Page {i} visual content]: {description}")
+            except Exception:
+                logger.warning("page_vision_failed", page=i, exc_info=True)
+                continue
+
+        return "\n\n".join(descriptions)
+
+    @staticmethod
     def _chunk_text(text: str) -> list[str]:
         encoding = tiktoken.get_encoding("cl100k_base")
         tokens = encoding.encode(text)
@@ -168,6 +209,23 @@ class DocumentProcessor:
 
             data = await self._storage.download(document.blob_path)
             text = await DocumentProcessor._extract_text_in_thread(data, document.content_type)
+
+            # For PDFs, analyze pages with GPT-4o vision to capture images/diagrams
+            if document.content_type == "application/pdf":
+                try:
+                    image_descriptions = await self._describe_pdf_pages(data)
+                    if image_descriptions:
+                        text = text + "\n\n" + image_descriptions
+                        logger.info(
+                            "vision_descriptions_added",
+                            document_id=str(document_id),
+                        )
+                except Exception:
+                    logger.warning(
+                        "vision_analysis_failed_continuing",
+                        document_id=str(document_id),
+                        exc_info=True,
+                    )
 
             if not text.strip():
                 await self._repo.update_status(

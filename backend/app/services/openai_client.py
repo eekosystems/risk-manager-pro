@@ -88,6 +88,45 @@ class AzureOpenAIClient:
                 yield chunk.choices[0].delta.content
 
     @_retry_on_rate_limit
+    async def describe_image(self, image_b64: str, prompt: str) -> str:
+        """Send a base64-encoded image to GPT-4o vision and return a text description."""
+        client = await self._get_client()
+        try:
+            response = await client.chat.completions.create(
+                model=settings.azure_openai_deployment_name,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": prompt},
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/png;base64,{image_b64}",
+                                    "detail": "high",
+                                },
+                            },
+                        ],
+                    }
+                ],
+                max_completion_tokens=1000,
+                temperature=0.2,
+            )
+            content = response.choices[0].message.content or ""
+            logger.info(
+                "image_description_success",
+                tokens_used=response.usage.total_tokens if response.usage else 0,
+            )
+            return content
+        except APIStatusError as e:
+            logger.error(
+                "image_description_error",
+                status=e.status_code,
+                message=str(e.message),
+            )
+            raise
+
+    @_retry_on_rate_limit
     async def embed(self, text: str) -> list[float]:
         client = await self._get_client()
         response = await client.embeddings.create(
