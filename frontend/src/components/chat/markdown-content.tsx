@@ -78,19 +78,26 @@ const components: Components = {
     </a>
   ),
   hr: () => <hr className="my-3 border-gray-200" />,
-  strong: ({ children }) => {
-    // react-markdown v9 may pass children as a string or array
-    const text = (
-      Array.isArray(children) ? children.join("") : String(children ?? "")
-    ).trim();
-    if (/^high$/i.test(text)) {
-      return <strong className="font-semibold text-red-600">{children}</strong>;
+  strong: ({ children, node }) => {
+    // Extract text from HAST node (most reliable) with React children fallback
+    let text = "";
+    if (node?.children) {
+      for (const child of node.children) {
+        if (child.type === "text") text += child.value;
+      }
     }
-    if (/^medium|moderate$/i.test(text)) {
-      return <strong className="font-semibold text-amber-500">{children}</strong>;
+    if (!text) {
+      text = Array.isArray(children) ? children.join("") : String(children ?? "");
     }
-    if (/^low$/i.test(text)) {
-      return <strong className="font-semibold text-green-600">{children}</strong>;
+    text = text.trim().toLowerCase();
+    if (text === "high") {
+      return <strong className="font-semibold" style={{ color: "#dc2626" }}>{children}</strong>;
+    }
+    if (text === "medium" || text === "moderate") {
+      return <strong className="font-semibold" style={{ color: "#d97706" }}>{children}</strong>;
+    }
+    if (text === "low") {
+      return <strong className="font-semibold" style={{ color: "#16a34a" }}>{children}</strong>;
     }
     return <strong className="font-semibold text-gray-900">{children}</strong>;
   },
