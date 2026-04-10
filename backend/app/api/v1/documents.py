@@ -17,7 +17,7 @@ from app.core.deps import (
     get_storage_service,
 )
 from app.core.tasks import track_task
-from app.models.document import SourceType
+from app.models.document import DocumentStatus, SourceType
 from app.models.organization import Organization
 from app.models.user import User
 from app.repositories.document import DocumentRepository
@@ -186,8 +186,6 @@ async def reindex_document(
     audit: AuditLogger = Depends(get_audit_logger),
 ) -> DataResponse[DocumentResponse]:
     """Clear existing chunks and reprocess a single document."""
-    from app.models.document import DocumentStatus
-
     repo = DocumentRepository(db)
     document = await repo.get_by_id(document_id, organization.id)
     if not document:
@@ -239,8 +237,6 @@ async def process_all_uploaded(
     audit: AuditLogger = Depends(get_audit_logger),
 ) -> DataResponse[ProcessAllResult]:
     """Queue all unprocessed (uploaded) documents for background processing."""
-    from app.models.document import DocumentStatus
-
     repo = DocumentRepository(db)
     docs, _ = await repo.list_for_organization(organization.id, skip=0, limit=10000)
 
@@ -251,9 +247,9 @@ async def process_all_uploaded(
     ]
     already = len(docs) - len(unprocessed)
 
-    # Reset stuck "processing" docs back to "uploaded" so the pipeline picks them up
+    # Reset failed and stuck processing docs so the pipeline picks them up
     for d in unprocessed:
-        if d.status == DocumentStatus.PROCESSING:
+        if d.status in (DocumentStatus.PROCESSING, DocumentStatus.FAILED):
             await repo.update_status(d.id, DocumentStatus.UPLOADED, organization_id=organization.id)
     await db.commit()
 
@@ -281,6 +277,10 @@ async def _process_one(doc_id: uuid.UUID, registry: object) -> None:
     try:
         async with async_session_factory() as db:
             repo = DocumentRepository(db)
+            # Commit PROCESSING status immediately so the UI reflects progress
+            await repo.update_status(doc_id, DocumentStatus.PROCESSING)
+            await db.commit()
+
             processor = DocumentProcessor(
                 storage=registry.storage_service,  # type: ignore[attr-defined]
                 openai_client=registry.openai_client,  # type: ignore[attr-defined]
@@ -291,6 +291,17 @@ async def _process_one(doc_id: uuid.UUID, registry: object) -> None:
             await db.commit()
     except Exception:
         logger.error("process_all_doc_failed", document_id=str(doc_id), exc_info=True)
+        try:
+            async with async_session_factory() as db:
+                repo = DocumentRepository(db)
+                await repo.update_status(
+                    doc_id,
+                    DocumentStatus.FAILED,
+                    error_message="Processing failed. See server logs.",
+                )
+                await db.commit()
+        except Exception:
+            logger.error("status_update_failed", document_id=str(doc_id), exc_info=True)
 
 
 async def _process_all_background(
