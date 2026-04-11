@@ -8,7 +8,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 import httpx
-import msal
+import msal  # type: ignore[import-untyped]
 import structlog
 
 from app.core.config import settings
