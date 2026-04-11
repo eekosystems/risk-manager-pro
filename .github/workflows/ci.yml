@@ -39,7 +39,7 @@ jobs:
         run: ruff format --check .
 
       - name: MyPy type check
-        run: mypy app/ --ignore-missing-imports
+        run: mypy app/
 
   backend-test:
     name: Backend Tests
