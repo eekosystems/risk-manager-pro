@@ -1,5 +1,6 @@
 import uuid
 
+import structlog
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -29,6 +30,8 @@ from app.services.chat import ChatService
 from app.services.notification import NotificationDispatcher
 from app.services.openai_client import AzureOpenAIClient
 from app.services.rag import RAGService
+
+logger = structlog.get_logger(__name__)
 
 _notification_dispatcher = NotificationDispatcher()
 
@@ -70,10 +73,21 @@ async def send_message(
         resource_type="conversation",
         resource_id=str(result.conversation_id),
     )
-    return DataResponse(
-        data=result,
-        meta=MetaResponse(request_id=str(result.conversation_id)),
-    )
+    try:
+        response = DataResponse(
+            data=result,
+            meta=MetaResponse(request_id=str(result.conversation_id)),
+        )
+    except Exception:
+        logger.error(
+            "chat_response_serialization_failed",
+            conversation_id=str(result.conversation_id),
+            message_id=str(result.message.id),
+            citations_count=len(result.message.citations) if result.message.citations else 0,
+            exc_info=True,
+        )
+        raise
+    return response
 
 
 @router.get("/conversations", response_model=DataResponse[list[ConversationListItem]])

@@ -3,12 +3,15 @@ import uuid
 from collections.abc import AsyncGenerator
 from datetime import datetime
 
+import structlog
 from sqlalchemy import func
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from app.core.config import settings
+
+_logger = structlog.get_logger(__name__)
 
 _db_url = settings.database_url
 # Container Apps may not resolve VNet private DNS — use IP directly if provided
@@ -48,6 +51,12 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
         try:
             yield session
             await session.commit()
-        except SQLAlchemyError:
+        except SQLAlchemyError as exc:
+            _logger.error(
+                "db_session_error",
+                error_type=type(exc).__name__,
+                error=str(exc),
+                exc_info=True,
+            )
             await session.rollback()
             raise

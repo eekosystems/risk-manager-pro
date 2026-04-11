@@ -260,13 +260,24 @@ class ChatService:
         )
         citations = _extract_citations(search_results) if search_results else None
 
-        assistant_msg = await self._repo.add_message(
-            conversation_id=conversation.id,
-            organization_id=organization_id,
-            role=MessageRole.ASSISTANT,
-            content=assistant_content,
-            citations=[c.model_dump() for c in citations] if citations else None,
-        )
+        try:
+            assistant_msg = await self._repo.add_message(
+                conversation_id=conversation.id,
+                organization_id=organization_id,
+                role=MessageRole.ASSISTANT,
+                content=assistant_content,
+                citations=[c.model_dump() for c in citations] if citations else None,
+            )
+        except Exception:
+            logger.error(
+                "assistant_message_save_failed",
+                conversation_id=str(conversation.id),
+                user_id=str(user.id),
+                content_length=len(assistant_content),
+                citations_count=len(citations) if citations else 0,
+                exc_info=True,
+            )
+            raise
 
         logger.info(
             "chat_message_processed",
