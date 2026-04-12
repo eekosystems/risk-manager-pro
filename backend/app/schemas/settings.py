@@ -46,13 +46,13 @@ class PromptsPayload(BaseModel):
 # ── QA/QC Settings ────────────────────────────────────────────────────
 
 
-class DeliveryMode(str, enum.Enum):
+class DeliveryMode(enum.StrEnum):
     IN_APP = "in_app"
     EMAIL = "email"
     BOTH = "both"
 
 
-class DigestFrequency(str, enum.Enum):
+class DigestFrequency(enum.StrEnum):
     IMMEDIATE = "immediate"
     DAILY = "daily"
     WEEKLY = "weekly"
