@@ -83,10 +83,19 @@ export async function updatePromptsSettings(
   return response.data.data;
 }
 
+export type DeliveryMode = "in_app" | "email" | "both";
+export type DigestFrequency = "immediate" | "daily" | "weekly";
+
 export interface QaqcSettings {
   reviewer_user_ids: string[];
   notify_on_chat: boolean;
   notify_on_risk_created: boolean;
+  notify_on_risk_updated: boolean;
+  notify_on_mitigation_created: boolean;
+  notify_on_document_indexed: boolean;
+  delivery_mode: DeliveryMode;
+  digest_frequency: DigestFrequency;
+  digest_send_hour_utc: number;
 }
 
 export async function updateQaqcSettings(

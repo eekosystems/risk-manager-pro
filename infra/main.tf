@@ -65,6 +65,14 @@ module "keyvault" {
   tenant_id = var.azure_ad_tenant_id
 }
 
+module "communication" {
+  source = "./modules/communication"
+
+  resource_group_name = azurerm_resource_group.main.name
+  name_prefix         = local.name_prefix
+  tags                = var.tags
+}
+
 module "container_registry" {
   source = "./modules/container_registry"
 
@@ -95,6 +103,9 @@ module "container_app" {
   container_registry_server  = module.container_registry.login_server
   container_registry_id      = module.container_registry.id
   cors_origins               = "[\"https://${module.static_web_app.default_hostname}\"]"
+
+  acs_endpoint       = module.communication.communication_service_endpoint
+  acs_sender_address = module.communication.email_sender_address
 }
 
 # Grant Container App managed identity access to Key Vault
@@ -122,6 +133,14 @@ resource "azurerm_role_assignment" "container_app_search" {
 resource "azurerm_role_assignment" "container_app_storage" {
   scope                = module.storage.storage_account_id
   role_definition_name = "Storage Blob Data Contributor"
+  principal_id         = module.container_app.identity_principal_id
+}
+
+# Grant Container App managed identity access to Azure Communication Services
+# for sending QA/QC notification emails via EmailClient (no API keys required).
+resource "azurerm_role_assignment" "container_app_communication" {
+  scope                = module.communication.communication_service_id
+  role_definition_name = "Contributor"
   principal_id         = module.container_app.identity_principal_id
 }
 

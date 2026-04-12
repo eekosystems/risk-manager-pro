@@ -85,6 +85,17 @@ class Settings(BaseSettings):
     # HTTP timeouts
     graph_api_timeout: float = 30.0
 
+    # Azure Communication Services (QA/QC email notifications)
+    acs_endpoint: str = ""
+    acs_sender_address: str = ""
+    acs_reply_to_address: str = ""
+    app_public_url: str = ""
+
+    # QA/QC digest worker
+    qaqc_digest_send_hour_utc: int = 13  # 08:00 Central, default
+    qaqc_digest_enabled: bool = True
+    qaqc_preference_token_secret: str = ""
+
     # Session management
     last_login_throttle_seconds: int = 300  # 5 minutes
     last_activity_throttle_seconds: int = 300  # 5 minutes

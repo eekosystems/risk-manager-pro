@@ -128,11 +128,21 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await service_registry.startup()
     app.state.services = service_registry
 
-    from app.core.tasks import drain_all_tasks
+    import asyncio as _asyncio
+
+    from app.core.tasks import drain_all_tasks, track_task
+    from app.services.digest_worker import run_digest_worker
+    from app.services.email import get_email_service
+
+    digest_stop = _asyncio.Event()
+    digest_task = _asyncio.create_task(run_digest_worker(digest_stop))
+    track_task(digest_task)
 
     yield
 
+    digest_stop.set()
     await drain_all_tasks()
+    await get_email_service().close()
     await service_registry.shutdown()
 
 

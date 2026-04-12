@@ -1,6 +1,8 @@
 import uuid
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -8,9 +10,11 @@ from app.core.deps import get_current_organization, get_current_user
 from app.core.exceptions import NotFoundError
 from app.models.organization import Organization
 from app.models.user import User
+from app.models.user_notification_preference import UserNotificationPreference
 from app.schemas.common import DataResponse, MetaResponse, PaginatedMeta, PaginatedResponse
 from app.schemas.notification import NotificationResponse, UnreadCountResponse
 from app.services.notification import NotificationService
+from app.services.preference_tokens import verify_preference_token
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
 
@@ -80,3 +84,75 @@ async def mark_all_read(
     service: NotificationService = Depends(_get_notification_service),
 ) -> None:
     await service.mark_all_read(current_user.id, organization.id)
+
+
+# --- Email preference management (token-authenticated, no login required) ---
+
+
+class PreferenceResponse(BaseModel):
+    email_opt_out: bool
+
+
+class UpdatePreferenceRequest(BaseModel):
+    email_opt_out: bool
+
+
+async def _resolve_token(token: str) -> uuid.UUID:
+    user_id = verify_preference_token(token)
+    if user_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": {"code": "INVALID_TOKEN", "message": "Invalid or expired token"}},
+        )
+    return user_id
+
+
+@router.get(
+    "/preferences/{token}",
+    response_model=DataResponse[PreferenceResponse],
+)
+async def get_email_preference(
+    token: str,
+    db: AsyncSession = Depends(get_db),
+) -> DataResponse[PreferenceResponse]:
+    user_id = await _resolve_token(token)
+    row = (
+        await db.execute(
+            select(UserNotificationPreference).where(
+                UserNotificationPreference.user_id == user_id
+            )
+        )
+    ).scalar_one_or_none()
+    return DataResponse(
+        data=PreferenceResponse(email_opt_out=bool(row and row.email_opt_out)),
+        meta=MetaResponse(request_id=""),
+    )
+
+
+@router.post(
+    "/preferences/{token}",
+    response_model=DataResponse[PreferenceResponse],
+)
+async def update_email_preference(
+    token: str,
+    payload: UpdatePreferenceRequest,
+    db: AsyncSession = Depends(get_db),
+) -> DataResponse[PreferenceResponse]:
+    user_id = await _resolve_token(token)
+    row = (
+        await db.execute(
+            select(UserNotificationPreference).where(
+                UserNotificationPreference.user_id == user_id
+            )
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        row = UserNotificationPreference(user_id=user_id, email_opt_out=payload.email_opt_out)
+        db.add(row)
+    else:
+        row.email_opt_out = payload.email_opt_out
+    await db.commit()
+    return DataResponse(
+        data=PreferenceResponse(email_opt_out=row.email_opt_out),
+        meta=MetaResponse(request_id=""),
+    )

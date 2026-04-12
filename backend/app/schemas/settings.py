@@ -1,3 +1,4 @@
+import enum
 from datetime import datetime
 from typing import Any
 
@@ -45,10 +46,30 @@ class PromptsPayload(BaseModel):
 # ── QA/QC Settings ────────────────────────────────────────────────────
 
 
+class DeliveryMode(str, enum.Enum):
+    IN_APP = "in_app"
+    EMAIL = "email"
+    BOTH = "both"
+
+
+class DigestFrequency(str, enum.Enum):
+    IMMEDIATE = "immediate"
+    DAILY = "daily"
+    WEEKLY = "weekly"
+
+
 class QaqcSettingsPayload(BaseModel):
     reviewer_user_ids: list[str] = Field(default_factory=list)
+
     notify_on_chat: bool = True
     notify_on_risk_created: bool = True
+    notify_on_risk_updated: bool = True
+    notify_on_mitigation_created: bool = True
+    notify_on_document_indexed: bool = False
+
+    delivery_mode: DeliveryMode = DeliveryMode.BOTH
+    digest_frequency: DigestFrequency = DigestFrequency.IMMEDIATE
+    digest_send_hour_utc: int = Field(13, ge=0, le=23)
 
 
 # ── Generic Settings Response ─────────────────────────────────────────

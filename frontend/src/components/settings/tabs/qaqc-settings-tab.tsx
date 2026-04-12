@@ -6,6 +6,8 @@ import { getOrganizationMembers } from "@/api/organizations";
 import {
   getSettingsByCategory,
   updateQaqcSettings,
+  type DeliveryMode,
+  type DigestFrequency,
   type QaqcSettings,
 } from "@/api/settings";
 import { Button } from "@/components/ui/button";
@@ -16,6 +18,12 @@ const DEFAULT_QAQC: QaqcSettings = {
   reviewer_user_ids: [],
   notify_on_chat: true,
   notify_on_risk_created: true,
+  notify_on_risk_updated: true,
+  notify_on_mitigation_created: true,
+  notify_on_document_indexed: false,
+  delivery_mode: "both",
+  digest_frequency: "immediate",
+  digest_send_hour_utc: 13,
 };
 
 export function QaqcSettingsTab() {
@@ -142,6 +150,74 @@ export function QaqcSettingsTab() {
         </div>
       </div>
 
+      {/* Delivery method */}
+      <div>
+        <h3 className="mb-3 text-sm font-bold text-slate-700">Delivery Method</h3>
+        <div className="grid grid-cols-3 gap-2">
+          {(["in_app", "email", "both"] as DeliveryMode[]).map((mode) => (
+            <button
+              key={mode}
+              onClick={() => setConfig((prev) => ({ ...prev, delivery_mode: mode }))}
+              className={`rounded-xl border px-3 py-3 text-sm font-medium transition-all ${
+                config.delivery_mode === mode
+                  ? "border-brand-300 bg-brand-50 text-brand-700"
+                  : "border-gray-200 bg-white text-slate-700 hover:border-gray-300"
+              }`}
+            >
+              {mode === "in_app" && "In-app only"}
+              {mode === "email" && "Email only"}
+              {mode === "both" && "In-app + Email"}
+            </button>
+          ))}
+        </div>
+        <p className="mt-2 text-xs text-slate-500">
+          Email delivery uses Azure Communication Services with managed identity authentication.
+        </p>
+      </div>
+
+      {/* Digest frequency */}
+      <div>
+        <h3 className="mb-3 text-sm font-bold text-slate-700">Digest Frequency</h3>
+        <div className="grid grid-cols-3 gap-2">
+          {(["immediate", "daily", "weekly"] as DigestFrequency[]).map((freq) => (
+            <button
+              key={freq}
+              onClick={() => setConfig((prev) => ({ ...prev, digest_frequency: freq }))}
+              className={`rounded-xl border px-3 py-3 text-sm font-medium transition-all ${
+                config.digest_frequency === freq
+                  ? "border-brand-300 bg-brand-50 text-brand-700"
+                  : "border-gray-200 bg-white text-slate-700 hover:border-gray-300"
+              }`}
+            >
+              {freq.charAt(0).toUpperCase() + freq.slice(1)}
+            </button>
+          ))}
+        </div>
+        {config.digest_frequency !== "immediate" && (
+          <div className="mt-3 flex items-center gap-3">
+            <label className="text-xs font-medium text-slate-600">
+              Send hour (UTC):
+            </label>
+            <input
+              type="number"
+              min={0}
+              max={23}
+              value={config.digest_send_hour_utc}
+              onChange={(e) =>
+                setConfig((prev) => ({
+                  ...prev,
+                  digest_send_hour_utc: Math.max(0, Math.min(23, Number(e.target.value))),
+                }))
+              }
+              className="w-20 rounded-lg border border-gray-200 px-3 py-1 text-sm"
+            />
+            <span className="text-xs text-slate-400">
+              13 UTC ≈ 08:00 US Central
+            </span>
+          </div>
+        )}
+      </div>
+
       {/* Notification toggles */}
       <div>
         <h3 className="mb-3 text-sm font-bold text-slate-700">Notification Triggers</h3>
@@ -157,6 +233,28 @@ export function QaqcSettingsTab() {
             description="Notify when a new risk entry is saved to the register"
             checked={config.notify_on_risk_created}
             onChange={(v) => setConfig((prev) => ({ ...prev, notify_on_risk_created: v }))}
+          />
+          <ToggleRow
+            label="Risk Entry Updated"
+            description="Notify when a risk entry's status, severity, or other fields change"
+            checked={config.notify_on_risk_updated}
+            onChange={(v) => setConfig((prev) => ({ ...prev, notify_on_risk_updated: v }))}
+          />
+          <ToggleRow
+            label="Mitigation Created"
+            description="Notify when a new mitigation is added to a risk"
+            checked={config.notify_on_mitigation_created}
+            onChange={(v) =>
+              setConfig((prev) => ({ ...prev, notify_on_mitigation_created: v }))
+            }
+          />
+          <ToggleRow
+            label="Document Indexed"
+            description="Notify when a new document finishes indexing into the RAG corpus"
+            checked={config.notify_on_document_indexed}
+            onChange={(v) =>
+              setConfig((prev) => ({ ...prev, notify_on_document_indexed: v }))
+            }
           />
         </div>
       </div>

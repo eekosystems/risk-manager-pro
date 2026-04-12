@@ -32,6 +32,14 @@ output "keyvault_uri" {
   value = module.keyvault.vault_uri
 }
 
+output "acs_endpoint" {
+  value = module.communication.communication_service_endpoint
+}
+
+output "acs_sender_address" {
+  value = module.communication.email_sender_address
+}
+
 output "container_registry_login_server" {
   value = module.container_registry.login_server
 }

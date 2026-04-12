@@ -64,3 +64,13 @@ variable "cors_origins" {
   type        = string
   description = "JSON array of allowed CORS origins"
 }
+
+variable "acs_endpoint" {
+  type        = string
+  description = "Azure Communication Services endpoint URL used for sending email via managed identity"
+}
+
+variable "acs_sender_address" {
+  type        = string
+  description = "Default system sender email address (donotreply@<managed-domain>.azurecomm.net)"
+}

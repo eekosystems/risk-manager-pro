@@ -1,0 +1,16 @@
+Risk Manager Pro — QA/QC Notification
+{{ notification_type | replace('_', ' ') | upper }}
+
+{{ title }}
+
+{{ body }}
+
+Triggered by: {{ triggered_by_name }}
+{% if deep_link %}
+Open in Risk Manager Pro:
+{{ deep_link }}
+{% endif %}
+
+---
+You are receiving this because you are designated as a QA/QC reviewer for your organization in Risk Manager Pro.
+{% if unsubscribe_link %}Manage email preferences: {{ unsubscribe_link }}{% endif %}

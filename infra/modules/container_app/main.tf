@@ -77,6 +77,14 @@ resource "azurerm_container_app" "backend" {
         name  = "LOG_LEVEL"
         value = "INFO"
       }
+      env {
+        name  = "ACS_ENDPOINT"
+        value = var.acs_endpoint
+      }
+      env {
+        name  = "ACS_SENDER_ADDRESS"
+        value = var.acs_sender_address
+      }
     }
   }
 

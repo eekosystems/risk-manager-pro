@@ -1,0 +1,16 @@
+Risk Manager Pro — {{ period_label }} QA/QC Digest
+{{ total }} item(s) produced since your last digest.
+
+{% for group in groups %}
+== {{ group.type | replace('_', ' ') | upper }} ({{ group.items | length }}) ==
+{% for item in group.items %}
+- {{ item.title }}
+  {{ item.body }}
+  {% if item.deep_link %}{{ item.deep_link }}{% endif %}
+  {{ item.created_at }}
+{% endfor %}
+
+{% endfor %}
+---
+You are receiving this digest because you are designated as a QA/QC reviewer in Risk Manager Pro.
+{% if unsubscribe_link %}Manage email preferences: {{ unsubscribe_link }}{% endif %}

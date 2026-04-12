@@ -128,6 +128,17 @@ async def update_risk_entry(
         resource_id=str(risk_id),
         organization_id=organization.id,
     )
+    changes = payload.model_dump(exclude_unset=True)
+    change_summary = ", ".join(f"{k}={v}" for k, v in changes.items() if v is not None) or "(no fields)"
+    _notification_dispatcher.dispatch(
+        organization_id=organization.id,
+        triggered_by=current_user,
+        notification_type=NotificationType.RISK_UPDATED,
+        title=f"Risk updated: {entry.title[:100]}",
+        body=f"Changes: {change_summary}",
+        resource_type="risk_entry",
+        resource_id=str(risk_id),
+    )
     return DataResponse(
         data=RiskEntryResponse.model_validate(entry),
         meta=MetaResponse(request_id=str(risk_id)),
@@ -175,6 +186,15 @@ async def create_mitigation(
         resource_type="mitigation",
         resource_id=str(mitigation.id),
         organization_id=organization.id,
+    )
+    _notification_dispatcher.dispatch(
+        organization_id=organization.id,
+        triggered_by=current_user,
+        notification_type=NotificationType.MITIGATION_CREATED,
+        title=f"New mitigation: {payload.title[:100]}",
+        body=f"Risk: {risk_id} | Assignee: {payload.assignee or 'unassigned'} | Due: {payload.due_date or 'not set'}",
+        resource_type="mitigation",
+        resource_id=str(mitigation.id),
     )
     return DataResponse(
         data=MitigationResponse.model_validate(mitigation),
