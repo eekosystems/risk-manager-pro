@@ -9,12 +9,9 @@ from azure.ai.documentintelligence import DocumentIntelligenceClient
 from azure.ai.documentintelligence.models import AnalyzeDocumentRequest, DocumentContentFormat
 from azure.core.credentials import AzureKeyCredential
 
-from sqlalchemy import select
-
 from app.core.config import settings
 from app.models.document import DocumentStatus
 from app.models.notification import NotificationType
-from app.models.user import User
 from app.repositories.document import DocumentRepository
 from app.services.notification import NotificationDispatcher
 from app.services.openai_client import AzureOpenAIClient
@@ -270,10 +267,7 @@ class DocumentProcessor:
                 chunks_indexed=len(chunks),
             )
 
-            uploader_row = await self._repo._db.execute(  # type: ignore[attr-defined]
-                select(User).where(User.id == document.uploaded_by)
-            )
-            uploader = uploader_row.scalar_one_or_none()
+            uploader = await self._repo.get_uploader(document)
             if uploader is not None:
                 NotificationDispatcher().dispatch(
                     organization_id=document.organization_id,

@@ -4,6 +4,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.document import Document, DocumentStatus, SourceType
+from app.models.user import User
 
 
 class DocumentRepository:
@@ -93,6 +94,12 @@ class DocumentRepository:
     async def get_by_id_system(self, document_id: uuid.UUID) -> Document | None:
         """Fetch document without org filter — trusted background processors only."""
         stmt = select(Document).where(Document.id == document_id)
+        result = await self._db.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def get_uploader(self, document: Document) -> User | None:
+        """Fetch the User who uploaded the given document."""
+        stmt = select(User).where(User.id == document.uploaded_by)
         result = await self._db.execute(stmt)
         return result.scalar_one_or_none()
 
