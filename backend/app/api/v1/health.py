@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.rate_limit import limiter
+from app.core.tasks import get_task_failure_counts
 
 logger = structlog.get_logger(__name__)
 
@@ -24,6 +25,7 @@ class ReadyResponse(BaseModel):
     status: str
     checks: dict[str, str]
     checked_at: str
+    background_task_failures: dict[str, int]
 
 
 @router.get("/health", response_model=HealthResponse)
@@ -71,6 +73,7 @@ async def readiness_check(
         status=status,
         checks=checks,
         checked_at=datetime.now(UTC).isoformat(),
+        background_task_failures=get_task_failure_counts(),
     )
 
 

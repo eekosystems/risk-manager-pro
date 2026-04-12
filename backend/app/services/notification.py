@@ -84,7 +84,7 @@ class NotificationDispatcher:
                 resource_id=resource_id,
             )
         )
-        track_task(task)
+        track_task(task, name="notification.dispatch_qaqc")
 
 
 async def _dispatch_qaqc_notifications(

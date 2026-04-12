@@ -78,7 +78,7 @@ async def upload_document(
             search_indexer=registry.search_indexer,
         )
     )
-    track_task(task)
+    track_task(task, name="document.process")
 
     return DataResponse(
         data=DocumentResponse.model_validate(document),
@@ -206,7 +206,7 @@ async def reindex_document(
             search_indexer=registry.search_indexer,
         )
     )
-    track_task(task)
+    track_task(task, name="document.reindex")
 
     await audit.log(
         action="document.reindexed",
@@ -257,7 +257,7 @@ async def process_all_uploaded(
         registry = request.app.state.services
         doc_ids = [d.id for d in unprocessed]
         task = asyncio.create_task(_process_all_background(doc_ids, registry))
-        track_task(task)
+        track_task(task, name="document.process_all")
 
     await audit.log(
         action="document.process_all",

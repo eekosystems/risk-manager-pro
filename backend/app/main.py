@@ -136,7 +136,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     digest_stop = _asyncio.Event()
     digest_task = _asyncio.create_task(run_digest_worker(digest_stop))
-    track_task(digest_task)
+    track_task(digest_task, name="notification.digest_worker")
 
     yield
 

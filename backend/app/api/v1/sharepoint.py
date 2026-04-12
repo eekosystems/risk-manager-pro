@@ -122,7 +122,7 @@ async def crawl_sharepoint(
                 registry=registry,
             )
         )
-        track_task(task)
+        track_task(task, name="sharepoint.crawl")
 
     await audit.log(
         action="sharepoint.crawl",
@@ -181,7 +181,7 @@ async def sync_folder(
                 registry=registry,
             )
         )
-        track_task(task)
+        track_task(task, name="sharepoint.sync_folder")
 
     await audit.log(
         action="sharepoint.sync_folder",

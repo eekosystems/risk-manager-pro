@@ -54,7 +54,7 @@ class AuditLogger:
                 storage=self._storage,
             )
         )
-        track_task(task)
+        track_task(task, name="audit.write_entry")
 
 
 async def _write_audit_entry(
