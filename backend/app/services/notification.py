@@ -106,8 +106,7 @@ async def _dispatch_qaqc_notifications(
                 return
 
             reviewer_ids = [
-                uuid.UUID(uid) if isinstance(uid, str) else uid
-                for uid in config.reviewer_user_ids
+                uuid.UUID(uid) if isinstance(uid, str) else uid for uid in config.reviewer_user_ids
             ]
             reviewer_ids = [uid for uid in reviewer_ids if uid != triggered_by_user_id]
             if not reviewer_ids:

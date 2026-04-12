@@ -129,7 +129,9 @@ async def update_risk_entry(
         organization_id=organization.id,
     )
     changes = payload.model_dump(exclude_unset=True)
-    change_summary = ", ".join(f"{k}={v}" for k, v in changes.items() if v is not None) or "(no fields)"
+    change_summary = (
+        ", ".join(f"{k}={v}" for k, v in changes.items() if v is not None) or "(no fields)"
+    )
     _notification_dispatcher.dispatch(
         organization_id=organization.id,
         triggered_by=current_user,

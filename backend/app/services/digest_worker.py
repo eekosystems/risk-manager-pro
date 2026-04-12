@@ -57,9 +57,7 @@ async def _run_cycle() -> None:
                 continue
             if not _is_due(config, now):
                 continue
-            period_label = (
-                "Daily" if config.digest_frequency == DigestFrequency.DAILY else "Weekly"
-            )
+            period_label = "Daily" if config.digest_frequency == DigestFrequency.DAILY else "Weekly"
             await _send_digests_for_org(session, org.id, config, period_label)
 
 

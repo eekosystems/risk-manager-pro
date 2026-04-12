@@ -18,9 +18,7 @@ class EmailService:
     async def _get_client(self) -> EmailClient:
         if self._client is None:
             if not settings.acs_endpoint:
-                raise RuntimeError(
-                    "ACS_ENDPOINT is required to send email in this environment"
-                )
+                raise RuntimeError("ACS_ENDPOINT is required to send email in this environment")
             self._credential = DefaultAzureCredential()
             self._client = EmailClient(settings.acs_endpoint, self._credential)
         return self._client

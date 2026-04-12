@@ -118,9 +118,7 @@ async def get_email_preference(
     user_id = await _resolve_token(token)
     row = (
         await db.execute(
-            select(UserNotificationPreference).where(
-                UserNotificationPreference.user_id == user_id
-            )
+            select(UserNotificationPreference).where(UserNotificationPreference.user_id == user_id)
         )
     ).scalar_one_or_none()
     return DataResponse(
@@ -141,9 +139,7 @@ async def update_email_preference(
     user_id = await _resolve_token(token)
     row = (
         await db.execute(
-            select(UserNotificationPreference).where(
-                UserNotificationPreference.user_id == user_id
-            )
+            select(UserNotificationPreference).where(UserNotificationPreference.user_id == user_id)
         )
     ).scalar_one_or_none()
     if row is None:
