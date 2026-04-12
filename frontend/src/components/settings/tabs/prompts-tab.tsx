@@ -20,23 +20,6 @@ import {
   type PromptsSettings,
 } from "@/api/settings";
 import { SettingsSection } from "@/components/settings/settings-section";
-import {
-  DEFAULT_DOCUMENT_INTERPRETATION_PROMPT,
-  DEFAULT_INDEXING_INSTRUCTIONS,
-  DEFAULT_PHL_PROMPT,
-  DEFAULT_SRA_PROMPT,
-  DEFAULT_SYSTEM_ANALYSIS_PROMPT,
-  DEFAULT_SYSTEM_PROMPT,
-} from "@/constants/default-prompts";
-
-const FALLBACK_PROMPTS: PromptsSettings = {
-  system_prompt: DEFAULT_SYSTEM_PROMPT,
-  phl_prompt: DEFAULT_PHL_PROMPT,
-  sra_prompt: DEFAULT_SRA_PROMPT,
-  system_analysis_prompt: DEFAULT_SYSTEM_ANALYSIS_PROMPT,
-  document_interpretation_prompt: DEFAULT_DOCUMENT_INTERPRETATION_PROMPT,
-  indexing_instructions: DEFAULT_INDEXING_INSTRUCTIONS,
-};
 
 type PromptKey = keyof PromptsSettings;
 
@@ -94,7 +77,7 @@ const PROMPT_SECTIONS: PromptSection[] = [
 
 export function PromptsTab() {
   const queryClient = useQueryClient();
-  const [prompts, setPrompts] = useState<PromptsSettings>(FALLBACK_PROMPTS);
+  const [prompts, setPrompts] = useState<PromptsSettings | null>(null);
   const [activePrompt, setActivePrompt] = useState<PromptKey>("system_prompt");
   const [copied, setCopied] = useState(false);
 
@@ -104,16 +87,11 @@ export function PromptsTab() {
     retry: false,
   });
 
-  // Use API response if available, otherwise fall back to built-in defaults.
-  const effectiveDefaults = data?.settings ?? FALLBACK_PROMPTS;
-
   useEffect(() => {
     if (data?.settings) {
       setPrompts(data.settings);
-    } else if (isError) {
-      setPrompts(FALLBACK_PROMPTS);
     }
-  }, [data?.settings, isError]);
+  }, [data?.settings]);
 
   const mutation = useMutation({
     mutationFn: updatePromptsSettings,
@@ -123,10 +101,12 @@ export function PromptsTab() {
   });
 
   function handleReset(key: PromptKey) {
-    setPrompts((prev) => ({ ...prev, [key]: effectiveDefaults[key] }));
+    if (!data?.settings) return;
+    setPrompts((prev) => (prev ? { ...prev, [key]: data.settings[key] } : prev));
   }
 
   function handleCopy() {
+    if (!prompts) return;
     void navigator.clipboard.writeText(prompts[activePrompt]);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -142,7 +122,6 @@ export function PromptsTab() {
     );
   }
 
-
   return (
     <div className="max-w-5xl">
       <div className="mb-6">
@@ -155,99 +134,103 @@ export function PromptsTab() {
       {isError && (
         <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
           <span className="font-semibold">Could not load prompts from the server.</span>{" "}
-          The backend may be unavailable. Default prompts are configured server-side and will still be used by the AI.
+          The backend may be unavailable. Try again in a moment — editing requires a successful fetch so the saved
+          prompt isn&apos;t clobbered by a stale local copy.
         </div>
       )}
 
-      {/* Prompt selector tabs */}
-      <div className="mb-4 flex gap-2 overflow-x-auto">
-        {PROMPT_SECTIONS.map((section) => {
-          const Icon = section.icon;
-          return (
+      {prompts && (
+        <>
+          {/* Prompt selector tabs */}
+          <div className="mb-4 flex gap-2 overflow-x-auto">
+            {PROMPT_SECTIONS.map((section) => {
+              const Icon = section.icon;
+              return (
+                <button
+                  key={section.key}
+                  onClick={() => setActivePrompt(section.key)}
+                  className={clsx(
+                    "flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-all",
+                    activePrompt === section.key
+                      ? "gradient-brand text-white shadow-md shadow-brand-500/20"
+                      : "border border-gray-200 bg-white text-gray-600 hover:bg-gray-50",
+                  )}
+                >
+                  <Icon size={16} />
+                  {section.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Active prompt editor */}
+          {activeSection && (
+            <SettingsSection>
+              <div className="mb-4 flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800">
+                    {activeSection.label}
+                  </h3>
+                  <p className="text-[12px] text-slate-400">
+                    {activeSection.description}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleCopy}
+                    className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-[12px] font-medium text-gray-500 transition-colors hover:bg-gray-50"
+                  >
+                    <Copy size={12} />
+                    {copied ? "Copied!" : "Copy"}
+                  </button>
+                  <button
+                    onClick={() => handleReset(activePrompt)}
+                    className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-[12px] font-medium text-gray-500 transition-colors hover:bg-gray-50"
+                  >
+                    <RotateCcw size={12} />
+                    Reset to Saved
+                  </button>
+                </div>
+              </div>
+
+              <textarea
+                value={prompts[activePrompt]}
+                onChange={(e) =>
+                  setPrompts((prev) =>
+                    prev ? { ...prev, [activePrompt]: e.target.value } : prev,
+                  )
+                }
+                rows={18}
+                className="w-full rounded-xl border border-gray-200 px-4 py-3 font-mono text-[13px] leading-relaxed text-slate-700 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                spellCheck={false}
+              />
+
+              <div className="mt-3 flex items-center justify-between">
+                <span className="text-[12px] text-slate-400">
+                  {prompts[activePrompt].length} characters
+                  {" / ~"}
+                  {Math.ceil(prompts[activePrompt].length / 4)} tokens (estimate)
+                </span>
+              </div>
+            </SettingsSection>
+          )}
+
+          {/* Save Button */}
+          <div className="mt-6">
             <button
-              key={section.key}
-              onClick={() => setActivePrompt(section.key)}
-              className={clsx(
-                "flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-all",
-                activePrompt === section.key
-                  ? "gradient-brand text-white shadow-md shadow-brand-500/20"
-                  : "border border-gray-200 bg-white text-gray-600 hover:bg-gray-50",
-              )}
+              onClick={() => mutation.mutate(prompts)}
+              disabled={mutation.isPending}
+              className="flex items-center gap-2 rounded-xl gradient-brand px-6 py-3 text-sm font-semibold text-white shadow-md shadow-brand-500/20 transition-all hover:shadow-lg hover:shadow-brand-500/30 disabled:opacity-50"
             >
-              <Icon size={16} />
-              {section.label}
+              {mutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+              {mutation.isSuccess ? "Saved!" : mutation.isPending ? "Saving..." : "Save All Prompts"}
             </button>
-          );
-        })}
-      </div>
-
-      {/* Active prompt editor */}
-      {activeSection && (
-        <SettingsSection>
-          <div className="mb-4 flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-bold text-slate-800">
-                {activeSection.label}
-              </h3>
-              <p className="text-[12px] text-slate-400">
-                {activeSection.description}
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={handleCopy}
-                className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-[12px] font-medium text-gray-500 transition-colors hover:bg-gray-50"
-              >
-                <Copy size={12} />
-                {copied ? "Copied!" : "Copy"}
-              </button>
-              <button
-                onClick={() => handleReset(activePrompt)}
-                className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-[12px] font-medium text-gray-500 transition-colors hover:bg-gray-50"
-              >
-                <RotateCcw size={12} />
-                Reset to Default
-              </button>
-            </div>
+            {mutation.isError && (
+              <p className="mt-2 text-sm text-red-500">Failed to save. Please try again.</p>
+            )}
           </div>
-
-          <textarea
-            value={prompts[activePrompt]}
-            onChange={(e) =>
-              setPrompts((prev) => ({
-                ...prev,
-                [activePrompt]: e.target.value,
-              }))
-            }
-            rows={18}
-            className="w-full rounded-xl border border-gray-200 px-4 py-3 font-mono text-[13px] leading-relaxed text-slate-700 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-            spellCheck={false}
-          />
-
-          <div className="mt-3 flex items-center justify-between">
-            <span className="text-[12px] text-slate-400">
-              {prompts[activePrompt].length} characters
-              {" / ~"}
-              {Math.ceil(prompts[activePrompt].length / 4)} tokens (estimate)
-            </span>
-          </div>
-        </SettingsSection>
+        </>
       )}
-
-      {/* Save Button */}
-      <div className="mt-6">
-        <button
-          onClick={() => mutation.mutate(prompts)}
-          disabled={mutation.isPending}
-          className="flex items-center gap-2 rounded-xl gradient-brand px-6 py-3 text-sm font-semibold text-white shadow-md shadow-brand-500/20 transition-all hover:shadow-lg hover:shadow-brand-500/30 disabled:opacity-50"
-        >
-          {mutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-          {mutation.isSuccess ? "Saved!" : mutation.isPending ? "Saving..." : "Save All Prompts"}
-        </button>
-        {mutation.isError && (
-          <p className="mt-2 text-sm text-red-500">Failed to save. Please try again.</p>
-        )}
-      </div>
     </div>
   );
 }
