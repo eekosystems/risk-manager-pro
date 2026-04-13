@@ -74,7 +74,7 @@ async def send_message(
         resource_id=str(result.conversation_id),
     )
     try:
-        response = DataResponse(
+        response: DataResponse[ChatResponse] = DataResponse(
             data=result,
             meta=MetaResponse(request_id=str(result.conversation_id)),
         )

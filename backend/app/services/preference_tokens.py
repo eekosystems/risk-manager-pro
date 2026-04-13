@@ -1,4 +1,5 @@
 import base64
+import binascii
 import hashlib
 import hmac
 import json
@@ -42,7 +43,7 @@ def verify_preference_token(token: str) -> uuid.UUID | None:
     expected = hmac.new(_secret_bytes(), body.encode("ascii"), hashlib.sha256).digest()
     try:
         provided = _b64url_decode(sig)
-    except (ValueError, base64.binascii.Error):
+    except (ValueError, binascii.Error):
         return None
     if not hmac.compare_digest(expected, provided):
         return None
