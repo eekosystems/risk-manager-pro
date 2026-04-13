@@ -99,7 +99,7 @@ class WorkflowService:
                 status_code=409,
             )
         workflow.status = WorkflowStatus.SUBMITTED
-        workflow.submitted_at = datetime.now(UTC)
+        workflow.submitted_at = datetime.now(UTC).replace(tzinfo=None)
         await self._db.flush()
         await self._db.refresh(workflow)
         return workflow
@@ -119,7 +119,7 @@ class WorkflowService:
                 status_code=409,
             )
         workflow.status = WorkflowStatus.APPROVED if approve else WorkflowStatus.REJECTED
-        workflow.approved_at = datetime.now(UTC)
+        workflow.approved_at = datetime.now(UTC).replace(tzinfo=None)
         workflow.approved_by = approver_id
 
         if approve and workflow.type == WorkflowType.SRA:
