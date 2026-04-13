@@ -71,7 +71,13 @@ async def test_require_org_role_allows_matching_role(db_session: AsyncSession) -
 
 
 @pytest.mark.asyncio
-async def test_require_org_role_rejects_wrong_role(db_session: AsyncSession) -> None:
+async def test_require_org_role_rejects_wrong_role(
+    db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "enforce_rbac", True)
+
     org = make_test_organization()
     db_session.add(org)
     await db_session.flush()
@@ -95,7 +101,13 @@ async def test_require_org_role_rejects_wrong_role(db_session: AsyncSession) -> 
 
 
 @pytest.mark.asyncio
-async def test_require_org_role_rejects_non_member(db_session: AsyncSession) -> None:
+async def test_require_org_role_rejects_non_member(
+    db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "enforce_rbac", True)
+
     org = make_test_organization()
     db_session.add(org)
     await db_session.flush()

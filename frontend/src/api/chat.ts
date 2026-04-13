@@ -50,12 +50,13 @@ export async function* streamChatMessage(
   signal?: AbortSignal,
 ): AsyncGenerator<ChatStreamEvent> {
   const headers = await getAuthHeaders();
-  const response = await fetch(`${env.apiBaseUrl}/chat/stream`, {
+  const init: RequestInit = {
     method: "POST",
     headers: { ...headers, "Content-Type": "application/json" },
     body: JSON.stringify(payload),
-    signal,
-  });
+  };
+  if (signal) init.signal = signal;
+  const response = await fetch(`${env.apiBaseUrl}/chat/stream`, init);
 
   if (!response.ok || !response.body) {
     throw new Error(`Chat stream failed: ${response.status}`);

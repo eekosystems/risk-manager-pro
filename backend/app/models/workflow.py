@@ -1,6 +1,7 @@
 import enum
 import uuid
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import Enum, ForeignKey, String, func
 from sqlalchemy.dialects.postgresql import JSONB
@@ -35,7 +36,7 @@ class Workflow(Base):
         default=WorkflowStatus.DRAFT,
     )
     title: Mapped[str] = mapped_column(String(500), default="")
-    data: Mapped[dict] = mapped_column(JSONB, default=dict)
+    data: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     conversation_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("conversations.id", ondelete="SET NULL"),
         default=None,

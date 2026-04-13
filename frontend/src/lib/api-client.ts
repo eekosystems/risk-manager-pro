@@ -87,12 +87,13 @@ export async function getAuthHeaders(): Promise<Record<string, string>> {
   const headers: Record<string, string> = {};
   if (!msalInstance) return headers;
   const accounts = msalInstance.getAllAccounts();
-  if (accounts.length === 0) return headers;
+  const account = accounts[0];
+  if (!account) return headers;
   try {
     const response = await withTimeout(
       msalInstance.acquireTokenSilent({
         ...apiTokenRequest,
-        account: accounts[0],
+        account,
       }),
       TOKEN_TIMEOUT_MS,
     );

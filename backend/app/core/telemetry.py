@@ -57,7 +57,7 @@ def configure_telemetry(app: FastAPI) -> None:
     FastAPIInstrumentor.instrument_app(app)
     HTTPXClientInstrumentor().instrument()
     SQLAlchemyInstrumentor().instrument()
-    AsyncPGInstrumentor().instrument()
+    AsyncPGInstrumentor().instrument()  # type: ignore[no-untyped-call,unused-ignore]
 
     _configured = True
     logger.info(

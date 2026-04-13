@@ -29,7 +29,7 @@ class WorkflowService:
             conversation_id=payload.conversation_id,
         )
         self._db.add(workflow)
-        await self._db.commit()
+        await self._db.flush()
         await self._db.refresh(workflow)
         return workflow
 
@@ -86,7 +86,7 @@ class WorkflowService:
             merged: dict[str, Any] = dict(workflow.data or {})
             merged.update(payload.data)
             workflow.data = merged
-        await self._db.commit()
+        await self._db.flush()
         await self._db.refresh(workflow)
         return workflow
 
@@ -100,7 +100,7 @@ class WorkflowService:
             )
         workflow.status = WorkflowStatus.SUBMITTED
         workflow.submitted_at = datetime.now(UTC)
-        await self._db.commit()
+        await self._db.flush()
         await self._db.refresh(workflow)
         return workflow
 
@@ -127,7 +127,7 @@ class WorkflowService:
             if risk_entry_id is not None:
                 workflow.risk_entry_id = risk_entry_id
 
-        await self._db.commit()
+        await self._db.flush()
         await self._db.refresh(workflow)
         return workflow
 
@@ -140,7 +140,7 @@ class WorkflowService:
                 status_code=409,
             )
         await self._db.delete(workflow)
-        await self._db.commit()
+        await self._db.flush()
 
     async def _spawn_risk_from_sra(self, workflow: Workflow) -> uuid.UUID | None:
         """Create a RiskEntry from an approved SRA workflow's structured data."""

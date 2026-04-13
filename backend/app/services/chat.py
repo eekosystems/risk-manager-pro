@@ -1,5 +1,6 @@
 import uuid
 from collections.abc import AsyncGenerator
+from typing import Any
 
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -301,7 +302,7 @@ class ChatService:
 
     async def process_message_stream(
         self, request: ChatRequest, user: User, organization_id: uuid.UUID
-    ) -> AsyncGenerator[dict, None]:
+    ) -> AsyncGenerator[dict[str, Any], None]:
         """Stream assistant tokens then persist the completed message.
 
         Yields event dicts: {"event": "metadata"|"delta"|"done"|"error", ...}.
