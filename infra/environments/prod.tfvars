@@ -3,7 +3,7 @@ location          = "eastus2"
 project_name      = "rmpfg"
 db_admin_username = "rmpadmin"
 
-audit_retention_days      = 365
+audit_retention_days = 365
 # IRREVERSIBLE: set to true only after burn-in validation. Once locked,
 # the immutability policy cannot be shortened or deleted for the full
 # retention window.
