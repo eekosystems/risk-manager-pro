@@ -1,6 +1,9 @@
 import asyncio
 import json
+import re
+import time
 import uuid
+from collections import deque
 from datetime import UTC, datetime
 
 import structlog
@@ -14,6 +17,24 @@ from app.models.user import User  # noqa: TCH001
 from app.services.storage import BlobStorageService  # noqa: TCH001
 
 logger = structlog.get_logger(__name__)
+
+_BLOB_FAILURE_TIMES: deque[float] = deque()
+_BLOB_ACTION_SAFE = re.compile(r"[^A-Za-z0-9._-]+")
+
+
+def _circuit_open() -> bool:
+    from app.core.config import settings
+
+    window = settings.audit_blob_circuit_breaker_window_seconds
+    threshold = settings.audit_blob_circuit_breaker_threshold
+    now = time.monotonic()
+    while _BLOB_FAILURE_TIMES and now - _BLOB_FAILURE_TIMES[0] > window:
+        _BLOB_FAILURE_TIMES.popleft()
+    return len(_BLOB_FAILURE_TIMES) >= threshold
+
+
+def _record_blob_failure() -> None:
+    _BLOB_FAILURE_TIMES.append(time.monotonic())
 
 
 class AuditLogger:
@@ -141,10 +162,23 @@ async def _write_audit_blob(
         if not settings.azure_storage_account_name and not settings.azure_storage_connection_string:
             return
 
+        if _circuit_open():
+            logger.error(
+                "audit_blob_circuit_open",
+                correlation_id=str(correlation_id),
+                alert_category="soc2_audit_failure",
+            )
+            return
+
         from app.services.storage import BlobStorageService
 
         now = datetime.now(UTC)
-        blob_path = f"audit/{now.year}/{now.month:02d}/{now.day:02d}/{correlation_id}.json"
+        safe_action = _BLOB_ACTION_SAFE.sub("-", action)[:64] or "action"
+        epoch_ms = int(now.timestamp() * 1000)
+        blob_path = (
+            f"audit/{now.year}/{now.month:02d}/{now.day:02d}/"
+            f"{correlation_id}-{safe_action}-{epoch_ms}.json"
+        )
 
         audit_data = {
             "timestamp": now.isoformat(),
@@ -175,7 +209,8 @@ async def _write_audit_blob(
             if owns_storage:
                 await storage.close()
 
-    except (OSError, ValueError):
+    except Exception:
+        _record_blob_failure()
         logger.error(
             "audit_blob_write_failed",
             correlation_id=str(correlation_id),

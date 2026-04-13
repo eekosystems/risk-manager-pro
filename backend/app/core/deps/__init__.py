@@ -8,6 +8,8 @@ from app.core.deps.auth import (
 from app.core.deps.common import get_audit_logger, get_correlation_id
 from app.core.deps.organization import (
     get_current_organization,
+    require_analyst_or_above,
+    require_any_member,
     require_org_role,
     require_platform_admin,
 )
@@ -31,6 +33,8 @@ __all__ = [
     "get_search_indexer",
     "get_storage_service",
     "get_token_payload",
+    "require_analyst_or_above",
+    "require_any_member",
     "require_org_role",
     "require_platform_admin",
 ]

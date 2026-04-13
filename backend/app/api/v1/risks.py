@@ -4,7 +4,12 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.deps import get_audit_logger, get_current_organization, get_current_user
+from app.core.deps import (
+    get_audit_logger,
+    get_current_organization,
+    require_analyst_or_above,
+    require_any_member,
+)
 from app.models.notification import NotificationType
 from app.models.organization import Organization
 from app.models.user import User
@@ -22,6 +27,7 @@ from app.schemas.risk import (
 from app.services.audit import AuditLogger
 from app.services.notification import NotificationDispatcher
 from app.services.risk import RiskService
+from app.services.risk_threshold import RiskThresholdService
 
 _notification_dispatcher = NotificationDispatcher()
 
@@ -32,18 +38,26 @@ def _get_risk_service(db: AsyncSession = Depends(get_db)) -> RiskService:
     return RiskService(db=db)
 
 
+def _get_threshold_service(
+    db: AsyncSession = Depends(get_db),
+) -> RiskThresholdService:
+    return RiskThresholdService(db=db, dispatcher=_notification_dispatcher)
+
+
 # --- Risk Entry Endpoints ---
 
 
 @router.post("", response_model=DataResponse[RiskEntryResponse], status_code=201)
 async def create_risk_entry(
     payload: CreateRiskEntryRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_analyst_or_above),
     organization: Organization = Depends(get_current_organization),
     service: RiskService = Depends(_get_risk_service),
+    threshold_service: RiskThresholdService = Depends(_get_threshold_service),
     audit: AuditLogger = Depends(get_audit_logger),
 ) -> DataResponse[RiskEntryResponse]:
     entry = await service.create_risk_entry(payload, current_user.id, organization.id)
+    await threshold_service.evaluate(organization.id, current_user, entry.risk_level)
     await audit.log(
         action="risk.created",
         user=current_user,
@@ -72,7 +86,7 @@ async def list_risk_entries(
     limit: int = Query(50, ge=1, le=100),
     status: str | None = Query(None),
     risk_level: str | None = Query(None),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_any_member),
     organization: Organization = Depends(get_current_organization),
     service: RiskService = Depends(_get_risk_service),
 ) -> PaginatedResponse[RiskEntryListItem]:
@@ -100,7 +114,7 @@ async def list_risk_entries(
 @router.get("/{risk_id}", response_model=DataResponse[RiskEntryDetailResponse])
 async def get_risk_entry(
     risk_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_any_member),
     organization: Organization = Depends(get_current_organization),
     service: RiskService = Depends(_get_risk_service),
 ) -> DataResponse[RiskEntryDetailResponse]:
@@ -115,12 +129,14 @@ async def get_risk_entry(
 async def update_risk_entry(
     risk_id: uuid.UUID,
     payload: UpdateRiskEntryRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_analyst_or_above),
     organization: Organization = Depends(get_current_organization),
     service: RiskService = Depends(_get_risk_service),
+    threshold_service: RiskThresholdService = Depends(_get_threshold_service),
     audit: AuditLogger = Depends(get_audit_logger),
 ) -> DataResponse[RiskEntryResponse]:
     entry = await service.update_risk_entry(risk_id, organization.id, payload)
+    await threshold_service.evaluate(organization.id, current_user, entry.risk_level)
     await audit.log(
         action="risk.updated",
         user=current_user,
@@ -150,7 +166,7 @@ async def update_risk_entry(
 @router.delete("/{risk_id}", status_code=204)
 async def delete_risk_entry(
     risk_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_analyst_or_above),
     organization: Organization = Depends(get_current_organization),
     service: RiskService = Depends(_get_risk_service),
     audit: AuditLogger = Depends(get_audit_logger),
@@ -176,7 +192,7 @@ async def delete_risk_entry(
 async def create_mitigation(
     risk_id: uuid.UUID,
     payload: CreateMitigationRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_analyst_or_above),
     organization: Organization = Depends(get_current_organization),
     service: RiskService = Depends(_get_risk_service),
     audit: AuditLogger = Depends(get_audit_logger),
@@ -207,7 +223,7 @@ async def create_mitigation(
 @router.get("/{risk_id}/mitigations", response_model=DataResponse[list[MitigationResponse]])
 async def list_mitigations(
     risk_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_any_member),
     organization: Organization = Depends(get_current_organization),
     service: RiskService = Depends(_get_risk_service),
 ) -> DataResponse[list[MitigationResponse]]:
@@ -228,7 +244,7 @@ async def update_mitigation(
     risk_id: uuid.UUID,
     mitigation_id: uuid.UUID,
     payload: UpdateMitigationRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_analyst_or_above),
     organization: Organization = Depends(get_current_organization),
     service: RiskService = Depends(_get_risk_service),
     audit: AuditLogger = Depends(get_audit_logger),
@@ -251,7 +267,7 @@ async def update_mitigation(
 async def delete_mitigation(
     risk_id: uuid.UUID,
     mitigation_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_analyst_or_above),
     organization: Organization = Depends(get_current_organization),
     service: RiskService = Depends(_get_risk_service),
     audit: AuditLogger = Depends(get_audit_logger),

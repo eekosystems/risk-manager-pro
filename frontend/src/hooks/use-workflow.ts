@@ -1,4 +1,19 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
+
+import {
+  approveWorkflow,
+  createWorkflow,
+  deleteWorkflow,
+  getWorkflow,
+  listWorkflows,
+  submitWorkflow,
+  updateWorkflow,
+  type CreateWorkflowPayload,
+  type UpdateWorkflowPayload,
+  type WorkflowStatus,
+  type WorkflowType,
+} from "@/api/workflows";
 
 export interface UseWorkflowOptions {
   totalSteps: number;
@@ -65,4 +80,77 @@ export function useWorkflow<T>(
     isLast: currentStep === options.totalSteps - 1,
     reset,
   };
+}
+
+export function useWorkflowList(params?: {
+  type?: WorkflowType;
+  status?: WorkflowStatus;
+}) {
+  return useQuery({
+    queryKey: ["workflows", params ?? {}],
+    queryFn: () => listWorkflows(params),
+  });
+}
+
+export function useWorkflowDetail(id: string | null) {
+  return useQuery({
+    queryKey: ["workflow", id],
+    queryFn: () => getWorkflow(id!),
+    enabled: !!id,
+  });
+}
+
+export function useCreateWorkflow() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: CreateWorkflowPayload) => createWorkflow(payload),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["workflows"] });
+    },
+  });
+}
+
+export function useUpdateWorkflow(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: UpdateWorkflowPayload) => updateWorkflow(id, payload),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["workflow", id] });
+      void qc.invalidateQueries({ queryKey: ["workflows"] });
+    },
+  });
+}
+
+export function useSubmitWorkflow(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => submitWorkflow(id),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["workflow", id] });
+      void qc.invalidateQueries({ queryKey: ["workflows"] });
+    },
+  });
+}
+
+export function useApproveWorkflow(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (args: { approve: boolean; notes?: string }) =>
+      approveWorkflow(id, args.approve, args.notes),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["workflow", id] });
+      void qc.invalidateQueries({ queryKey: ["workflows"] });
+      void qc.invalidateQueries({ queryKey: ["risks"] });
+    },
+  });
+}
+
+export function useDeleteWorkflow() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => deleteWorkflow(id),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["workflows"] });
+    },
+  });
 }

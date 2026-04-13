@@ -53,7 +53,7 @@ resource "azurerm_storage_management_policy" "audit_immutability" {
 resource "azurerm_storage_container_immutability_policy" "audit_logs" {
   storage_container_resource_manager_id = azurerm_storage_container.audit_logs.resource_manager_id
   immutability_period_in_days           = var.audit_retention_days
-  locked                                = false # Unlock during testing; lock in production
+  locked                                = var.audit_immutability_locked
 }
 
 resource "azurerm_storage_account_network_rules" "main" {

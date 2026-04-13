@@ -1,7 +1,10 @@
+import json
 import uuid
+from collections.abc import AsyncIterator
 
 import structlog
 from fastapi import APIRouter, Depends, Query, Request
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -9,9 +12,10 @@ from app.core.database import get_db
 from app.core.deps import (
     get_audit_logger,
     get_current_organization,
-    get_current_user,
     get_openai_client,
     get_rag_service,
+    require_analyst_or_above,
+    require_any_member,
 )
 from app.core.exceptions import NotFoundError
 from app.core.rate_limit import limiter
@@ -51,7 +55,7 @@ def _get_chat_service(
 async def send_message(
     request: Request,
     payload: ChatRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_analyst_or_above),
     organization: Organization = Depends(get_current_organization),
     service: ChatService = Depends(_get_chat_service),
     audit: AuditLogger = Depends(get_audit_logger),
@@ -90,11 +94,47 @@ async def send_message(
     return response
 
 
+@router.post("/stream")
+@limiter.limit(settings.rate_limit_ai)
+async def send_message_stream(
+    request: Request,
+    payload: ChatRequest,
+    current_user: User = Depends(require_analyst_or_above),
+    organization: Organization = Depends(get_current_organization),
+    service: ChatService = Depends(_get_chat_service),
+    audit: AuditLogger = Depends(get_audit_logger),
+) -> StreamingResponse:
+    async def _sse() -> AsyncIterator[str]:
+        conversation_id: str | None = None
+        try:
+            async for event in service.process_message_stream(
+                payload, current_user, organization.id
+            ):
+                if event.get("event") == "metadata":
+                    conversation_id = event.get("conversation_id")
+                yield f"data: {json.dumps(event)}\n\n"
+        finally:
+            if conversation_id:
+                await audit.log(
+                    action="chat.message_streamed",
+                    user=current_user,
+                    resource_type="conversation",
+                    resource_id=conversation_id,
+                    organization_id=organization.id,
+                )
+
+    return StreamingResponse(
+        _sse(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
 @router.get("/conversations", response_model=DataResponse[list[ConversationListItem]])
 async def list_conversations(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_any_member),
     organization: Organization = Depends(get_current_organization),
     service: ChatService = Depends(_get_chat_service),
 ) -> DataResponse[list[ConversationListItem]]:
@@ -111,7 +151,7 @@ async def list_conversations(
 @router.get("/conversations/{conversation_id}", response_model=DataResponse[ConversationDetail])
 async def get_conversation(
     conversation_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_any_member),
     organization: Organization = Depends(get_current_organization),
     service: ChatService = Depends(_get_chat_service),
 ) -> DataResponse[ConversationDetail]:
@@ -127,7 +167,7 @@ async def get_conversation(
 @router.delete("/conversations/{conversation_id}", status_code=204)
 async def delete_conversation(
     conversation_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_analyst_or_above),
     organization: Organization = Depends(get_current_organization),
     service: ChatService = Depends(_get_chat_service),
     audit: AuditLogger = Depends(get_audit_logger),

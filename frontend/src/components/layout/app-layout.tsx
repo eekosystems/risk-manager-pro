@@ -7,6 +7,7 @@ import { SettingsPage } from "@/components/settings/settings-page";
 import { PHLWizard } from "@/components/workflows/phl-wizard";
 import { SRAWizard } from "@/components/workflows/sra-wizard";
 import { useOrganizationContext } from "@/hooks/use-organization-context";
+import { useUserRole } from "@/hooks/use-user-role";
 import type { FunctionType } from "@/types/api";
 
 import { HeaderBar } from "./header-bar";
@@ -32,6 +33,19 @@ export function AppLayout({ children }: AppLayoutProps) {
   const [currentView, setCurrentView] = useState<AppView>("chat");
   const { activeOrganization, organizations, setActiveOrganization } =
     useOrganizationContext();
+  const { canEdit } = useUserRole();
+
+  const readOnlyNotice = (
+    <div className="flex flex-1 items-center justify-center p-8">
+      <div className="max-w-md rounded-lg border border-amber-200 bg-amber-50 p-6 text-center">
+        <p className="text-sm font-semibold text-amber-900">Read-only access</p>
+        <p className="mt-2 text-sm text-amber-700">
+          This workflow requires analyst or admin permissions. Ask an admin to
+          grant you access.
+        </p>
+      </div>
+    </div>
+  );
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50 font-sans">
@@ -65,15 +79,23 @@ export function AppLayout({ children }: AppLayoutProps) {
         ) : currentView === "risk-register" ? (
           <RiskRegisterPage />
         ) : currentView === "phl-workflow" ? (
-          <PHLWizard
-            onComplete={() => setCurrentView("risk-register")}
-            onCancel={() => setCurrentView("chat")}
-          />
+          canEdit ? (
+            <PHLWizard
+              onComplete={() => setCurrentView("risk-register")}
+              onCancel={() => setCurrentView("chat")}
+            />
+          ) : (
+            readOnlyNotice
+          )
         ) : currentView === "sra-workflow" ? (
-          <SRAWizard
-            onComplete={() => setCurrentView("risk-register")}
-            onCancel={() => setCurrentView("chat")}
-          />
+          canEdit ? (
+            <SRAWizard
+              onComplete={() => setCurrentView("risk-register")}
+              onCancel={() => setCurrentView("chat")}
+            />
+          ) : (
+            readOnlyNotice
+          )
         ) : (
           children({ activeFunction, conversationId, setConversationId })
         )}

@@ -74,3 +74,10 @@ variable "acs_sender_address" {
   type        = string
   description = "Default system sender email address (donotreply@<managed-domain>.azurecomm.net)"
 }
+
+variable "applicationinsights_connection_string" {
+  type        = string
+  description = "Application Insights connection string for OpenTelemetry export"
+  sensitive   = true
+  default     = ""
+}

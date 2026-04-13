@@ -12,9 +12,10 @@ from app.core.database import async_session_factory, get_db
 from app.core.deps import (
     get_audit_logger,
     get_current_organization,
-    get_current_user,
     get_search_indexer,
     get_storage_service,
+    require_analyst_or_above,
+    require_any_member,
 )
 from app.core.tasks import track_task
 from app.models.document import DocumentStatus, SourceType
@@ -47,7 +48,7 @@ async def upload_document(
     file: UploadFile,
     request: Request,
     source_type: SourceType = Query(SourceType.CLIENT, alias="source_type"),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_analyst_or_above),
     organization: Organization = Depends(get_current_organization),
     service: DocumentService = Depends(_get_document_service),
     audit: AuditLogger = Depends(get_audit_logger),
@@ -122,7 +123,7 @@ async def _process_document_background(
 async def list_documents(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=500),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_any_member),
     organization: Organization = Depends(get_current_organization),
     service: DocumentService = Depends(_get_document_service),
 ) -> PaginatedResponse[DocumentListItem]:
@@ -146,7 +147,7 @@ async def list_documents(
 @router.get("/{document_id}", response_model=DataResponse[DocumentDetail])
 async def get_document(
     document_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_any_member),
     organization: Organization = Depends(get_current_organization),
     service: DocumentService = Depends(_get_document_service),
 ) -> DataResponse[DocumentDetail]:
@@ -160,7 +161,7 @@ async def get_document(
 @router.delete("/{document_id}", status_code=204)
 async def delete_document(
     document_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_analyst_or_above),
     organization: Organization = Depends(get_current_organization),
     service: DocumentService = Depends(_get_document_service),
     audit: AuditLogger = Depends(get_audit_logger),
@@ -179,7 +180,7 @@ async def delete_document(
 async def reindex_document(
     document_id: uuid.UUID,
     request: Request,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_analyst_or_above),
     organization: Organization = Depends(get_current_organization),
     db: AsyncSession = Depends(get_db),
     indexer: SearchIndexer = Depends(get_search_indexer),
@@ -228,10 +229,61 @@ class ProcessAllResult(BaseModel):
     already_indexed: int
 
 
+class BulkDeleteRequest(BaseModel):
+    document_ids: list[uuid.UUID]
+
+
+class BulkDeleteResult(BaseModel):
+    deleted: int
+    skipped: int
+
+
+@router.post(
+    "/bulk-delete",
+    response_model=DataResponse[BulkDeleteResult],
+    status_code=200,
+)
+async def bulk_delete_documents(
+    payload: BulkDeleteRequest,
+    current_user: User = Depends(require_analyst_or_above),
+    organization: Organization = Depends(get_current_organization),
+    service: DocumentService = Depends(_get_document_service),
+    audit: AuditLogger = Depends(get_audit_logger),
+) -> DataResponse[BulkDeleteResult]:
+    deleted = 0
+    skipped = 0
+    for doc_id in payload.document_ids:
+        try:
+            await service.delete_document(doc_id, organization.id)
+            deleted += 1
+        except Exception:
+            logger.warning(
+                "bulk_delete_skip",
+                document_id=str(doc_id),
+                organization_id=str(organization.id),
+                exc_info=True,
+            )
+            skipped += 1
+
+    await audit.log(
+        action="document.bulk_deleted",
+        user=current_user,
+        resource_type="document",
+        resource_id=str(organization.id),
+        organization_id=organization.id,
+        metadata={"deleted": deleted, "skipped": skipped, "requested": len(payload.document_ids)},
+    )
+
+    return DataResponse(
+        data=BulkDeleteResult(deleted=deleted, skipped=skipped),
+        meta=MetaResponse(request_id=""),
+    )
+
+
 @router.post("/process-all", response_model=DataResponse[ProcessAllResult])
 async def process_all_uploaded(
     request: Request,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_analyst_or_above),
     organization: Organization = Depends(get_current_organization),
     db: AsyncSession = Depends(get_db),
     audit: AuditLogger = Depends(get_audit_logger),

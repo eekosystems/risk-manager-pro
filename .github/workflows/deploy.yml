@@ -13,6 +13,8 @@ env:
   ACR_NAME: ${{ vars.ACR_NAME }}
   CONTAINER_APP_NAME: ${{ vars.CONTAINER_APP_NAME }}
   RESOURCE_GROUP: ${{ vars.RESOURCE_GROUP }}
+  TF_ENV: ${{ vars.TF_ENV || 'prod' }}
+  API_BASE_URL: ${{ vars.API_BASE_URL }}
 
 permissions:
   id-token: write
@@ -54,7 +56,7 @@ jobs:
         run: terraform init
 
       - name: Terraform Plan
-        run: terraform plan -var-file=environments/dev.tfvars -out=tfplan
+        run: terraform plan -var-file=environments/${{ env.TF_ENV }}.tfvars -out=tfplan
         env:
           TF_VAR_azure_ad_tenant_id: ${{ secrets.AZURE_AD_TENANT_ID }}
           TF_VAR_azure_ad_client_id: ${{ secrets.AZURE_AD_CLIENT_ID }}
@@ -102,12 +104,56 @@ jobs:
           IMAGE_TAG="${{ env.ACR_NAME }}.azurecr.io/rmp-api:${{ github.sha }}"
           docker push "$IMAGE_TAG"
 
-      - name: Update Container App
+      - name: Capture current revision for rollback
+        id: prev-revision
         run: |
+          PREV=$(az containerapp revision list \
+            --name ${{ env.CONTAINER_APP_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --query "[?properties.active].name | [0]" -o tsv)
+          echo "name=$PREV" >> "$GITHUB_OUTPUT"
+          echo "Previous active revision: $PREV"
+
+      - name: Update Container App
+        id: update
+        run: |
+          REV_SUFFIX="s$(date +%s)"
           az containerapp update \
             --name ${{ env.CONTAINER_APP_NAME }} \
             --resource-group ${{ env.RESOURCE_GROUP }} \
-            --image "${{ env.ACR_NAME }}.azurecr.io/rmp-api:${{ github.sha }}"
+            --image "${{ env.ACR_NAME }}.azurecr.io/rmp-api:${{ github.sha }}" \
+            --revision-suffix "$REV_SUFFIX"
+          echo "revision_suffix=$REV_SUFFIX" >> "$GITHUB_OUTPUT"
+
+      - name: Health check new revision
+        id: health
+        run: |
+          URL="${{ env.API_BASE_URL }}/health"
+          echo "Polling $URL"
+          for i in $(seq 1 30); do
+            CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "$URL" || echo "000")
+            if [ "$CODE" = "200" ]; then
+              echo "Healthy after ${i} attempts"
+              exit 0
+            fi
+            echo "attempt $i: $CODE"
+            sleep 3
+          done
+          echo "Health check failed after 90s"
+          exit 1
+
+      - name: Rollback on failure
+        if: failure() && steps.update.outcome == 'success' && steps.prev-revision.outputs.name != ''
+        run: |
+          echo "Rolling back to ${{ steps.prev-revision.outputs.name }}"
+          az containerapp ingress traffic set \
+            --name ${{ env.CONTAINER_APP_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --revision-weight "${{ steps.prev-revision.outputs.name }}=100"
+          az containerapp revision deactivate \
+            --name ${{ env.CONTAINER_APP_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --revision "${{ env.CONTAINER_APP_NAME }}--${{ steps.update.outputs.revision_suffix }}" || true
 
   # 3. Frontend deploy (after infra, parallel with backend)
   deploy-frontend:

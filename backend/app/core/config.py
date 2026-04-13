@@ -100,6 +100,20 @@ class Settings(BaseSettings):
     last_login_throttle_seconds: int = 300  # 5 minutes
     last_activity_throttle_seconds: int = 300  # 5 minutes
 
+    # RBAC enforcement on risks/documents/chat endpoints. Disabled by default to
+    # allow a rollout window; production envs should set RMP_ENFORCE_RBAC=true
+    # after membership backfill has run.
+    enforce_rbac: bool = False
+
+    # Azure Monitor / Application Insights
+    applicationinsights_connection_string: str = ""
+    otel_service_name: str = "risk-manager-pro-api"
+    otel_traces_sampler_arg: float = 1.0
+
+    # Audit log WORM export
+    audit_blob_circuit_breaker_threshold: int = 5
+    audit_blob_circuit_breaker_window_seconds: int = 60
+
     @model_validator(mode="after")
     def _validate_database_url(self) -> "Settings":
         if not self.database_url:

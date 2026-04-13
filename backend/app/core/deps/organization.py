@@ -65,6 +65,8 @@ def require_org_role(*allowed_roles: MembershipRole) -> Callable[..., Awaitable[
         organization: Organization = Depends(get_current_organization),
         db: AsyncSession = Depends(get_db),
     ) -> User:
+        from app.core.config import settings
+
         if current_user.is_platform_admin:
             return current_user
 
@@ -77,12 +79,20 @@ def require_org_role(*allowed_roles: MembershipRole) -> Callable[..., Awaitable[
         membership = result.scalar_one_or_none()
 
         if not membership or membership.role not in allowed_roles:
+            if not settings.enforce_rbac:
+                return current_user
             raise ForbiddenError(
                 f"Requires one of roles: {', '.join(r.value for r in allowed_roles)}"
             )
         return current_user
 
     return _check_org_role
+
+
+require_analyst_or_above = require_org_role(MembershipRole.ORG_ADMIN, MembershipRole.ANALYST)
+require_any_member = require_org_role(
+    MembershipRole.ORG_ADMIN, MembershipRole.ANALYST, MembershipRole.VIEWER
+)
 
 
 async def require_platform_admin(

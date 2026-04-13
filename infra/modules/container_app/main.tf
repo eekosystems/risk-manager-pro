@@ -85,6 +85,14 @@ resource "azurerm_container_app" "backend" {
         name  = "ACS_SENDER_ADDRESS"
         value = var.acs_sender_address
       }
+      env {
+        name  = "APPLICATIONINSIGHTS_CONNECTION_STRING"
+        value = var.applicationinsights_connection_string
+      }
+      env {
+        name  = "OTEL_SERVICE_NAME"
+        value = "risk-manager-pro-api"
+      }
     }
   }
 

@@ -172,6 +172,10 @@ def create_app() -> FastAPI:
 
     app.include_router(api_router)
 
+    from app.core.telemetry import configure_telemetry
+
+    configure_telemetry(app)
+
     return app
 
 

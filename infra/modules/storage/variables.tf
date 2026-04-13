@@ -23,3 +23,9 @@ variable "audit_retention_days" {
   type        = number
   default     = 2555
 }
+
+variable "audit_immutability_locked" {
+  description = "Whether to lock the audit container immutability policy. IRREVERSIBLE: once locked, the policy cannot be shortened or deleted for the full retention_days period. Flip to true only after a burn-in window in production."
+  type        = bool
+  default     = false
+}

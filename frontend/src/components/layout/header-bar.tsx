@@ -1,6 +1,7 @@
 import { Search, Settings } from "lucide-react";
 
 import { NotificationBell } from "@/components/notifications/notification-bell";
+import { useUserRole } from "@/hooks/use-user-role";
 
 import type { AppView } from "./app-layout";
 
@@ -39,6 +40,7 @@ const VIEW_HEADERS: Record<AppView, { title: string; subtitle: string }> = {
 
 export function HeaderBar({ currentView = "chat", onSettingsClick, onViewChange }: HeaderBarProps) {
   const header = VIEW_HEADERS[currentView];
+  const { isAdmin } = useUserRole();
 
   return (
     <div className="flex items-center justify-between border-b border-gray-200 bg-white px-8 py-4">
@@ -60,13 +62,15 @@ export function HeaderBar({ currentView = "chat", onSettingsClick, onViewChange 
           </kbd>
         </div>
         <NotificationBell onNavigate={onViewChange} />
-        <button
-          onClick={onSettingsClick}
-          className="rounded-xl border border-gray-200 p-2.5 text-gray-400 transition-colors hover:bg-gray-50 hover:text-gray-600"
-          aria-label="Settings"
-        >
-          <Settings size={18} />
-        </button>
+        {isAdmin && (
+          <button
+            onClick={onSettingsClick}
+            className="rounded-xl border border-gray-200 p-2.5 text-gray-400 transition-colors hover:bg-gray-50 hover:text-gray-600"
+            aria-label="Settings"
+          >
+            <Settings size={18} />
+          </button>
+        )}
       </div>
     </div>
   );

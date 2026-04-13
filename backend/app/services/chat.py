@@ -1,4 +1,5 @@
 import uuid
+from collections.abc import AsyncGenerator
 
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -297,6 +298,86 @@ class ChatService:
             ),
             title=conversation.title,
         )
+
+    async def process_message_stream(
+        self, request: ChatRequest, user: User, organization_id: uuid.UUID
+    ) -> AsyncGenerator[dict, None]:
+        """Stream assistant tokens then persist the completed message.
+
+        Yields event dicts: {"event": "metadata"|"delta"|"done"|"error", ...}.
+        """
+        conversation = await self._resolve_conversation(request, user, organization_id)
+
+        await self._repo.add_message(
+            conversation_id=conversation.id,
+            organization_id=organization_id,
+            role=MessageRole.USER,
+            content=request.message,
+        )
+
+        rag_config = await self._settings.get_effective_rag_config(organization_id)
+        model_config = await self._settings.get_effective_model_config(organization_id)
+        try:
+            prompts_config = await self._settings.get_effective_prompts(organization_id)
+        except (ValueError, KeyError):
+            prompts_config = None
+
+        search_results, context_block = await self._build_rag_context(
+            query=request.message,
+            organization_id=organization_id,
+            conversation_id=conversation.id,
+            top_k=rag_config.top_k,
+            score_threshold=rag_config.score_threshold,
+        )
+
+        messages = await self._prepare_messages(
+            conversation_id=conversation.id,
+            organization_id=organization_id,
+            function_type=request.function_type,
+            prompts_config=prompts_config,
+            context_block=context_block,
+        )
+
+        yield {
+            "event": "metadata",
+            "conversation_id": str(conversation.id),
+            "title": conversation.title,
+        }
+
+        buffered: list[str] = []
+        try:
+            async for delta in self._openai.chat_completion_stream(
+                messages,
+                temperature=model_config.temperature,
+                max_tokens=model_config.max_output_tokens,
+            ):
+                buffered.append(delta)
+                yield {"event": "delta", "content": delta}
+        except Exception as exc:
+            logger.error(
+                "chat_stream_failed",
+                conversation_id=str(conversation.id),
+                user_id=str(user.id),
+                exc_info=True,
+            )
+            yield {"event": "error", "message": str(exc)}
+            return
+
+        assistant_content = "".join(buffered)
+        citations = _extract_citations(search_results) if search_results else None
+        assistant_msg = await self._repo.add_message(
+            conversation_id=conversation.id,
+            organization_id=organization_id,
+            role=MessageRole.ASSISTANT,
+            content=assistant_content,
+            citations=[c.model_dump() for c in citations] if citations else None,
+        )
+
+        yield {
+            "event": "done",
+            "message_id": str(assistant_msg.id),
+            "citations": [c.model_dump(mode="json") for c in citations] if citations else None,
+        }
 
     async def get_conversation(
         self,

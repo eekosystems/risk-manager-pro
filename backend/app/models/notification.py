@@ -14,6 +14,7 @@ class NotificationType(enum.StrEnum):
     RISK_UPDATED = "risk_updated"
     MITIGATION_CREATED = "mitigation_created"
     DOCUMENT_INDEXED = "document_indexed"
+    RISK_THRESHOLD_EXCEEDED = "risk_threshold_exceeded"
 
 
 class DeliveryChannel(enum.StrEnum):

@@ -8,14 +8,24 @@ resource "azurerm_postgresql_flexible_server" "main" {
   administrator_login           = var.admin_username
   administrator_password        = var.admin_password
   storage_mb                    = 32768
-  sku_name                      = "B_Standard_B1ms"
+  sku_name                      = var.sku_name
   zone                          = "1"
   public_network_access_enabled = false
+  backup_retention_days         = var.backup_retention_days
+  geo_redundant_backup_enabled  = var.geo_redundant_backup_enabled
   tags                          = var.tags
 
   authentication {
     active_directory_auth_enabled = true
     password_auth_enabled         = true
+  }
+
+  dynamic "high_availability" {
+    for_each = var.ha_enabled ? [1] : []
+    content {
+      mode                      = "ZoneRedundant"
+      standby_availability_zone = var.standby_availability_zone
+    }
   }
 }
 

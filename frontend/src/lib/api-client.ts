@@ -83,6 +83,30 @@ apiClient.interceptors.response.use(
   },
 );
 
+export async function getAuthHeaders(): Promise<Record<string, string>> {
+  const headers: Record<string, string> = {};
+  if (!msalInstance) return headers;
+  const accounts = msalInstance.getAllAccounts();
+  if (accounts.length === 0) return headers;
+  try {
+    const response = await withTimeout(
+      msalInstance.acquireTokenSilent({
+        ...apiTokenRequest,
+        account: accounts[0],
+      }),
+      TOKEN_TIMEOUT_MS,
+    );
+    headers["Authorization"] = `Bearer ${response.accessToken}`;
+  } catch (error) {
+    logger.error("[api-client] Token acquisition failed:", error);
+    throw new Error("Authentication required — please log in again");
+  }
+  if (activeOrganizationId) {
+    headers["X-Organization-ID"] = activeOrganizationId;
+  }
+  return headers;
+}
+
 export async function checkApiHealth(): Promise<boolean> {
   try {
     const response = await axios.get(`${env.apiBaseUrl}/health`);

@@ -30,6 +30,10 @@ module "database" {
   admin_password      = var.db_admin_password
   subnet_id           = module.network.database_subnet_id
   private_dns_zone_id = module.network.postgres_private_dns_zone_id
+
+  backup_retention_days        = var.postgres_backup_retention_days
+  geo_redundant_backup_enabled = var.postgres_geo_redundant_backup
+  ha_enabled                   = var.postgres_ha_enabled
 }
 
 module "storage" {
@@ -40,7 +44,9 @@ module "storage" {
   name_prefix         = local.name_prefix
   tags                = var.tags
 
-  subnet_id = module.network.storage_subnet_id
+  subnet_id                 = module.network.storage_subnet_id
+  audit_retention_days      = var.audit_retention_days
+  audit_immutability_locked = var.audit_immutability_locked
 }
 
 module "ai_services" {
@@ -106,6 +112,8 @@ module "container_app" {
 
   acs_endpoint       = module.communication.communication_service_endpoint
   acs_sender_address = module.communication.email_sender_address
+
+  applicationinsights_connection_string = module.monitoring.app_insights_connection_string
 }
 
 # Grant Container App managed identity access to Key Vault

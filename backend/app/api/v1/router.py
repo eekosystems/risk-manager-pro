@@ -11,6 +11,7 @@ from app.api.v1.risks import router as risks_router
 from app.api.v1.settings import router as settings_router
 from app.api.v1.sharepoint import router as sharepoint_router
 from app.api.v1.users import router as users_router
+from app.api.v1.workflows import router as workflows_router
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(health_router)
@@ -24,3 +25,4 @@ api_router.include_router(analytics_router)
 api_router.include_router(audit_router)
 api_router.include_router(notifications_router)
 api_router.include_router(sharepoint_router)
+api_router.include_router(workflows_router)
