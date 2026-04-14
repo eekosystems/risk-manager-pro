@@ -1,3 +1,4 @@
+import { ChevronRight } from "lucide-react";
 import { useMemo } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -143,6 +144,35 @@ function preprocessCitations(content: string): string {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Split out the `### Reasoning` section so it can be collapsible     */
+/* ------------------------------------------------------------------ */
+function splitReasoning(content: string): {
+  before: string;
+  reasoning: string | null;
+  after: string;
+} {
+  const match = content.match(/(^|\n)### Reasoning[^\n]*\n/);
+  if (!match || match.index === undefined) {
+    return { before: content, reasoning: null, after: "" };
+  }
+  const leadingNewline = match[1] ?? "";
+  const headingStart = match.index + leadingNewline.length;
+  const headingEnd = match.index + match[0].length;
+  const rest = content.slice(headingEnd);
+  const nextHeading = rest.match(/\n### /);
+  const reasoningEnd =
+    nextHeading && nextHeading.index !== undefined
+      ? headingEnd + nextHeading.index
+      : content.length;
+
+  return {
+    before: content.slice(0, headingStart).trimEnd(),
+    reasoning: content.slice(headingEnd, reasoningEnd).trim(),
+    after: content.slice(reasoningEnd).replace(/^\n+/, ""),
+  };
+}
+
+/* ------------------------------------------------------------------ */
 /*  Public component                                                  */
 /* ------------------------------------------------------------------ */
 interface MarkdownContentProps {
@@ -194,12 +224,42 @@ export function MarkdownContent({
     [citations, onCitationClick],
   );
 
+  const { before, reasoning, after } = splitReasoning(processed);
+
+  if (!reasoning) {
+    return (
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+        {processed}
+      </ReactMarkdown>
+    );
+  }
+
   return (
-    <ReactMarkdown
-      remarkPlugins={[remarkGfm]}
-      components={components}
-    >
-      {processed}
-    </ReactMarkdown>
+    <>
+      {before && (
+        <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+          {before}
+        </ReactMarkdown>
+      )}
+      <details open className="group my-3 rounded-xl border border-gray-200 bg-gray-50 open:bg-white">
+        <summary className="flex cursor-pointer list-none items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold text-gray-900 hover:bg-gray-100 [&::-webkit-details-marker]:hidden">
+          <ChevronRight
+            size={14}
+            className="shrink-0 text-gray-500 transition-transform group-open:rotate-90"
+          />
+          Reasoning
+        </summary>
+        <div className="border-t border-gray-200 px-3 pb-2 pt-2">
+          <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+            {reasoning}
+          </ReactMarkdown>
+        </div>
+      </details>
+      {after && (
+        <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+          {after}
+        </ReactMarkdown>
+      )}
+    </>
   );
 }
