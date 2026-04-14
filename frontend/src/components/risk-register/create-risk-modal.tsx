@@ -14,13 +14,6 @@ import {
   type Severity,
 } from "@/types/risk-matrix";
 
-const FUNCTION_TYPE_OPTIONS = [
-  { value: "general", label: "General" },
-  { value: "phl", label: "PHL" },
-  { value: "sra", label: "SRA" },
-  { value: "system", label: "System Analysis" },
-];
-
 interface CreateRiskModalProps {
   onClose: () => void;
   onSubmit: (payload: CreateRiskEntryRequest) => void;
@@ -38,8 +31,9 @@ export function CreateRiskModal({
   defaultFunctionType,
   conversationId,
 }: CreateRiskModalProps) {
-  const [title, setTitle] = useState(existingRisk?.title ?? "");
-  const [hazard, setHazard] = useState(existingRisk?.hazard ?? "");
+  const [hazard, setHazard] = useState(
+    existingRisk?.hazard ?? existingRisk?.title ?? "",
+  );
   const [description, setDescription] = useState(existingRisk?.description ?? "");
   const [severity, setSeverity] = useState<Severity>(
     (existingRisk?.severity as Severity) ?? 3,
@@ -47,21 +41,21 @@ export function CreateRiskModal({
   const [likelihood, setLikelihood] = useState<Likelihood>(
     (existingRisk?.likelihood as Likelihood) ?? "C",
   );
-  const [functionType, setFunctionType] = useState(
-    existingRisk?.function_type ?? defaultFunctionType ?? "general",
-  );
   const [notes, setNotes] = useState(existingRisk?.notes ?? "");
 
+  const functionType =
+    existingRisk?.function_type ?? defaultFunctionType ?? "general";
   const computedRiskLevel = RISK_MATRIX[likelihood][severity];
   const riskConfig = RISK_LEVEL_CONFIG[computedRiskLevel];
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!title.trim() || !hazard.trim() || !description.trim()) return;
+    const trimmedHazard = hazard.trim();
+    if (!trimmedHazard || !description.trim()) return;
     onSubmit({
-      title: title.trim(),
+      title: trimmedHazard.slice(0, 500),
       description: description.trim(),
-      hazard: hazard.trim(),
+      hazard: trimmedHazard,
       severity,
       likelihood,
       function_type: functionType,
@@ -94,19 +88,6 @@ export function CreateRiskModal({
         <form onSubmit={handleSubmit} className="max-h-[70vh] overflow-y-auto px-6 py-5">
           <div className="space-y-4">
             <div>
-              <label className={labelClass}>Title</label>
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Brief risk title..."
-                className={inputClass}
-                required
-                maxLength={500}
-              />
-            </div>
-
-            <div>
               <label className={labelClass}>Hazard</label>
               <input
                 type="text"
@@ -115,6 +96,7 @@ export function CreateRiskModal({
                 placeholder="Identified hazard..."
                 className={inputClass}
                 required
+                maxLength={500}
               />
             </div>
 
@@ -171,21 +153,6 @@ export function CreateRiskModal({
             </div>
 
             <div>
-              <label className={labelClass}>Function Type</label>
-              <select
-                value={functionType}
-                onChange={(e) => setFunctionType(e.target.value)}
-                className={inputClass}
-              >
-                {FUNCTION_TYPE_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
               <label className={labelClass}>Notes (optional)</label>
               <textarea
                 value={notes}
@@ -201,7 +168,7 @@ export function CreateRiskModal({
             <Button type="button" variant="secondary" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isPending || !title.trim() || !hazard.trim() || !description.trim()}>
+            <Button type="submit" disabled={isPending || !hazard.trim() || !description.trim()}>
               {isPending ? (
                 <>
                   <Loader2 size={16} className="mr-2 animate-spin" />

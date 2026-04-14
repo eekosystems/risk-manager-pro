@@ -29,7 +29,6 @@ const PHL_STEPS = [
 ];
 
 interface PHLWorkflowData {
-  title: string;
   description: string;
   affectedArea: string;
   existingControls: string;
@@ -68,7 +67,7 @@ export function PHLWizard({ onComplete, onCancel }: PHLWizardProps) {
   function canProceed(): boolean {
     switch (workflow.currentStep) {
       case 0:
-        return !!(d.title?.trim() && d.description?.trim());
+        return !!d.description?.trim();
       case 1:
         return !!(d.hazard?.trim());
       case 2:
@@ -79,12 +78,13 @@ export function PHLWizard({ onComplete, onCancel }: PHLWizardProps) {
   }
 
   function handleSave() {
-    if (!d.title || !d.hazard || !d.description || !d.severity || !d.likelihood) return;
+    if (!d.hazard || !d.description || !d.severity || !d.likelihood) return;
 
+    const trimmedHazard = d.hazard.trim();
     const payload: CreateRiskEntryRequest = {
-      title: d.title,
+      title: trimmedHazard.slice(0, 500),
       description: d.description,
-      hazard: d.hazard,
+      hazard: trimmedHazard,
       severity: d.severity,
       likelihood: d.likelihood,
       function_type: "phl",
@@ -115,7 +115,6 @@ export function PHLWizard({ onComplete, onCancel }: PHLWizardProps) {
   function getAiContext(): string {
     const parts = [
       `I'm conducting a Preliminary Hazard List (PHL) analysis.`,
-      d.title ? `System/Change: ${d.title}` : "",
       d.description ? `Description: ${d.description}` : "",
       d.affectedArea ? `Affected Area: ${d.affectedArea}` : "",
       d.existingControls ? `Existing Controls: ${d.existingControls}` : "",
@@ -128,17 +127,6 @@ export function PHLWizard({ onComplete, onCancel }: PHLWizardProps) {
   const stepContent = [
     // Step 0: Describe the System
     <div key="step-0" className="space-y-4">
-      <div>
-        <label className={labelClass}>Title / System Change</label>
-        <input
-          type="text"
-          value={d.title ?? ""}
-          onChange={(e) => workflow.updateData({ title: e.target.value } as Partial<PHLWorkflowData>)}
-          placeholder="e.g., Runway 9/27 construction project..."
-          className={inputClass}
-          maxLength={500}
-        />
-      </div>
       <div>
         <label className={labelClass}>Description</label>
         <textarea
@@ -242,9 +230,6 @@ export function PHLWizard({ onComplete, onCancel }: PHLWizardProps) {
       <div className="rounded-2xl border border-gray-200 bg-white p-5">
         <h3 className="text-sm font-bold text-slate-900">Summary</h3>
         <div className="mt-3 space-y-2 text-sm text-slate-600">
-          <div>
-            <span className="font-semibold">Title:</span> {d.title}
-          </div>
           <div>
             <span className="font-semibold">Description:</span> {d.description}
           </div>

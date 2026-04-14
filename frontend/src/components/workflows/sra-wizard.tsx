@@ -30,7 +30,6 @@ const SRA_STEPS = [
 
 interface SRAWorkflowData {
   sourceRiskId: string | null;
-  title: string;
   description: string;
   hazard: string;
   initialSeverity: Severity;
@@ -82,7 +81,7 @@ export function SRAWizard({ onComplete, onCancel }: SRAWizardProps) {
   function canProceed(): boolean {
     switch (workflow.currentStep) {
       case 0:
-        return !!(d.title?.trim() && d.hazard?.trim());
+        return !!d.hazard?.trim();
       case 1:
         return !!(d.initialSeverity && d.initialLikelihood);
       case 2:
@@ -97,15 +96,14 @@ export function SRAWizard({ onComplete, onCancel }: SRAWizardProps) {
   function handleSelectExistingRisk(risk: RiskEntryListItem) {
     workflow.updateData({
       sourceRiskId: risk.id,
-      title: risk.title,
-      hazard: risk.hazard,
+      hazard: risk.hazard || risk.title,
       initialSeverity: risk.severity as Severity,
       initialLikelihood: risk.likelihood as Likelihood,
     } as Partial<SRAWorkflowData>);
   }
 
   function handleSave() {
-    if (!d.title || !d.hazard || !d.residualSeverity || !d.residualLikelihood) return;
+    if (!d.hazard || !d.residualSeverity || !d.residualLikelihood) return;
 
     const notes = [
       d.justification ? `Risk Analysis Justification: ${d.justification}` : "",
@@ -143,10 +141,11 @@ export function SRAWizard({ onComplete, onCancel }: SRAWizardProps) {
         },
       );
     } else {
+      const trimmedHazard = d.hazard.trim();
       const payload: CreateRiskEntryRequest = {
-        title: d.title,
-        description: d.description ?? d.hazard,
-        hazard: d.hazard,
+        title: trimmedHazard.slice(0, 500),
+        description: d.description?.trim() || trimmedHazard,
+        hazard: trimmedHazard,
         severity: d.residualSeverity,
         likelihood: d.residualLikelihood,
         function_type: "sra",
@@ -169,8 +168,7 @@ export function SRAWizard({ onComplete, onCancel }: SRAWizardProps) {
   function getAiContext(): string {
     const parts = [
       `I'm conducting a Safety Risk Assessment (SRA) per AC 150/5200-37A Steps 3-5.`,
-      d.title ? `Hazard: ${d.title}` : "",
-      d.hazard ? `Description: ${d.hazard}` : "",
+      d.hazard ? `Hazard: ${d.hazard}` : "",
       initialSelection
         ? `Initial Risk Level: ${RISK_LEVEL_CONFIG[initialSelection.riskLevel].label}`
         : "",
@@ -229,23 +227,13 @@ export function SRAWizard({ onComplete, onCancel }: SRAWizardProps) {
         )}
         <div className="space-y-3">
           <div>
-            <label className={labelClass}>Hazard Title</label>
-            <input
-              type="text"
-              value={d.title ?? ""}
-              onChange={(e) => workflow.updateData({ title: e.target.value, sourceRiskId: null } as Partial<SRAWorkflowData>)}
-              placeholder="Brief hazard title..."
-              className={inputClass}
-              maxLength={500}
-            />
-          </div>
-          <div>
-            <label className={labelClass}>Hazard Description</label>
+            <label className={labelClass}>Hazard</label>
             <textarea
               value={d.hazard ?? ""}
               onChange={(e) => workflow.updateData({ hazard: e.target.value, sourceRiskId: null } as Partial<SRAWorkflowData>)}
               placeholder="Describe the hazard..."
-              className={`${inputClass} min-h-[80px] resize-y`}
+              className={`${inputClass} min-h-[100px] resize-y`}
+              maxLength={2000}
             />
           </div>
         </div>
@@ -355,10 +343,7 @@ export function SRAWizard({ onComplete, onCancel }: SRAWizardProps) {
         <h3 className="text-sm font-bold text-slate-900">SRA Summary</h3>
         <div className="mt-3 space-y-2 text-sm text-slate-600">
           <div>
-            <span className="font-semibold">Hazard:</span> {d.title}
-          </div>
-          <div>
-            <span className="font-semibold">Description:</span> {d.hazard}
+            <span className="font-semibold">Hazard:</span> {d.hazard}
           </div>
           {d.justification && (
             <div>
