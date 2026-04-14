@@ -3,12 +3,6 @@ import { FileText, Hash, Shield, X } from "lucide-react";
 
 import type { Citation } from "@/types/api";
 
-const TIER_STYLES: Record<string, { bg: string; text: string; dot: string }> = {
-  High: { bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-500" },
-  Moderate: { bg: "bg-amber-50", text: "text-amber-700", dot: "bg-amber-500" },
-  Low: { bg: "bg-gray-100", text: "text-gray-600", dot: "bg-gray-400" },
-};
-
 interface CitationModalProps {
   citation: Citation;
   index: number;
@@ -30,8 +24,6 @@ export function CitationModal({ citation, index, onClose }: CitationModalProps) 
     if (e.target === overlayRef.current) onClose();
   }
 
-  const tier = citation.match_tier ?? "Moderate";
-  const tierStyle = TIER_STYLES[tier] ?? TIER_STYLES["Moderate"]!;
   const rank = citation.rank ?? index + 1;
 
   return (
@@ -50,12 +42,6 @@ export function CitationModal({ citation, index, onClose }: CitationModalProps) 
             <h3 className="text-sm font-semibold text-gray-900">
               Source #{rank}
             </h3>
-            <span
-              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${tierStyle.bg} ${tierStyle.text}`}
-            >
-              <span className={`h-1.5 w-1.5 rounded-full ${tierStyle.dot}`} />
-              {tier} Match
-            </span>
           </div>
           <button
             onClick={onClose}
@@ -120,9 +106,7 @@ export function CitationModal({ citation, index, onClose }: CitationModalProps) 
         <div className="border-t border-gray-100 bg-gray-50 px-6 py-3">
           <p className="text-[11px] text-gray-400">
             This passage was retrieved from your indexed safety documents using
-            hybrid search (keyword + semantic similarity). Sources are ranked by
-            best match — a &quot;High Match&quot; means this document closely aligns with
-            your query.
+            hybrid search (keyword + semantic similarity).
           </p>
         </div>
       </div>

@@ -98,12 +98,6 @@ const baseComponents: Partial<Components> = {
 /* ------------------------------------------------------------------ */
 /*  Inline citation tooltip                                           */
 /* ------------------------------------------------------------------ */
-const TIER_DOT: Record<string, string> = {
-  High: "#10b981",
-  Moderate: "#f59e0b",
-  Low: "#9ca3af",
-};
-
 function CitationTooltip({
   citation,
   children,
@@ -113,8 +107,6 @@ function CitationTooltip({
   children: React.ReactNode;
   onClick: () => void;
 }) {
-  const tier = citation.match_tier ?? "Moderate";
-  const dotColor = TIER_DOT[tier] ?? TIER_DOT.Moderate;
   const name =
     citation.source.length > 50
       ? citation.source.slice(0, 47) + "..."
@@ -134,13 +126,6 @@ function CitationTooltip({
         {citation.section && (
           <span className="block text-gray-400">{citation.section}</span>
         )}
-        <span className="flex items-center gap-1.5 text-gray-400">
-          <span
-            className="inline-block h-1.5 w-1.5 rounded-full"
-            style={{ backgroundColor: dotColor }}
-          />
-          {tier} Match
-        </span>
         <span className="absolute -bottom-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 bg-gray-900" />
       </span>
     </span>
