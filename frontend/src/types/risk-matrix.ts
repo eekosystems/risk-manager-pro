@@ -1,7 +1,7 @@
 /**
  * FAA SMS 5x5 Risk Matrix types and constants.
  *
- * Severity: columns (1=Minimal → 5=Catastrophic)
+ * Severity: columns (1=Catastrophic → 5=Minimal)
  * Likelihood: rows (A=Frequent → E=Extremely Improbable)
  * Risk levels follow FAA Order 8040.4B guidelines.
  */
@@ -17,11 +17,11 @@ export interface RiskMatrixSelection {
 }
 
 export const SEVERITY_LABELS: Record<Severity, { short: string; full: string }> = {
-  1: { short: "1", full: "Minimal" },
-  2: { short: "2", full: "Minor" },
+  1: { short: "1", full: "Catastrophic" },
+  2: { short: "2", full: "Hazardous" },
   3: { short: "3", full: "Major" },
-  4: { short: "4", full: "Hazardous" },
-  5: { short: "5", full: "Catastrophic" },
+  4: { short: "4", full: "Minor" },
+  5: { short: "5", full: "Minimal" },
 };
 
 export const LIKELIHOOD_LABELS: Record<Likelihood, { short: string; full: string }> = {
@@ -37,11 +37,11 @@ export const LIKELIHOOD_LABELS: Record<Likelihood, { short: string; full: string
  * Per FAA SMS guidelines (Order 8040.4B).
  */
 export const RISK_MATRIX: Record<Likelihood, Record<Severity, RiskLevel>> = {
-  A: { 1: "medium",  2: "high",   3: "high",    4: "high",    5: "high"    },
-  B: { 1: "low",     2: "medium", 3: "high",    4: "high",    5: "high"    },
-  C: { 1: "low",     2: "low",    3: "medium",  4: "high",    5: "high"    },
-  D: { 1: "low",     2: "low",    3: "medium",  4: "medium",  5: "high"    },
-  E: { 1: "low",     2: "low",    3: "low",     4: "low",     5: "medium"  },
+  A: { 1: "high",    2: "high",   3: "high",    4: "high",    5: "medium"  },
+  B: { 1: "high",    2: "high",   3: "high",    4: "medium",  5: "low"     },
+  C: { 1: "high",    2: "high",   3: "medium",  4: "low",     5: "low"     },
+  D: { 1: "high",    2: "medium", 3: "medium",  4: "low",     5: "low"     },
+  E: { 1: "medium",  2: "low",    3: "low",     4: "low",     5: "low"     },
 };
 
 export const RISK_LEVEL_CONFIG: Record<
