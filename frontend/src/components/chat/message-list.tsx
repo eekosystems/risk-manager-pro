@@ -151,19 +151,7 @@ export function MessageList({
           </div>
         ))}
 
-        {isTyping && (
-          <div className="flex justify-start">
-            <div className="flex items-center gap-1.5 rounded-2xl border border-gray-200 bg-white px-5 py-3.5 shadow-sm">
-              {[0, 1, 2].map((i) => (
-                <div
-                  key={`dot-${i}`}
-                  className="h-2 w-2 rounded-full bg-brand-400 animate-typing-dot"
-                  style={{ animationDelay: `${i * 0.2}s` }}
-                />
-              ))}
-            </div>
-          </div>
-        )}
+        {isTyping && <TypingIndicator />}
 
         <div ref={endRef} />
       </div>
@@ -196,6 +184,47 @@ function ActionButton({ icon, label, onClick }: ActionButtonProps) {
       {icon}
       {label}
     </button>
+  );
+}
+
+const THINKING_PHRASES = [
+  "Searching safety documents…",
+  "Reviewing relevant sources…",
+  "Cross-referencing regulations…",
+  "Analyzing risk factors…",
+  "Drafting response…",
+];
+
+function TypingIndicator() {
+  const [phraseIdx, setPhraseIdx] = useState(0);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setPhraseIdx((i) => (i + 1) % THINKING_PHRASES.length);
+    }, 2200);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="flex justify-start">
+      <div className="flex flex-col items-start gap-1.5 rounded-2xl border border-gray-200 bg-white px-5 py-3.5 shadow-sm">
+        <div className="flex items-center gap-1.5">
+          {[0, 1, 2].map((i) => (
+            <div
+              key={`dot-${i}`}
+              className="h-2 w-2 rounded-full bg-brand-400 animate-typing-dot"
+              style={{ animationDelay: `${i * 0.2}s` }}
+            />
+          ))}
+        </div>
+        <span
+          key={phraseIdx}
+          className="animate-thinking-phrase text-[11px] italic text-gray-400"
+        >
+          {THINKING_PHRASES[phraseIdx]}
+        </span>
+      </div>
+    </div>
   );
 }
 

@@ -55,3 +55,10 @@
   40% { opacity: 1; transform: scale(1); }
 }
 .animate-typing-dot { animation: typing-dot 1.2s infinite; }
+
+@keyframes thinking-phrase {
+  0% { opacity: 0; transform: translateY(2px); }
+  15%, 85% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-2px); }
+}
+.animate-thinking-phrase { animation: thinking-phrase 2.2s ease-in-out; }
