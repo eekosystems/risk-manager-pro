@@ -110,6 +110,9 @@ export function MessageList({
                 )}
               </div>
               {msg.role === "assistant" && !msg.id.startsWith("welcome") && (
+                <ConfidentialityFooter />
+              )}
+              {msg.role === "assistant" && !msg.id.startsWith("welcome") && (
                 <div className="mt-1 ml-1 flex flex-wrap items-center gap-1">
                   {onSaveAsRisk && (
                     <ActionButton
@@ -184,6 +187,24 @@ function ActionButton({ icon, label, onClick }: ActionButtonProps) {
       {icon}
       {label}
     </button>
+  );
+}
+
+function ConfidentialityFooter() {
+  return (
+    <div className="mt-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+      <p className="text-[10px] leading-snug text-gray-500">
+        <span className="font-semibold uppercase tracking-wide">
+          Confidentiality Warning
+        </span>
+        {" — "}
+        This output contains information intended only for the use of the
+        individual or entity named above. If the reader is not the intended
+        recipient or the employee or agent responsible for delivering it, any
+        dissemination, publication or copying of this output is strictly
+        prohibited.
+      </p>
+    </div>
   );
 }
 

@@ -144,6 +144,22 @@ function preprocessCitations(content: string): string {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Strip "### Sources Used" section + confidentiality warning        */
+/*  from AI output — the UI renders both separately.                  */
+/* ------------------------------------------------------------------ */
+function stripLegacySections(content: string): string {
+  let out = content;
+  // Remove "### Sources Used" section through next ### or EOF.
+  out = out.replace(/(^|\n)### Sources Used[^\n]*\n[\s\S]*?(?=\n### |\n*$)/g, "");
+  // Remove any paragraph starting with CONFIDENTIALITY WARNING (any case).
+  out = out.replace(
+    /(^|\n)[ \t]*(?:\*\*)?CONFIDENTIALITY WARNING[\s\S]*?(?=\n### |\n*$)/gi,
+    "",
+  );
+  return out.trimEnd();
+}
+
+/* ------------------------------------------------------------------ */
 /*  Split out the `### Reasoning` section so it can be collapsible     */
 /* ------------------------------------------------------------------ */
 function splitReasoning(content: string): {
@@ -186,9 +202,10 @@ export function MarkdownContent({
   citations,
   onCitationClick,
 }: MarkdownContentProps) {
+  const cleaned = stripLegacySections(content);
   const processed = citations?.length
-    ? preprocessCitations(content)
-    : content;
+    ? preprocessCitations(cleaned)
+    : cleaned;
 
   const components: Components = useMemo(
     () => ({
