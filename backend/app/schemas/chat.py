@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
 
 from app.models.conversation import FunctionType
 
@@ -56,3 +56,9 @@ class ConversationDetail(BaseModel):
     messages: list[MessageResponse]
 
     model_config = {"from_attributes": True}
+
+
+class EmailChatMessageRequest(BaseModel):
+    to: EmailStr
+    subject: str = Field(..., min_length=1, max_length=200)
+    content: str = Field(..., min_length=1, max_length=50000)

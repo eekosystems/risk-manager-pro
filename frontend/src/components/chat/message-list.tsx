@@ -1,8 +1,9 @@
 import { clsx } from "clsx";
 import { format } from "date-fns";
-import { ShieldAlert } from "lucide-react";
+import { Check, Copy, Download, Mail, ShieldAlert } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { exportTextToPdf } from "@/lib/export-pdf";
 import type { ChatMessage, Citation } from "@/types/api";
 
 import { CitationChip } from "./citation-chip";
@@ -13,6 +14,9 @@ interface MessageListProps {
   messages: ChatMessage[];
   isTyping: boolean;
   onSaveAsRisk?: (messageContent: string) => void;
+  onEmail?: (messageContent: string) => void;
+  onCopied?: () => void;
+  onCopyFailed?: () => void;
 }
 
 interface SelectedCitation {
@@ -20,15 +24,37 @@ interface SelectedCitation {
   index: number;
 }
 
-export function MessageList({ messages, isTyping, onSaveAsRisk }: MessageListProps) {
+export function MessageList({
+  messages,
+  isTyping,
+  onSaveAsRisk,
+  onEmail,
+  onCopied,
+  onCopyFailed,
+}: MessageListProps) {
   const endRef = useRef<HTMLDivElement>(null);
   const [selected, setSelected] = useState<SelectedCitation | null>(null);
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
 
   const handleClose = useCallback(() => setSelected(null), []);
+
+  const handleCopy = useCallback(
+    async (messageId: string, content: string) => {
+      try {
+        await navigator.clipboard.writeText(content);
+        setCopiedMessageId(messageId);
+        onCopied?.();
+        window.setTimeout(() => setCopiedMessageId(null), 2000);
+      } catch {
+        onCopyFailed?.();
+      }
+    },
+    [onCopied, onCopyFailed],
+  );
 
   return (
     <div className="flex-1 overflow-y-auto px-6 py-6">
@@ -83,15 +109,39 @@ export function MessageList({ messages, isTyping, onSaveAsRisk }: MessageListPro
                   </div>
                 )}
               </div>
-              {msg.role === "assistant" && msg.id !== "welcome" && onSaveAsRisk && (
-                <button
-                  onClick={() => onSaveAsRisk(msg.content)}
-                  className="mt-1 ml-1 flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] text-gray-400 transition-colors hover:bg-brand-50 hover:text-brand-500"
-                  title="Save as Risk Entry"
-                >
-                  <ShieldAlert size={12} />
-                  Save as Risk
-                </button>
+              {msg.role === "assistant" && !msg.id.startsWith("welcome") && (
+                <div className="mt-1 ml-1 flex flex-wrap items-center gap-1">
+                  {onSaveAsRisk && (
+                    <ActionButton
+                      icon={<ShieldAlert size={12} />}
+                      label="Add to Risk Registry"
+                      onClick={() => onSaveAsRisk(msg.content)}
+                    />
+                  )}
+                  <ActionButton
+                    icon={
+                      copiedMessageId === msg.id ? (
+                        <Check size={12} />
+                      ) : (
+                        <Copy size={12} />
+                      )
+                    }
+                    label={copiedMessageId === msg.id ? "Copied" : "Copy"}
+                    onClick={() => handleCopy(msg.id, msg.content)}
+                  />
+                  {onEmail && (
+                    <ActionButton
+                      icon={<Mail size={12} />}
+                      label="Send Email"
+                      onClick={() => onEmail(msg.content)}
+                    />
+                  )}
+                  <ActionButton
+                    icon={<Download size={12} />}
+                    label="Export PDF"
+                    onClick={() => exportTextToPdf(msg.content)}
+                  />
+                </div>
               )}
               <MessageTimestamp
                 createdAt={msg.created_at}
@@ -126,6 +176,26 @@ export function MessageList({ messages, isTyping, onSaveAsRisk }: MessageListPro
         />
       )}
     </div>
+  );
+}
+
+interface ActionButtonProps {
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+}
+
+function ActionButton({ icon, label, onClick }: ActionButtonProps) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] text-gray-400 transition-colors hover:bg-brand-50 hover:text-brand-500"
+      title={label}
+    >
+      {icon}
+      {label}
+    </button>
   );
 }
 

@@ -45,6 +45,18 @@ export async function deleteConversation(
   await apiClient.delete(`/chat/conversations/${conversationId}`);
 }
 
+export interface EmailChatMessageRequest {
+  to: string;
+  subject: string;
+  content: string;
+}
+
+export async function emailChatMessage(
+  payload: EmailChatMessageRequest,
+): Promise<void> {
+  await apiClient.post("/chat/messages/email", payload);
+}
+
 export async function* streamChatMessage(
   payload: ChatRequest,
   signal?: AbortSignal,

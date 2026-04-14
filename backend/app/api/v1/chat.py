@@ -17,7 +17,7 @@ from app.core.deps import (
     require_analyst_or_above,
     require_any_member,
 )
-from app.core.exceptions import NotFoundError
+from app.core.exceptions import AppError, NotFoundError
 from app.core.rate_limit import limiter
 from app.models.notification import NotificationType
 from app.models.organization import Organization
@@ -27,10 +27,12 @@ from app.schemas.chat import (
     ChatResponse,
     ConversationDetail,
     ConversationListItem,
+    EmailChatMessageRequest,
 )
 from app.schemas.common import DataResponse, MetaResponse
 from app.services.audit import AuditLogger
 from app.services.chat import ChatService
+from app.services.email import get_email_service
 from app.services.notification import NotificationDispatcher
 from app.services.openai_client import AzureOpenAIClient
 from app.services.rag import RAGService
@@ -127,6 +129,57 @@ async def send_message_stream(
         _sse(),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@router.post("/messages/email", status_code=202)
+@limiter.limit(settings.rate_limit_default)
+async def email_chat_message(
+    request: Request,
+    payload: EmailChatMessageRequest,
+    current_user: User = Depends(require_analyst_or_above),
+    organization: Organization = Depends(get_current_organization),
+    audit: AuditLogger = Depends(get_audit_logger),
+) -> dict[str, str]:
+    email_service = get_email_service()
+    html = _build_chat_email_html(payload.content)
+    sent = await email_service.send(
+        to=payload.to,
+        subject=payload.subject,
+        html=html,
+        text_fallback=payload.content,
+    )
+    outcome = "success" if sent else "failure"
+    await audit.log(
+        action="chat.response.emailed",
+        user=current_user,
+        resource_type="chat_message",
+        resource_id=None,
+        organization_id=organization.id,
+        outcome=outcome,
+        metadata={"recipient": payload.to, "subject": payload.subject},
+    )
+    if not sent:
+        raise AppError(
+            code="EMAIL_SEND_FAILED",
+            message="Email could not be delivered. Contact your administrator.",
+            status_code=502,
+        )
+    return {"status": "sent"}
+
+
+def _build_chat_email_html(content: str) -> str:
+    import html as html_lib
+
+    escaped = html_lib.escape(content).replace("\n", "<br>")
+    return (
+        '<!doctype html><html><body style="font-family:Segoe UI,Arial,sans-serif;'
+        'color:#1f2937;line-height:1.5;">'
+        '<h2 style="color:#1e3a8a;margin-bottom:8px;">Risk Manager Pro — AI response</h2>'
+        f'<div style="white-space:normal;">{escaped}</div>'
+        '<hr style="margin-top:24px;border:none;border-top:1px solid #e5e7eb;">'
+        '<p style="font-size:12px;color:#6b7280;">Sent from Risk Manager Pro.</p>'
+        "</body></html>"
     )
 
 

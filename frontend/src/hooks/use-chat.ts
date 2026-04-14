@@ -3,6 +3,7 @@ import { useCallback, useRef, useState } from "react";
 
 import {
   deleteConversation,
+  emailChatMessage,
   getConversation,
   getConversations,
   sendMessage,
@@ -119,6 +120,12 @@ export function useStreamMessage() {
   );
 
   return { ...state, start, cancel };
+}
+
+export function useEmailChatMessage() {
+  return useMutation({
+    mutationFn: emailChatMessage,
+  });
 }
 
 export function useDeleteConversation() {

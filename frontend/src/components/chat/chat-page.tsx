@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { CreateRiskModal } from "@/components/risk-register/create-risk-modal";
-import { useConversation, useSendMessage } from "@/hooks/use-chat";
+import { useConversation, useEmailChatMessage, useSendMessage } from "@/hooks/use-chat";
 import { useUploadDocument } from "@/hooks/use-documents";
 import { useCreateRisk } from "@/hooks/use-risks";
 import { useToast } from "@/hooks/use-toast";
 import type { ChatMessage, CreateRiskEntryRequest, FunctionType } from "@/types/api";
 
 import { ChatInput } from "./chat-input";
+import { EmailChatModal } from "./email-chat-modal";
 import { MessageList } from "./message-list";
 
 const WELCOME_MESSAGES: Record<FunctionType, string> = {
@@ -62,8 +63,10 @@ export function ChatPage({
   ]);
   const [isTyping, setIsTyping] = useState(false);
   const [showRiskModal, setShowRiskModal] = useState(false);
+  const [emailTargetContent, setEmailTargetContent] = useState<string | null>(null);
   const { addToast } = useToast();
   const createRiskMutation = useCreateRisk();
+  const emailChatMutation = useEmailChatMessage();
 
   const { data: conversation } = useConversation(conversationId);
   const sendMessageMutation = useSendMessage();
@@ -166,12 +169,42 @@ export function ChatPage({
     [createRiskMutation, addToast],
   );
 
+  const handleEmail = useCallback((content: string) => {
+    setEmailTargetContent(content);
+  }, []);
+
+  const handleSendEmail = useCallback(
+    (payload: { to: string; subject: string; content: string }) => {
+      emailChatMutation.mutate(payload, {
+        onSuccess: () => {
+          setEmailTargetContent(null);
+          addToast(`Email sent to ${payload.to}`, "success");
+        },
+        onError: () => {
+          addToast("Failed to send email", "error");
+        },
+      });
+    },
+    [emailChatMutation, addToast],
+  );
+
+  const handleCopied = useCallback(() => {
+    addToast("Copied to clipboard", "success");
+  }, [addToast]);
+
+  const handleCopyFailed = useCallback(() => {
+    addToast("Copy failed — select the text manually", "error");
+  }, [addToast]);
+
   return (
     <>
       <MessageList
         messages={localMessages}
         isTyping={isTyping}
         onSaveAsRisk={handleSaveAsRisk}
+        onEmail={handleEmail}
+        onCopied={handleCopied}
+        onCopyFailed={handleCopyFailed}
       />
       <ChatInput
         onSend={handleSend}
@@ -184,6 +217,14 @@ export function ChatPage({
           isPending={createRiskMutation.isPending}
           defaultFunctionType={activeFunction}
           conversationId={conversationId}
+        />
+      )}
+      {emailTargetContent !== null && (
+        <EmailChatModal
+          content={emailTargetContent}
+          onClose={() => setEmailTargetContent(null)}
+          onSubmit={handleSendEmail}
+          isPending={emailChatMutation.isPending}
         />
       )}
     </>
