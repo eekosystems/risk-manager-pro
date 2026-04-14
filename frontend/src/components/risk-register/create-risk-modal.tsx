@@ -121,7 +121,7 @@ export function CreateRiskModal({
                 >
                   {SEVERITIES.map((s) => (
                     <option key={s} value={s}>
-                      {s} — {SEVERITY_LABELS[s].full}
+                      {SEVERITY_LABELS[s].short} — {SEVERITY_LABELS[s].full}
                     </option>
                   ))}
                 </select>

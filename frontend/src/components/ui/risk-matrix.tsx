@@ -56,7 +56,7 @@ export function RiskMatrix({ selection, onSelect, riskPositions, readOnly }: Ris
                   className="min-w-[72px] p-2 text-center text-xs font-semibold text-gray-600"
                 >
                   <div>{SEVERITY_LABELS[s].full}</div>
-                  <div className="text-[10px] text-gray-400">({s})</div>
+                  <div className="text-[10px] text-gray-400">({SEVERITY_LABELS[s].short})</div>
                 </th>
               ))}
             </tr>
@@ -145,7 +145,7 @@ export function RiskMatrix({ selection, onSelect, riskPositions, readOnly }: Ris
             Risk Level: {RISK_LEVEL_CONFIG[selection.riskLevel].label}
           </p>
           <p className="mt-0.5 text-xs text-gray-600">
-            Severity: {SEVERITY_LABELS[selection.severity].full} ({selection.severity})
+            Severity: {SEVERITY_LABELS[selection.severity].full} ({SEVERITY_LABELS[selection.severity].short})
             {" | "}
             Likelihood: {LIKELIHOOD_LABELS[selection.likelihood].full} ({selection.likelihood})
           </p>

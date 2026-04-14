@@ -101,7 +101,7 @@ export function RiskDetailView({ riskId, onBack, onEdit }: RiskDetailViewProps) 
               Severity
             </div>
             <div className="mt-1 text-sm text-slate-700">
-              {SEVERITY_LABELS[risk.severity as Severity]?.full ?? risk.severity} ({risk.severity})
+              {SEVERITY_LABELS[risk.severity as Severity]?.full ?? risk.severity} ({SEVERITY_LABELS[risk.severity as Severity]?.short ?? risk.severity})
             </div>
           </div>
           <div>
