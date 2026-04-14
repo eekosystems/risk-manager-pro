@@ -207,8 +207,8 @@ function TypingIndicator() {
 
   return (
     <div className="flex justify-start">
-      <div className="flex flex-col items-start gap-1.5 rounded-2xl border border-gray-200 bg-white px-5 py-3.5 shadow-sm">
-        <div className="flex items-center gap-1.5">
+      <div className="flex flex-col items-start">
+        <div className="flex items-center gap-1.5 rounded-2xl border border-gray-200 bg-white px-5 py-3.5 shadow-sm">
           {[0, 1, 2].map((i) => (
             <div
               key={`dot-${i}`}
@@ -219,7 +219,7 @@ function TypingIndicator() {
         </div>
         <span
           key={phraseIdx}
-          className="animate-thinking-phrase text-[11px] italic text-gray-400"
+          className="animate-thinking-phrase mt-1 px-1 text-[11px] italic text-gray-400"
         >
           {THINKING_PHRASES[phraseIdx]}
         </span>
