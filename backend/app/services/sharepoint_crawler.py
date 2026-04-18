@@ -168,17 +168,41 @@ class SharePointCrawler:
         drive_id: str,
         folder_path: str = "",
     ) -> list[SharePointFile]:
-        """Recursively list supported files in a drive or folder."""
+        """Recursively list supported files in a drive or folder.
+
+        Errors on any single subfolder (a 403, 404, timeout, rate-limit,
+        etc.) are logged and swallowed so the recursion continues into
+        sibling folders. Without this isolation, one broken subfolder
+        aborts the entire walk and silently drops every airport that
+        comes after it in traversal order.
+        """
         url = _graph_path_url(drive_id, folder_path)
 
         files: list[SharePointFile] = []
         while url:
-            data = await self._graph_get(url)
+            try:
+                data = await self._graph_get(url)
+            except Exception:  # noqa: BLE001 — never kill the wider walk on one HTTP error
+                logger.warning(
+                    "sharepoint_list_folder_failed",
+                    folder_path=folder_path or "<drive root>",
+                    exc_info=True,
+                )
+                break
+
             for item in data.get("value", []):
                 name: str = item.get("name", "")
                 if "folder" in item:
                     child_path = f"{folder_path}/{name}" if folder_path else name
-                    sub_files = await self._list_folder_items(drive_id, child_path)
+                    try:
+                        sub_files = await self._list_folder_items(drive_id, child_path)
+                    except Exception:  # noqa: BLE001 — isolate per-child recursion errors
+                        logger.warning(
+                            "sharepoint_subfolder_walk_failed",
+                            folder_path=child_path,
+                            exc_info=True,
+                        )
+                        continue
                     files.extend(sub_files)
                 elif "file" in item:
                     ext = _get_extension(name)
