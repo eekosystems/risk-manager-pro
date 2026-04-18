@@ -29,8 +29,9 @@ from typing import TYPE_CHECKING, Any
 
 import structlog
 
+from app.core.config import settings
 from app.services.document_processor import DocumentProcessor
-from app.services.sharepoint_crawler import is_risk_outcome_folder
+from app.services.sharepoint_crawler import is_risk_outcome_folder, normalize_folder_name
 
 if TYPE_CHECKING:
     from app.services.openai_client import AzureOpenAIClient
@@ -161,14 +162,42 @@ def _normalize_risk_level(value: Any) -> str | None:
 
 
 def _airport_from_segments(segments: list[str]) -> str | None:
-    """Return the folder segment directly above the first risk-outcome folder.
+    """Return the airport folder name for a file path under the configured root.
 
-    Match is tolerant (spaces/dashes/underscores/case) — see
-    `is_risk_outcome_folder`.
+    The real SharePoint layout nests projects and sometimes sub-projects
+    between the airport folder and the Risk Outcome folder, e.g.
+
+        RMP Master Directory / Airport - Safety Risk Management Documents /
+            ABQ / ABQ - 362-001 - SRMP / Risk Outcome / *.pdf
+
+        CLT / CLT - 405-005 - Taxiway Nomenclature Change / Reports /
+            Risk Outcome / *.pdf
+
+    So we identify the airport as the segment directly AFTER the configured
+    airport-root path (`settings.sharepoint_airport_root_folder`), and only
+    if a Risk Outcome folder exists somewhere deeper in the same path.
     """
-    for i, seg in enumerate(segments):
-        if is_risk_outcome_folder(seg) and i > 0:
-            return segments[i - 1]
+    # The file must live under a Risk Outcome folder somewhere in its chain.
+    if not any(is_risk_outcome_folder(s) for s in segments):
+        return None
+
+    root_parts = [
+        normalize_folder_name(s)
+        for s in (settings.sharepoint_airport_root_folder or "").strip("/").split("/")
+        if s
+    ]
+    if not root_parts:
+        # No configured root — fall back to the top-level folder.
+        return segments[0] if segments else None
+
+    normalized = [normalize_folder_name(s) for s in segments]
+    # Find the configured root prefix as a contiguous run of segments.
+    for i in range(len(normalized) - len(root_parts) + 1):
+        if normalized[i : i + len(root_parts)] == root_parts:
+            airport_idx = i + len(root_parts)
+            if airport_idx < len(segments):
+                return segments[airport_idx]
+            return None
     return None
 
 

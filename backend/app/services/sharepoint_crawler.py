@@ -18,10 +18,10 @@ logger = structlog.get_logger(__name__)
 GRAPH_BASE_URL = "https://graph.microsoft.com/v1.0"
 
 
-# The risk-outcome folder may show up as "risk-outcome", "risk outcome",
-# "Risk Outcome", "risk_outcome", etc. Normalize away spaces/dashes/underscores
-# and case so the matcher doesn't break when someone renames the folder.
-def _normalize_folder_name(name: str) -> str:
+# Normalize away spaces/dashes/underscores + case so matchers don't break
+# when folder names vary slightly between airports (e.g. "risk-outcome" vs
+# "Risk Outcome" vs "risk_outcome").
+def normalize_folder_name(name: str) -> str:
     return re.sub(r"[\s\-_]+", "", name or "").lower()
 
 
@@ -29,7 +29,7 @@ RISK_OUTCOME_NORMALIZED = "riskoutcome"
 
 
 def is_risk_outcome_folder(name: str) -> bool:
-    return _normalize_folder_name(name) == RISK_OUTCOME_NORMALIZED
+    return normalize_folder_name(name) == RISK_OUTCOME_NORMALIZED
 
 
 def _graph_path_url(drive_id: str, path: str, suffix: str = "children") -> str:
@@ -284,42 +284,61 @@ class SharePointCrawler:
     async def list_risk_outcome_files(
         self, airport_identifier: str | None = None
     ) -> list[SharePointFile]:
-        """Return every file under a `risk-outcome`-style folder across all drives.
+        """Return every file under a Risk Outcome folder in the configured root.
 
-        The folder name is matched tolerantly via `is_risk_outcome_folder` so
-        variants like "risk outcome" (space), "Risk-Outcome" (mixed case),
-        and "risk_outcome" (underscore) all resolve. When
-        `airport_identifier` is provided, only files whose parent chain
-        contains that identifier as a folder segment are returned.
+        Tolerant folder-name match (spaces/dashes/underscores/case) handles
+        variants like "Risk Outcome", "risk-outcome", "Risk_Outcome" etc.
+        The airport identifier is resolved as the first path segment after
+        `settings.sharepoint_airport_root_folder`, so files nested under
+        projects or sub-projects still group under the right airport.
 
-        Convention (Faith Group SharePoint layout): each airport folder has
-        a `risk-outcome` subfolder with its risk registry PDFs, e.g.
-        `RMP Master Directory/Airport - Safety Risk Management Documents/{AIRPORT}/risk-outcome/*.pdf`.
+        Example paths that all resolve to airport "CLT":
+            RMP Master Directory/Airport - Safety Risk Management Documents/CLT/
+                CLT - 405-003-001 - Runway Decommission/Risk Outcome/x.pdf
+            RMP Master Directory/Airport - Safety Risk Management Documents/CLT/
+                CLT - 405-005 - Taxiway Nomenclature Change/Reports/Risk Outcome/y.pdf
         """
         all_files = await self.discover_files()
         matches: list[SharePointFile] = []
         airport_lc = airport_identifier.lower() if airport_identifier else None
 
-        # Track the variants we actually see so we can log them if matching fails.
+        root_parts = [
+            normalize_folder_name(s)
+            for s in (settings.sharepoint_airport_root_folder or "").strip("/").split("/")
+            if s
+        ]
+
+        # Track variants we actually see so a misnamed folder is visible in logs.
         folder_name_hits: set[str] = set()
 
         for f in all_files:
             segments = [s for s in f.folder_path.split("/") if s]
-            # Find the index of the risk-outcome folder in the path chain.
-            risk_idx = -1
-            for i, seg in enumerate(segments):
-                if is_risk_outcome_folder(seg):
-                    risk_idx = i
-                    folder_name_hits.add(seg)
-                    break
-            if risk_idx < 0:
+            # Must have a Risk Outcome folder somewhere in the chain.
+            if not any(is_risk_outcome_folder(s) for s in segments):
                 continue
-            # Airport filter: the identifier must appear as a parent segment
-            # before the risk-outcome folder.
-            if airport_lc is not None:
-                parents = segments[:risk_idx]
-                if not any(s.lower() == airport_lc for s in parents):
-                    continue
+            for s in segments:
+                if is_risk_outcome_folder(s):
+                    folder_name_hits.add(s)
+
+            # Resolve the airport by locating the configured root prefix and
+            # taking the segment that immediately follows it.
+            file_airport: str | None = None
+            if root_parts:
+                normalized = [normalize_folder_name(s) for s in segments]
+                for i in range(len(normalized) - len(root_parts) + 1):
+                    if normalized[i : i + len(root_parts)] == root_parts:
+                        ai = i + len(root_parts)
+                        if ai < len(segments):
+                            file_airport = segments[ai]
+                        break
+            elif segments:
+                file_airport = segments[0]
+
+            if airport_lc is not None and (
+                file_airport is None or file_airport.lower() != airport_lc
+            ):
+                continue
+
             matches.append(f)
 
         logger.info(
