@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 
 import httpx
 import msal
@@ -16,6 +16,24 @@ from app.core.config import settings
 logger = structlog.get_logger(__name__)
 
 GRAPH_BASE_URL = "https://graph.microsoft.com/v1.0"
+
+
+def _graph_path_url(drive_id: str, path: str, suffix: str = "children") -> str:
+    """Build a Graph path-addressed URL with each segment percent-encoded.
+
+    Graph addresses items by path via `/drives/{id}/root:/{path}:/{suffix}`.
+    Path segments frequently contain spaces or other reserved characters
+    (e.g. "RMP Master Directory", "Airport - Safety Risk Management
+    Documents") that MUST be percent-encoded before being sent to Graph,
+    while the `:` separators and the `/` between segments must remain
+    unescaped. Passing raw spaces/specials silently yields empty results.
+    """
+    cleaned = (path or "").strip("/")
+    if not cleaned:
+        return f"{GRAPH_BASE_URL}/drives/{drive_id}/root/{suffix}"
+    encoded_path = "/".join(quote(seg, safe="") for seg in cleaned.split("/") if seg)
+    return f"{GRAPH_BASE_URL}/drives/{drive_id}/root:/{encoded_path}:/{suffix}"
+
 
 SUPPORTED_EXTENSIONS = {".pdf", ".docx", ".doc", ".txt", ".csv", ".xlsx", ".pptx"}
 
@@ -137,10 +155,7 @@ class SharePointCrawler:
         folder_path: str = "",
     ) -> list[SharePointFile]:
         """Recursively list supported files in a drive or folder."""
-        if folder_path:
-            url = f"{GRAPH_BASE_URL}/drives/{drive_id}/root:/{folder_path}:/children"
-        else:
-            url = f"{GRAPH_BASE_URL}/drives/{drive_id}/root/children"
+        url = _graph_path_url(drive_id, folder_path)
 
         files: list[SharePointFile] = []
         while url:
@@ -225,10 +240,7 @@ class SharePointCrawler:
                 continue
             drive_id = drive["id"]
 
-            if configured_root:
-                url = f"{GRAPH_BASE_URL}/drives/{drive_id}/root:/{configured_root}:/children"
-            else:
-                url = f"{GRAPH_BASE_URL}/drives/{drive_id}/root/children"
+            url = _graph_path_url(drive_id, configured_root)
 
             try:
                 count_before = len(folders)
