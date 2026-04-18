@@ -30,6 +30,7 @@ from typing import TYPE_CHECKING, Any
 import structlog
 
 from app.services.document_processor import DocumentProcessor
+from app.services.sharepoint_crawler import is_risk_outcome_folder
 
 if TYPE_CHECKING:
     from app.services.openai_client import AzureOpenAIClient
@@ -160,8 +161,13 @@ def _normalize_risk_level(value: Any) -> str | None:
 
 
 def _airport_from_segments(segments: list[str]) -> str | None:
+    """Return the folder segment directly above the first risk-outcome folder.
+
+    Match is tolerant (spaces/dashes/underscores/case) — see
+    `is_risk_outcome_folder`.
+    """
     for i, seg in enumerate(segments):
-        if seg.lower() == "risk-outcome" and i > 0:
+        if is_risk_outcome_folder(seg) and i > 0:
             return segments[i - 1]
     return None
 

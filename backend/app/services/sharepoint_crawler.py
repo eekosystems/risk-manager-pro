@@ -18,6 +18,20 @@ logger = structlog.get_logger(__name__)
 GRAPH_BASE_URL = "https://graph.microsoft.com/v1.0"
 
 
+# The risk-outcome folder may show up as "risk-outcome", "risk outcome",
+# "Risk Outcome", "risk_outcome", etc. Normalize away spaces/dashes/underscores
+# and case so the matcher doesn't break when someone renames the folder.
+def _normalize_folder_name(name: str) -> str:
+    return re.sub(r"[\s\-_]+", "", name or "").lower()
+
+
+RISK_OUTCOME_NORMALIZED = "riskoutcome"
+
+
+def is_risk_outcome_folder(name: str) -> bool:
+    return _normalize_folder_name(name) == RISK_OUTCOME_NORMALIZED
+
+
 def _graph_path_url(drive_id: str, path: str, suffix: str = "children") -> str:
     """Build a Graph path-addressed URL with each segment percent-encoded.
 
@@ -270,35 +284,41 @@ class SharePointCrawler:
     async def list_risk_outcome_files(
         self, airport_identifier: str | None = None
     ) -> list[SharePointFile]:
-        """Return every file under a `/risk-outcome/` folder across all drives.
+        """Return every file under a `risk-outcome`-style folder across all drives.
 
-        When `airport_identifier` is provided, only files whose folder path
-        contains that identifier as a parent folder segment are returned
-        (case-insensitive match). When omitted, every risk-outcome file for
-        every airport is returned.
+        The folder name is matched tolerantly via `is_risk_outcome_folder` so
+        variants like "risk outcome" (space), "Risk-Outcome" (mixed case),
+        and "risk_outcome" (underscore) all resolve. When
+        `airport_identifier` is provided, only files whose parent chain
+        contains that identifier as a folder segment are returned.
 
-        Convention (per Faith Group SharePoint layout): each airport folder
-        contains a nested `risk-outcome` subfolder holding its risk registry
-        documents, e.g. `.../{Airport Identifier}/risk-outcome/<files>`.
+        Convention (Faith Group SharePoint layout): each airport folder has
+        a `risk-outcome` subfolder with its risk registry PDFs, e.g.
+        `RMP Master Directory/Airport - Safety Risk Management Documents/{AIRPORT}/risk-outcome/*.pdf`.
         """
         all_files = await self.discover_files()
         matches: list[SharePointFile] = []
-        needle = "/risk-outcome/"
         airport_lc = airport_identifier.lower() if airport_identifier else None
 
+        # Track the variants we actually see so we can log them if matching fails.
+        folder_name_hits: set[str] = set()
+
         for f in all_files:
-            # folder_path is posix-style relative from the drive root, e.g.
-            # "Airports/KSFO/risk-outcome" for a file in that folder.
-            path_lc = f.folder_path.lower()
-            # Normalize: ensure we match `/risk-outcome/` both mid-path and as a trailing segment.
-            path_for_match = f"/{path_lc}/" if not path_lc.startswith("/") else f"{path_lc}/"
-            if needle not in path_for_match:
+            segments = [s for s in f.folder_path.split("/") if s]
+            # Find the index of the risk-outcome folder in the path chain.
+            risk_idx = -1
+            for i, seg in enumerate(segments):
+                if is_risk_outcome_folder(seg):
+                    risk_idx = i
+                    folder_name_hits.add(seg)
+                    break
+            if risk_idx < 0:
                 continue
+            # Airport filter: the identifier must appear as a parent segment
+            # before the risk-outcome folder.
             if airport_lc is not None:
-                # The airport identifier should appear as a parent segment before `risk-outcome`.
-                before_risk = path_for_match.split(needle, 1)[0]
-                segments = [s for s in before_risk.split("/") if s]
-                if not segments or airport_lc not in (s.lower() for s in segments):
+                parents = segments[:risk_idx]
+                if not any(s.lower() == airport_lc for s in parents):
                     continue
             matches.append(f)
 
@@ -307,6 +327,7 @@ class SharePointCrawler:
             airport=airport_identifier,
             total_candidates=len(all_files),
             matched=len(matches),
+            folder_name_variants_seen=list(folder_name_hits),
         )
         return matches
 
