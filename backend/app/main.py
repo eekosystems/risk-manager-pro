@@ -151,6 +151,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     digest_task = _asyncio.create_task(run_digest_worker(digest_stop))
     track_task(digest_task, name="notification.digest_worker")
 
+    # Kick off the SharePoint risk-outcome scan immediately so the Risk
+    # Register page has data ready the first time anyone opens it —
+    # no manual button click required.
+    async def _warm_risk_outcome_scan() -> None:
+        try:
+            await service_registry.risk_outcome_importer.ensure_scan(force=False)
+        except Exception:  # noqa: BLE001
+            logger.error("risk_outcome_warmup_failed", exc_info=True)
+
+    warmup_task = _asyncio.create_task(_warm_risk_outcome_scan())
+    track_task(warmup_task, name="risk_outcome.warmup")
+
     yield
 
     digest_stop.set()

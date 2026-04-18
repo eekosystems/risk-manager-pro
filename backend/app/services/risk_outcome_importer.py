@@ -351,10 +351,12 @@ class RiskOutcomeImporter:
         crawler: SharePointCrawler,
         openai_client: AzureOpenAIClient,
         stale_after_seconds: float = 3600.0,  # 1 hour — when to auto-rescan
+        empty_retry_after_seconds: float = 120.0,  # rescan sooner if last scan yielded 0 risks
     ) -> None:
         self._crawler = crawler
         self._openai = openai_client
         self._stale_after = stale_after_seconds
+        self._empty_retry_after = empty_retry_after_seconds
 
         # Per-file cache: file_id → entry. Never expires on its own; invalidated
         # only when the cache_key (size/content_type) changes.
@@ -380,14 +382,19 @@ class RiskOutcomeImporter:
 
         Returns immediately with whatever is currently cached plus the scan
         status — the frontend should poll until `status == "ready"`.
+
+        Also auto-retries on short notice when the last scan produced zero
+        risks — that almost always signals a silent failure (folder name
+        mismatch, LLM rejection, etc.) rather than a genuine empty
+        portfolio, so we don't want to wait the full stale_after window.
         """
         async with self._lock:
+            now = time.time()
+            has_any_risks = any(entry.risks for entry in self._file_cache.values())
+            stale_window = self._empty_retry_after if not has_any_risks else self._stale_after
             needs_scan = force or (
                 self._status != "scanning"
-                and (
-                    self._last_completed is None
-                    or (time.time() - self._last_completed) > self._stale_after
-                )
+                and (self._last_completed is None or (now - self._last_completed) > stale_window)
             )
             if needs_scan and (self._scan_task is None or self._scan_task.done()):
                 self._status = "scanning"

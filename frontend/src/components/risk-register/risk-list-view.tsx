@@ -6,7 +6,6 @@ import {
   ExternalLink,
   Loader2,
   Plus,
-  RefreshCw,
   ShieldAlert,
   Trash2,
   X,
@@ -97,22 +96,20 @@ export function RiskListView({ onSelectRisk, onCreateNew }: RiskListViewProps) {
 
   // Pull the SharePoint risk-outcome scan — airport list + hazards extracted
   // from each airport's /risk-outcome/ PDFs via LLM. Poll while scanning so
-  // the matrix + pills update live as more files are indexed.
-  const [forceRefreshCounter, setForceRefreshCounter] = useState(0);
-  const { data: spSummary, refetch: refetchSpSummary } = useQuery({
-    queryKey: ["sharepoint-risk-outcome-summary", forceRefreshCounter],
-    queryFn: () => getRiskOutcomeSummary(forceRefreshCounter > 0),
+  // the matrix + pills update live as more files are indexed. Also nudge
+  // the backend to re-scan when the result shows zero risks (usually
+  // signals a silent failure rather than a genuinely empty portfolio).
+  const { data: spSummary } = useQuery({
+    queryKey: ["sharepoint-risk-outcome-summary"],
+    queryFn: () => getRiskOutcomeSummary(false),
     refetchInterval: (q) => {
-      const s = q.state.data?.status;
-      return s === "scanning" ? 5000 : false;
+      const d = q.state.data;
+      if (!d) return false;
+      if (d.status === "scanning") return 5000; // poll while in progress
+      if (d.risks.length === 0 && d.airports.length > 0) return 15000; // retry empty results
+      return 60000; // steady-state heartbeat every minute
     },
   });
-  const triggerForceRefresh = () => {
-    setForceRefreshCounter((n) => n + 1);
-    // React Query re-runs the queryFn because the key changed; no need to
-    // call refetchSpSummary explicitly.
-    void refetchSpSummary;
-  };
 
   const dbRisks: RiskEntryListItem[] = useMemo(
     () => data?.data ?? [],
@@ -240,7 +237,6 @@ export function RiskListView({ onSelectRisk, onCreateNew }: RiskListViewProps) {
           riskCount={spSummary.risks.length}
           airportCount={spSummary.airports.length}
           notes={spSummary.notes}
-          onRefresh={triggerForceRefresh}
         />
       )}
 
@@ -460,7 +456,6 @@ function ScanStatusBanner({
   riskCount,
   airportCount,
   notes,
-  onRefresh,
 }: {
   status: string;
   scanned: number;
@@ -468,7 +463,6 @@ function ScanStatusBanner({
   riskCount: number;
   airportCount: number;
   notes: SharePointParseNote[];
-  onRefresh: () => void;
 }) {
   const scanning = status === "scanning";
   const noteCount = notes.length;
@@ -498,34 +492,25 @@ function ScanStatusBanner({
           : "border-gray-200 bg-gray-50 text-slate-600"
       }`}
     >
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          {scanning ? (
-            <Loader2 size={14} className="animate-spin" />
-          ) : (
-            <ShieldAlert size={14} />
+      <div className="flex items-center gap-2">
+        {scanning ? (
+          <Loader2 size={14} className="animate-spin" />
+        ) : (
+          <ShieldAlert size={14} />
+        )}
+        <span>
+          {scanning
+            ? `Extracting risks from SharePoint PDFs — ${scanned}/${total} files`
+            : `SharePoint: ${riskCount} risks across ${airportCount} airports`}
+          {noteCount > 0 && (
+            <button
+              onClick={() => setShowNotes((v) => !v)}
+              className="ml-2 underline decoration-dotted text-slate-500 hover:text-slate-700"
+            >
+              ({noteCount} {showNotes ? "▼" : "▸"} issues)
+            </button>
           )}
-          <span>
-            {scanning
-              ? `Extracting risks from SharePoint PDFs — ${scanned}/${total} files`
-              : `SharePoint: ${riskCount} risks across ${airportCount} airports`}
-            {noteCount > 0 && (
-              <button
-                onClick={() => setShowNotes((v) => !v)}
-                className="ml-2 underline decoration-dotted text-slate-500 hover:text-slate-700"
-              >
-                ({noteCount} {showNotes ? "▼" : "▸"} issues)
-              </button>
-            )}
-          </span>
-        </div>
-        <button
-          onClick={onRefresh}
-          className="flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2 py-0.5 font-medium text-slate-600 transition-colors hover:bg-gray-50"
-        >
-          <RefreshCw size={11} />
-          Force re-scan
-        </button>
+        </span>
       </div>
       {showNotes && noteCount > 0 && (
         <div className="mt-2 max-h-48 overflow-y-auto rounded-lg border border-gray-200 bg-white p-2 text-[11px]">
