@@ -12,9 +12,18 @@ from app.repositories.conversation import ConversationRepository
 from app.schemas.chat import ChatRequest, ChatResponse, CitationSchema, MessageResponse
 from app.schemas.settings import PromptsPayload
 from app.services.openai_client import AzureOpenAIClient
-from app.services.prompts import GENERAL_PROMPT, PHL_PROMPT, SRA_PROMPT, SYSTEM_ANALYSIS_PROMPT
+from app.services.prompts import (
+    GENERAL_PROMPT,
+    PHL_PROMPT,
+    RISK_REGISTER_PROMPT,
+    SRA_PROMPT,
+    SYSTEM_ANALYSIS_PROMPT,
+)
 from app.services.rag import RAGService, SearchResult
+from app.services.risk import RiskService
+from app.services.rr_tools import RR_TOOLS, execute_tool_call
 from app.services.settings import SettingsService
+from app.services.sharepoint_crawler import SharePointCrawler
 
 logger = structlog.get_logger(__name__)
 
@@ -27,6 +36,7 @@ SYSTEM_PROMPTS: dict[FunctionType, str] = {
     FunctionType.SRA: SRA_PROMPT,
     FunctionType.SYSTEM_ANALYSIS: SYSTEM_ANALYSIS_PROMPT,
     FunctionType.GENERAL: GENERAL_PROMPT,
+    FunctionType.RISK_REGISTER: RISK_REGISTER_PROMPT,
 }
 
 
@@ -40,6 +50,7 @@ def _resolve_prompt(function_type: FunctionType, prompts: PromptsPayload | None)
         FunctionType.SRA: prompts.sra_prompt,
         FunctionType.SYSTEM_ANALYSIS: prompts.system_analysis_prompt,
         FunctionType.GENERAL: prompts.system_prompt,
+        FunctionType.RISK_REGISTER: prompts.risk_register_prompt,
     }
     return prompt_map[function_type]
 
@@ -224,6 +235,96 @@ class ChatService:
 
         return messages
 
+    async def _run_tool_loop(
+        self,
+        *,
+        messages: list[dict[str, Any]],
+        temperature: float,
+        max_tokens: int,
+        conversation_id: uuid.UUID,
+        user_id: uuid.UUID,
+        organization_id: uuid.UUID,
+        max_iterations: int = 5,
+    ) -> str:
+        """Run a tool-calling loop for Risk Register chat mode.
+
+        The model may call `save_risk_register_record` one or more times. After
+        each tool call we execute it server-side and append the result as a
+        role="tool" message, then re-invoke the model. Loop terminates when
+        the model stops emitting tool calls (it produces a final text reply),
+        or after `max_iterations` to avoid runaway loops.
+        """
+        risk_service = RiskService(self._db)
+        sharepoint = SharePointCrawler()
+        loop_messages: list[dict[str, Any]] = list(messages)
+
+        try:
+            for iteration in range(max_iterations):
+                response = await self._openai.chat_completion_with_tools(
+                    loop_messages,
+                    tools=RR_TOOLS,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                )
+                tool_calls = response["tool_calls"]
+                if not tool_calls:
+                    return response["content"]
+
+                loop_messages.append(
+                    {
+                        "role": "assistant",
+                        "content": response["content"] or "",
+                        "tool_calls": [
+                            {
+                                "id": tc["id"],
+                                "type": "function",
+                                "function": {
+                                    "name": tc["name"],
+                                    "arguments": tc["arguments"],
+                                },
+                            }
+                            for tc in tool_calls
+                        ],
+                    }
+                )
+
+                for tc in tool_calls:
+                    result = await execute_tool_call(
+                        tool_call=tc,
+                        risk_service=risk_service,
+                        sharepoint=sharepoint,
+                        user_id=user_id,
+                        organization_id=organization_id,
+                        conversation_id=conversation_id,
+                    )
+                    loop_messages.append(
+                        {
+                            "role": "tool",
+                            "tool_call_id": tc["id"],
+                            "content": result,
+                        }
+                    )
+
+                logger.info(
+                    "rr_tool_loop_iteration",
+                    iteration=iteration + 1,
+                    tool_call_count=len(tool_calls),
+                    conversation_id=str(conversation_id),
+                )
+        finally:
+            await sharepoint.close()
+
+        logger.warning(
+            "rr_tool_loop_exhausted",
+            conversation_id=str(conversation_id),
+            max_iterations=max_iterations,
+        )
+        return (
+            "I saved what I could but ran into an issue completing the final "
+            "confirmation. Please check the Risk Register to verify the record was "
+            "created, and try again if anything is missing."
+        )
+
     async def process_message(
         self, request: ChatRequest, user: User, organization_id: uuid.UUID
     ) -> ChatResponse:
@@ -260,11 +361,21 @@ class ChatService:
             context_block=context_block,
         )
 
-        assistant_content = await self._openai.chat_completion(
-            messages,
-            temperature=model_config.temperature,
-            max_tokens=model_config.max_output_tokens,
-        )
+        if request.function_type == FunctionType.RISK_REGISTER:
+            assistant_content = await self._run_tool_loop(
+                messages=messages,
+                temperature=model_config.temperature,
+                max_tokens=model_config.max_output_tokens,
+                conversation_id=conversation.id,
+                user_id=user.id,
+                organization_id=organization_id,
+            )
+        else:
+            assistant_content = await self._openai.chat_completion(
+                messages,
+                temperature=model_config.temperature,
+                max_tokens=model_config.max_output_tokens,
+            )
         citations = _extract_citations(search_results) if search_results else None
 
         try:

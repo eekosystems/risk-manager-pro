@@ -207,6 +207,49 @@ class SharePointCrawler:
         )
         return files
 
+    async def list_risk_outcome_files(
+        self, airport_identifier: str | None = None
+    ) -> list[SharePointFile]:
+        """Return every file under a `/risk-outcome/` folder across all drives.
+
+        When `airport_identifier` is provided, only files whose folder path
+        contains that identifier as a parent folder segment are returned
+        (case-insensitive match). When omitted, every risk-outcome file for
+        every airport is returned.
+
+        Convention (per Faith Group SharePoint layout): each airport folder
+        contains a nested `risk-outcome` subfolder holding its risk registry
+        documents, e.g. `.../{Airport Identifier}/risk-outcome/<files>`.
+        """
+        all_files = await self.discover_files()
+        matches: list[SharePointFile] = []
+        needle = "/risk-outcome/"
+        airport_lc = airport_identifier.lower() if airport_identifier else None
+
+        for f in all_files:
+            # folder_path is posix-style relative from the drive root, e.g.
+            # "Airports/KSFO/risk-outcome" for a file in that folder.
+            path_lc = f.folder_path.lower()
+            # Normalize: ensure we match `/risk-outcome/` both mid-path and as a trailing segment.
+            path_for_match = f"/{path_lc}/" if not path_lc.startswith("/") else f"{path_lc}/"
+            if needle not in path_for_match:
+                continue
+            if airport_lc is not None:
+                # The airport identifier should appear as a parent segment before `risk-outcome`.
+                before_risk = path_for_match.split(needle, 1)[0]
+                segments = [s for s in before_risk.split("/") if s]
+                if not segments or airport_lc not in (s.lower() for s in segments):
+                    continue
+            matches.append(f)
+
+        logger.info(
+            "sharepoint_risk_outcome_scanned",
+            airport=airport_identifier,
+            total_candidates=len(all_files),
+            matched=len(matches),
+        )
+        return matches
+
     async def download_file(self, file: SharePointFile) -> bytes:
         """Download a file's content from SharePoint."""
         client = await self._ensure_client()

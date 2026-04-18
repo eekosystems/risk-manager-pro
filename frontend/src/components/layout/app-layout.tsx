@@ -77,7 +77,13 @@ export function AppLayout({ children }: AppLayoutProps) {
         ) : currentView === "audit-log" ? (
           <AuditLogPage />
         ) : currentView === "risk-register" ? (
-          <RiskRegisterPage />
+          <RiskRegisterPage
+            onStartChatEntry={() => {
+              setActiveFunction("risk_register");
+              setConversationId(null);
+              setCurrentView("chat");
+            }}
+          />
         ) : currentView === "phl-workflow" ? (
           canEdit ? (
             <PHLWizard

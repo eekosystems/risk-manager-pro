@@ -17,6 +17,7 @@ class FunctionType(enum.StrEnum):
     SRA = "sra"
     SYSTEM_ANALYSIS = "system"
     GENERAL = "general"
+    RISK_REGISTER = "risk_register"
 
 
 class ConversationStatus(enum.StrEnum):

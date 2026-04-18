@@ -17,6 +17,7 @@ from app.services.prompts import (
     GENERAL_PROMPT,
     INDEXING_INSTRUCTIONS,
     PHL_PROMPT,
+    RISK_REGISTER_PROMPT,
     SRA_PROMPT,
     SYSTEM_ANALYSIS_PROMPT,
 )
@@ -39,6 +40,7 @@ DEFAULT_PROMPTS = PromptsPayload(
     sra_prompt=SRA_PROMPT,
     system_analysis_prompt=SYSTEM_ANALYSIS_PROMPT,
     document_interpretation_prompt=DOCUMENT_INTERPRETATION_PROMPT,
+    risk_register_prompt=RISK_REGISTER_PROMPT,
     indexing_instructions=INDEXING_INSTRUCTIONS,
 )
 

@@ -1,4 +1,4 @@
-export type FunctionType = "phl" | "sra" | "system" | "general";
+export type FunctionType = "phl" | "sra" | "system" | "general" | "risk_register";
 export type MessageRole = "user" | "assistant" | "system";
 export type DocumentStatus = "uploaded" | "processing" | "indexed" | "failed";
 export type SourceType = "client" | "faa" | "icao" | "easa" | "nasa_asrs" | "internal";
@@ -137,6 +137,33 @@ export interface ErrorResponse {
 export type RiskStatus = "open" | "mitigating" | "closed" | "accepted";
 export type MitigationStatus = "pending" | "in_progress" | "completed" | "cancelled";
 
+export type OperationalDomain =
+  | "movement_area"
+  | "non_movement_area"
+  | "ramp"
+  | "terminal"
+  | "landside"
+  | "user_defined";
+export type HazardCategory5M = "human" | "machine" | "medium" | "mission" | "management";
+export type HazardCategoryICAO = "technical" | "human" | "organizational" | "environmental";
+export type RiskMatrixApplied = "airport_specific" | "faa_5x5" | "conservative_default";
+export type RecordStatus =
+  | "open"
+  | "in_progress"
+  | "pending_assessment"
+  | "closed"
+  | "monitoring";
+export type ValidationStatus = "rmp_validated" | "user_reported" | "pending";
+export type RecordSource =
+  | "rmp_sp1"
+  | "rmp_sp2"
+  | "rmp_sp3"
+  | "rmp_sp4"
+  | "manual_entry"
+  | "fg_push"
+  | "client_push";
+export type SyncStatus = "fg_only" | "client_only" | "dual_in_sync" | "dual_pending";
+
 export interface RiskEntryListItem {
   id: string;
   title: string;
@@ -146,6 +173,12 @@ export interface RiskEntryListItem {
   risk_level: string;
   status: RiskStatus;
   function_type: string;
+  airport_identifier: string | null;
+  operational_domain: OperationalDomain | null;
+  hazard_category_5m: HazardCategory5M | null;
+  record_status: RecordStatus;
+  validation_status: ValidationStatus;
+  source: RecordSource;
   created_at: string;
   updated_at: string;
 }
@@ -157,6 +190,7 @@ export interface MitigationItem {
   description: string;
   assignee: string | null;
   due_date: string | null;
+  verification_method: string | null;
   status: MitigationStatus;
   completed_at: string | null;
   created_at: string;
@@ -177,6 +211,20 @@ export interface RiskEntryDetail {
   function_type: string;
   conversation_id: string | null;
   notes: string | null;
+  airport_identifier: string | null;
+  potential_credible_outcome: string | null;
+  operational_domain: OperationalDomain | null;
+  sub_location: string | null;
+  hazard_category_5m: HazardCategory5M | null;
+  hazard_category_icao: HazardCategoryICAO | null;
+  risk_matrix_applied: RiskMatrixApplied;
+  existing_controls: string | null;
+  residual_risk_level: string | null;
+  record_status: RecordStatus;
+  validation_status: ValidationStatus;
+  source: RecordSource;
+  sync_status: SyncStatus;
+  acm_cross_reference: string | null;
   created_at: string;
   updated_at: string;
   mitigations: MitigationItem[];
@@ -191,6 +239,19 @@ export interface CreateRiskEntryRequest {
   function_type?: string;
   conversation_id?: string | null;
   notes?: string | null;
+  airport_identifier?: string | null;
+  potential_credible_outcome?: string | null;
+  operational_domain?: OperationalDomain | null;
+  sub_location?: string | null;
+  hazard_category_5m?: HazardCategory5M | null;
+  hazard_category_icao?: HazardCategoryICAO | null;
+  risk_matrix_applied?: RiskMatrixApplied;
+  existing_controls?: string | null;
+  residual_risk_level?: string | null;
+  record_status?: RecordStatus;
+  validation_status?: ValidationStatus;
+  source?: RecordSource;
+  acm_cross_reference?: string | null;
 }
 
 export interface UpdateRiskEntryRequest {
@@ -201,6 +262,18 @@ export interface UpdateRiskEntryRequest {
   likelihood?: string | null;
   status?: RiskStatus | null;
   notes?: string | null;
+  airport_identifier?: string | null;
+  potential_credible_outcome?: string | null;
+  operational_domain?: OperationalDomain | null;
+  sub_location?: string | null;
+  hazard_category_5m?: HazardCategory5M | null;
+  hazard_category_icao?: HazardCategoryICAO | null;
+  risk_matrix_applied?: RiskMatrixApplied | null;
+  existing_controls?: string | null;
+  residual_risk_level?: string | null;
+  record_status?: RecordStatus | null;
+  validation_status?: ValidationStatus | null;
+  acm_cross_reference?: string | null;
 }
 
 export interface CreateMitigationRequest {
@@ -208,6 +281,7 @@ export interface CreateMitigationRequest {
   description: string;
   assignee?: string | null;
   due_date?: string | null;
+  verification_method?: string | null;
 }
 
 export interface UpdateMitigationRequest {
@@ -215,7 +289,15 @@ export interface UpdateMitigationRequest {
   description?: string | null;
   assignee?: string | null;
   due_date?: string | null;
+  verification_method?: string | null;
   status?: MitigationStatus | null;
+}
+
+export interface SubLocation {
+  id: string;
+  airport_identifier: string;
+  name: string;
+  created_at: string;
 }
 
 // --- Analytics Dashboard Types ---

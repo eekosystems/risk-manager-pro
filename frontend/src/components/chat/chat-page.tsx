@@ -34,6 +34,12 @@ const WELCOME_MESSAGES: Record<FunctionType, string> = {
     "ready to help with any questions about aviation safety, regulatory compliance, " +
     "or your indexed documentation. Select a core function from the sidebar to focus " +
     "on a specific workflow, or ask me anything.",
+  risk_register:
+    "You're now in **Risk Register** mode. I'll walk you through adding a hazard to " +
+    "the Airport Risk Register step by step — hazard description, credible outcome, " +
+    "operational domain, 5M/ICAO category, risk scoring, existing controls, and " +
+    "mitigation actions. Tell me the airport you're working on and describe the " +
+    "hazard you'd like to record.",
 };
 
 function buildWelcomeMessage(functionType: FunctionType): ChatMessage {

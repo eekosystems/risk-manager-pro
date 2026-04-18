@@ -4,6 +4,7 @@ import { clsx } from "clsx";
 import {
   AlertTriangle,
   BarChart3,
+  ClipboardList,
   Copy,
   Database,
   FileText,
@@ -65,6 +66,13 @@ const PROMPT_SECTIONS: PromptSection[] = [
     description:
       "Governs how RMP reads, interprets, extracts, and applies Faith Group SRM/SRA documentation before Sub-Prompts execute.",
     icon: FileText,
+  },
+  {
+    key: "risk_register_prompt",
+    label: "Risk Register (Sub-Prompt 4)",
+    description:
+      "Instructions for the Risk Register / Hazard Management Module — the persistent operational layer that receives RMP output and manages hazard records, mitigation tracking, and ACP oversight.",
+    icon: ClipboardList,
   },
   {
     key: "indexing_instructions",

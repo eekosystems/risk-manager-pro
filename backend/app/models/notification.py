@@ -15,6 +15,10 @@ class NotificationType(enum.StrEnum):
     MITIGATION_CREATED = "mitigation_created"
     DOCUMENT_INDEXED = "document_indexed"
     RISK_THRESHOLD_EXCEEDED = "risk_threshold_exceeded"
+    SYNC_PENDING_REVIEW = "sync_pending_review"
+    ACP_FLAG_RAISED = "acp_flag_raised"
+    CLOSURE_APPROVAL_REQUESTED = "closure_approval_requested"
+    CLOSURE_APPROVAL_DECIDED = "closure_approval_decided"
 
 
 class DeliveryChannel(enum.StrEnum):

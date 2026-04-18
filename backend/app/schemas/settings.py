@@ -40,6 +40,7 @@ class PromptsPayload(BaseModel):
     sra_prompt: str = Field(..., min_length=1, max_length=200000)
     system_analysis_prompt: str = Field(..., min_length=1, max_length=200000)
     document_interpretation_prompt: str = Field(..., min_length=1, max_length=200000)
+    risk_register_prompt: str = Field(..., min_length=1, max_length=200000)
     indexing_instructions: str = Field(..., min_length=1, max_length=80000)
 
 

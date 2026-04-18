@@ -1,4 +1,5 @@
 from collections.abc import AsyncGenerator
+from typing import Any
 
 import structlog
 from azure.identity.aio import DefaultAzureCredential, get_bearer_token_provider
@@ -66,6 +67,65 @@ class AzureOpenAIClient:
                 status=e.status_code,
                 message=str(e.message),
                 body=str(e.body) if e.body else None,
+            )
+            raise
+
+    @_retry_on_rate_limit
+    async def chat_completion_with_tools(
+        self,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]],
+        temperature: float = 0.3,
+        max_tokens: int = 2000,
+        tool_choice: str | dict[str, Any] = "auto",
+    ) -> dict[str, Any]:
+        """Run a chat completion that may emit tool calls.
+
+        Returns a dict with keys:
+          - `content`: assistant text (possibly empty if the model only emitted tool calls)
+          - `tool_calls`: list of tool-call dicts (each with `id`, `name`, `arguments` (str))
+                          — empty list when the model did not call any tools.
+          - `finish_reason`: the raw finish reason from the API.
+
+        The caller is responsible for executing tool calls and appending the
+        results (role="tool") before re-invoking the model.
+        """
+        client = await self._get_client()
+        try:
+            response = await client.chat.completions.create(
+                model=settings.azure_openai_deployment_name,
+                messages=messages,  # type: ignore[arg-type]
+                tools=tools,  # type: ignore[arg-type]
+                tool_choice=tool_choice,  # type: ignore[arg-type]
+                temperature=temperature,
+                max_completion_tokens=max_tokens,
+            )
+            choice = response.choices[0]
+            raw_tool_calls = choice.message.tool_calls or []
+            tool_calls = [
+                {
+                    "id": tc.id,
+                    "name": tc.function.name,
+                    "arguments": tc.function.arguments,
+                }
+                for tc in raw_tool_calls
+            ]
+            logger.info(
+                "chat_completion_with_tools_success",
+                tool_call_count=len(tool_calls),
+                finish_reason=choice.finish_reason,
+                tokens_used=response.usage.total_tokens if response.usage else 0,
+            )
+            return {
+                "content": choice.message.content or "",
+                "tool_calls": tool_calls,
+                "finish_reason": choice.finish_reason,
+            }
+        except APIStatusError as e:
+            logger.error(
+                "openai_tool_call_error",
+                status=e.status_code,
+                message=str(e.message),
             )
             raise
 

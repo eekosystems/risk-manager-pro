@@ -135,7 +135,9 @@ async def update_risk_entry(
     threshold_service: RiskThresholdService = Depends(_get_threshold_service),
     audit: AuditLogger = Depends(get_audit_logger),
 ) -> DataResponse[RiskEntryResponse]:
-    entry = await service.update_risk_entry(risk_id, organization.id, payload)
+    entry = await service.update_risk_entry(
+        risk_id, organization.id, payload, user_id=current_user.id
+    )
     await threshold_service.evaluate(organization.id, current_user, entry.risk_level)
     await audit.log(
         action="risk.updated",

@@ -8,6 +8,7 @@ from app.api.v1.health import router as health_router
 from app.api.v1.notifications import router as notifications_router
 from app.api.v1.organizations import router as organizations_router
 from app.api.v1.risks import router as risks_router
+from app.api.v1.rr_sync import router as rr_sync_router
 from app.api.v1.settings import router as settings_router
 from app.api.v1.sharepoint import router as sharepoint_router
 from app.api.v1.users import router as users_router
@@ -20,6 +21,7 @@ api_router.include_router(chat_router)
 api_router.include_router(documents_router)
 api_router.include_router(organizations_router)
 api_router.include_router(risks_router)
+api_router.include_router(rr_sync_router)
 api_router.include_router(settings_router)
 api_router.include_router(analytics_router)
 api_router.include_router(audit_router)

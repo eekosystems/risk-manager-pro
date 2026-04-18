@@ -34,6 +34,7 @@ export interface PromptsSettings {
   sra_prompt: string;
   system_analysis_prompt: string;
   document_interpretation_prompt: string;
+  risk_register_prompt: string;
   indexing_instructions: string;
 }
 

@@ -1,4 +1,4 @@
-import { AlertTriangle, BarChart3, Shield } from "lucide-react";
+import { AlertTriangle, BarChart3, ClipboardList, Shield } from "lucide-react";
 
 import type { FunctionType } from "@/types/api";
 
@@ -35,5 +35,13 @@ export const FUNCTIONS: FunctionDefinition[] = [
     title: "System Analysis",
     description: "Analyze system changes and impacts",
     icon: BarChart3,
+  },
+  {
+    id: "risk_register",
+    name: "Risk Register",
+    shortName: "RR",
+    title: "Risk Register Entry",
+    description: "Conversational hazard entry into the Airport Risk Register",
+    icon: ClipboardList,
   },
 ];
