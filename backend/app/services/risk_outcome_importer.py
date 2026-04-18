@@ -207,19 +207,26 @@ def _airport_from_segments(segments: list[str]) -> str | None:
 
 
 _SYSTEM_PROMPT = (
-    "You are extracting structured risk register entries from aviation safety "
-    "documents. Given the text of one PDF, return ONLY a JSON object of the "
-    "exact shape described — no prose, no commentary, no code fences."
+    "You extract hazards from aviation safety risk management documents. "
+    "You are thorough: hazards can appear as table rows, bulleted lists, "
+    "or inline prose — find them all. Return ONLY a JSON object matching "
+    "the requested shape. No commentary, no code fences."
 )
 
 _USER_TEMPLATE = """\
-Extract every hazard listed in the following risk register document. Return
-ONLY this JSON shape (no prose):
+Extract EVERY hazard described in the following risk register / SRMD /
+SRMP document. Be thorough — hazards may appear as:
+- rows in a hazard analysis or risk assessment table
+- bulleted entries in a preliminary hazard list (PHL)
+- numbered items in a "hazards identified" section
+- inline prose describing a specific hazard with an assessed risk level
+
+Return ONLY this JSON shape (no prose):
 
 {{
   "risks": [
     {{
-      "hazard": "short description (required, under 250 chars)",
+      "hazard": "concise description of the hazard (required, under 250 chars)",
       "severity": <integer 1-5, where 1=Minimal and 5=Catastrophic>,
       "likelihood": "<letter A-E, where A=Frequent and E=Extremely Improbable>",
       "risk_level": "<low | medium | high | extreme — optional>"
@@ -228,14 +235,19 @@ ONLY this JSON shape (no prose):
 }}
 
 Rules:
-- Only include entries that clearly represent an individual hazard with an
-  assessed severity AND likelihood. Skip summaries, headers, narrative, and
-  table-of-contents entries.
-- If the document uses a different scoring scheme, translate to the FAA
-  1-5 / A-E convention.
-- Return {{"risks": []}} if no hazards are found.
+- Include every hazard that has an identifiable severity AND likelihood
+  (either explicit scores, or descriptive words you can map — e.g.
+  'Major/Remote' → severity 3, likelihood C).
+- If the document uses a different numeric or letter scheme, translate to
+  the FAA 1-5 / A-E convention.
+- Include hazards that are associated with a stated Low/Medium/High/Extreme
+  risk level even if severity/likelihood aren't explicitly separate — pick
+  the severity and likelihood that would produce that risk level on the
+  FAA 5x5 matrix.
+- Deduplicate obvious duplicates but do not merge distinct hazards.
+- Return {{"risks": []}} only if the document truly contains no hazards.
 
-Document text:
+Document text (may be a chunk of a longer document):
 ---
 {document_text}
 ---
@@ -244,7 +256,9 @@ Return ONLY the JSON object.
 """
 
 
-_MAX_PDF_CHARS = 40_000
+# Per-chunk cap. Azure OpenAI gpt-4o has a 128k-token window (~450k chars);
+# 90k chars per chunk leaves plenty of room for the prompt + JSON response.
+_MAX_CHARS_PER_CHUNK = 90_000
 _MAX_PARALLEL_EXTRACTIONS = 4
 
 
@@ -269,6 +283,61 @@ def _parse_json_payload(raw: str) -> dict[str, Any] | None:
     return obj if isinstance(obj, dict) else None
 
 
+def _chunk_text(text: str, chunk_chars: int = _MAX_CHARS_PER_CHUNK) -> list[str]:
+    """Split long text into chunks at paragraph boundaries where possible.
+
+    Most SRMDs are multi-section; splitting on double-newlines keeps a
+    logical section intact within a chunk, which helps the model reason
+    about hazards in context rather than mid-sentence.
+    """
+    if len(text) <= chunk_chars:
+        return [text]
+    chunks: list[str] = []
+    remaining = text
+    while len(remaining) > chunk_chars:
+        # Find a paragraph break within the last ~10% of the chunk window.
+        break_hint = remaining.rfind("\n\n", chunk_chars - chunk_chars // 10, chunk_chars)
+        split_at = break_hint if break_hint > 0 else chunk_chars
+        chunks.append(remaining[:split_at])
+        remaining = remaining[split_at:]
+    if remaining.strip():
+        chunks.append(remaining)
+    return chunks
+
+
+async def _extract_risks_from_chunk(
+    *,
+    chunk: str,
+    airport: str,
+    source_file: str,
+    chunk_idx: int,
+    chunk_total: int,
+    openai_client: AzureOpenAIClient,
+) -> tuple[list[dict[str, Any]], str | None]:
+    """Ask the LLM for hazards in one chunk. Returns (rows, error_message)."""
+    if not chunk.strip():
+        return [], None
+    messages = [
+        {"role": "system", "content": _SYSTEM_PROMPT},
+        {"role": "user", "content": _USER_TEMPLATE.format(document_text=chunk)},
+    ]
+    try:
+        raw = await openai_client.chat_completion(
+            messages,
+            temperature=0.0,
+            max_tokens=8000,
+            json_mode=True,
+        )
+    except Exception as exc:  # noqa: BLE001
+        return [], (f"LLM extraction failed on chunk {chunk_idx + 1}/{chunk_total}: {exc}")
+    payload = _parse_json_payload(raw)
+    if payload is None or not isinstance(payload.get("risks"), list):
+        return [], (
+            f"LLM did not return a {{risks:[...]}} object on chunk {chunk_idx + 1}/{chunk_total}"
+        )
+    return [r for r in payload["risks"] if isinstance(r, dict)], None
+
+
 async def _extract_risks_via_llm(
     *,
     text: str,
@@ -285,40 +354,38 @@ async def _extract_risks_via_llm(
                 message="empty text extraction",
             )
         ]
-    truncated = text if len(text) <= _MAX_PDF_CHARS else text[:_MAX_PDF_CHARS]
-    messages = [
-        {"role": "system", "content": _SYSTEM_PROMPT},
-        {"role": "user", "content": _USER_TEMPLATE.format(document_text=truncated)},
-    ]
-    try:
-        raw = await openai_client.chat_completion(
-            messages,
-            temperature=0.0,
-            max_tokens=4000,
-            json_mode=True,
-        )
-    except Exception as exc:  # noqa: BLE001
-        return [], [
-            SharePointParseNote(
-                airport_identifier=airport,
-                source_file=source_file,
-                message=f"LLM extraction failed: {exc}",
-            )
-        ]
-    payload = _parse_json_payload(raw)
-    if payload is None or not isinstance(payload.get("risks"), list):
-        return [], [
-            SharePointParseNote(
-                airport_identifier=airport,
-                source_file=source_file,
-                message="LLM did not return a {risks:[...]} object",
-            )
-        ]
-    risks: list[SharePointRisk] = []
+
+    chunks = _chunk_text(text)
+    chunk_total = len(chunks)
+    raw_rows: list[dict[str, Any]] = []
     notes: list[SharePointParseNote] = []
-    for idx, row in enumerate(payload["risks"]):
-        if not isinstance(row, dict):
-            continue
+
+    # Run chunks sequentially per file (outer semaphore in _run_scan bounds
+    # concurrency across files) to keep token usage predictable.
+    for idx, chunk in enumerate(chunks):
+        rows, err = await _extract_risks_from_chunk(
+            chunk=chunk,
+            airport=airport,
+            source_file=source_file,
+            chunk_idx=idx,
+            chunk_total=chunk_total,
+            openai_client=openai_client,
+        )
+        raw_rows.extend(rows)
+        if err:
+            notes.append(
+                SharePointParseNote(
+                    airport_identifier=airport,
+                    source_file=source_file,
+                    message=err,
+                )
+            )
+
+    # Deduplicate on (hazard-normalized, severity, likelihood) so chunks with
+    # overlapping context don't double-count hazards that span a chunk boundary.
+    seen: set[tuple[str, int, str]] = set()
+    risks: list[SharePointRisk] = []
+    for idx, row in enumerate(raw_rows):
         severity = _normalize_severity(row.get("severity"))
         likelihood = _normalize_likelihood(row.get("likelihood"))
         if severity is None or likelihood is None:
@@ -331,6 +398,10 @@ async def _extract_risks_via_llm(
             )
             continue
         hazard_text = str(row.get("hazard") or "").strip() or f"Hazard {idx + 1}"
+        dedup_key = (hazard_text.lower()[:120], severity, likelihood)
+        if dedup_key in seen:
+            continue
+        seen.add(dedup_key)
         risk_level = _normalize_risk_level(row.get("risk_level")) or _compute_risk_level(
             severity, likelihood
         )
@@ -345,6 +416,7 @@ async def _extract_risks_via_llm(
                 source_url=source_url,
             )
         )
+
     if not risks and not notes:
         notes.append(
             SharePointParseNote(
@@ -353,6 +425,14 @@ async def _extract_risks_via_llm(
                 message="LLM returned zero hazards",
             )
         )
+    logger.info(
+        "risk_outcome_file_extracted",
+        airport=airport,
+        source_file=source_file,
+        chunks=chunk_total,
+        text_chars=len(text),
+        risks_extracted=len(risks),
+    )
     return risks, notes
 
 
