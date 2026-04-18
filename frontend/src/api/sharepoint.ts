@@ -46,7 +46,7 @@ export async function getRiskOutcomeSummary(
 ): Promise<RiskOutcomeSummary> {
   const response = await apiClient.get<DataResponse<RiskOutcomeSummary>>(
     "/sharepoint/risk-outcome-summary",
-    { params: refresh ? { refresh: true } : {} },
+    refresh ? { params: { refresh: "true" } } : undefined,
   );
   return response.data.data;
 }

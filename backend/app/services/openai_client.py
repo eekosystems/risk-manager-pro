@@ -46,15 +46,19 @@ class AzureOpenAIClient:
         messages: list[dict[str, str]],
         temperature: float = 0.3,
         max_tokens: int = 2000,
+        json_mode: bool = False,
     ) -> str:
         client = await self._get_client()
         try:
-            response = await client.chat.completions.create(
-                model=settings.azure_openai_deployment_name,
-                messages=messages,  # type: ignore[arg-type]
-                temperature=temperature,
-                max_completion_tokens=max_tokens,
-            )
+            kwargs: dict[str, Any] = {
+                "model": settings.azure_openai_deployment_name,
+                "messages": messages,
+                "temperature": temperature,
+                "max_completion_tokens": max_tokens,
+            }
+            if json_mode:
+                kwargs["response_format"] = {"type": "json_object"}
+            response = await client.chat.completions.create(**kwargs)
             content = response.choices[0].message.content or ""
             logger.info(
                 "chat_completion_success",

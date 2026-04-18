@@ -256,7 +256,12 @@ async def _extract_risks_via_llm(
         {"role": "user", "content": _USER_TEMPLATE.format(document_text=truncated)},
     ]
     try:
-        raw = await openai_client.chat_completion(messages, temperature=0.0, max_tokens=4000)
+        raw = await openai_client.chat_completion(
+            messages,
+            temperature=0.0,
+            max_tokens=4000,
+            json_mode=True,
+        )
     except Exception as exc:  # noqa: BLE001
         return [], [
             SharePointParseNote(

@@ -12,7 +12,11 @@ import {
   X,
 } from "lucide-react";
 
-import { getRiskOutcomeSummary, type SharePointRiskRow } from "@/api/sharepoint";
+import {
+  getRiskOutcomeSummary,
+  type SharePointParseNote,
+  type SharePointRiskRow,
+} from "@/api/sharepoint";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { RiskMatrix } from "@/components/ui/risk-matrix";
@@ -94,14 +98,21 @@ export function RiskListView({ onSelectRisk, onCreateNew }: RiskListViewProps) {
   // Pull the SharePoint risk-outcome scan — airport list + hazards extracted
   // from each airport's /risk-outcome/ PDFs via LLM. Poll while scanning so
   // the matrix + pills update live as more files are indexed.
+  const [forceRefreshCounter, setForceRefreshCounter] = useState(0);
   const { data: spSummary, refetch: refetchSpSummary } = useQuery({
-    queryKey: ["sharepoint-risk-outcome-summary"],
-    queryFn: () => getRiskOutcomeSummary(false),
+    queryKey: ["sharepoint-risk-outcome-summary", forceRefreshCounter],
+    queryFn: () => getRiskOutcomeSummary(forceRefreshCounter > 0),
     refetchInterval: (q) => {
       const s = q.state.data?.status;
       return s === "scanning" ? 5000 : false;
     },
   });
+  const triggerForceRefresh = () => {
+    setForceRefreshCounter((n) => n + 1);
+    // React Query re-runs the queryFn because the key changed; no need to
+    // call refetchSpSummary explicitly.
+    void refetchSpSummary;
+  };
 
   const dbRisks: RiskEntryListItem[] = useMemo(
     () => data?.data ?? [],
@@ -228,8 +239,8 @@ export function RiskListView({ onSelectRisk, onCreateNew }: RiskListViewProps) {
           total={spSummary.total}
           riskCount={spSummary.risks.length}
           airportCount={spSummary.airports.length}
-          noteCount={spSummary.notes.length}
-          onRefresh={() => refetchSpSummary()}
+          notes={spSummary.notes}
+          onRefresh={triggerForceRefresh}
         />
       )}
 
@@ -448,7 +459,7 @@ function ScanStatusBanner({
   total,
   riskCount,
   airportCount,
-  noteCount,
+  notes,
   onRefresh,
 }: {
   status: string;
@@ -456,40 +467,83 @@ function ScanStatusBanner({
   total: number;
   riskCount: number;
   airportCount: number;
-  noteCount: number;
+  notes: SharePointParseNote[];
   onRefresh: () => void;
 }) {
   const scanning = status === "scanning";
+  const noteCount = notes.length;
+  const [showNotes, setShowNotes] = useState(false);
+
+  // Group repeated note messages so a common failure across many files
+  // collapses to "<message> (43x)" instead of scrolling a wall of text.
+  const groupedNotes = useMemo(() => {
+    const m = new Map<string, { message: string; count: number; first: SharePointParseNote }>();
+    for (const n of notes) {
+      const key = n.message;
+      const entry = m.get(key);
+      if (entry) {
+        entry.count += 1;
+      } else {
+        m.set(key, { message: key, count: 1, first: n });
+      }
+    }
+    return Array.from(m.values()).sort((a, b) => b.count - a.count);
+  }, [notes]);
+
   return (
     <div
-      className={`mb-3 flex items-center justify-between rounded-xl border px-3 py-2 text-[12px] ${
+      className={`mb-3 rounded-xl border px-3 py-2 text-[12px] ${
         scanning
           ? "border-brand-200 bg-brand-50 text-brand-700"
           : "border-gray-200 bg-gray-50 text-slate-600"
       }`}
     >
-      <div className="flex items-center gap-2">
-        {scanning ? (
-          <Loader2 size={14} className="animate-spin" />
-        ) : (
-          <ShieldAlert size={14} />
-        )}
-        <span>
-          {scanning
-            ? `Extracting risks from SharePoint PDFs — ${scanned}/${total} files`
-            : `SharePoint: ${riskCount} risks across ${airportCount} airports`}
-          {noteCount > 0 && !scanning && (
-            <span className="ml-2 text-slate-400">({noteCount} files skipped)</span>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          {scanning ? (
+            <Loader2 size={14} className="animate-spin" />
+          ) : (
+            <ShieldAlert size={14} />
           )}
-        </span>
+          <span>
+            {scanning
+              ? `Extracting risks from SharePoint PDFs — ${scanned}/${total} files`
+              : `SharePoint: ${riskCount} risks across ${airportCount} airports`}
+            {noteCount > 0 && (
+              <button
+                onClick={() => setShowNotes((v) => !v)}
+                className="ml-2 underline decoration-dotted text-slate-500 hover:text-slate-700"
+              >
+                ({noteCount} {showNotes ? "▼" : "▸"} issues)
+              </button>
+            )}
+          </span>
+        </div>
+        <button
+          onClick={onRefresh}
+          className="flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2 py-0.5 font-medium text-slate-600 transition-colors hover:bg-gray-50"
+        >
+          <RefreshCw size={11} />
+          Force re-scan
+        </button>
       </div>
-      <button
-        onClick={onRefresh}
-        className="flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2 py-0.5 font-medium text-slate-600 transition-colors hover:bg-gray-50"
-      >
-        <RefreshCw size={11} />
-        Refresh
-      </button>
+      {showNotes && noteCount > 0 && (
+        <div className="mt-2 max-h-48 overflow-y-auto rounded-lg border border-gray-200 bg-white p-2 text-[11px]">
+          {groupedNotes.map((g) => (
+            <div key={g.message} className="border-b border-gray-100 py-1 last:border-0">
+              <span className="font-semibold text-slate-700">
+                {g.count > 1 ? `${g.count}× ` : ""}
+              </span>
+              <span className="text-slate-600">{g.message}</span>
+              {g.count === 1 && (g.first.airport_identifier || g.first.source_file) && (
+                <span className="ml-2 text-slate-400">
+                  — {g.first.airport_identifier} / {g.first.source_file}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
