@@ -77,9 +77,12 @@ class Settings(BaseSettings):
     sharepoint_client_id: str = ""
     sharepoint_client_secret: str = ""
     sharepoint_site_url: str = "https://faithgroupllc.sharepoint.com/sites/RiskManagerPro"
-    # Folder inside the primary drive that contains one subfolder per airport.
+    # Path inside the primary drive whose children are the airport folders.
+    # Supports nested paths (slashes). Graph path lookups are case-insensitive.
     # Leave blank to treat the drive root as the airport folder parent.
-    sharepoint_airport_root_folder: str = "RMP master directory"
+    sharepoint_airport_root_folder: str = (
+        "RMP Master Directory/Airport - Safety Risk Management Documents"
+    )
 
     # Azure AI Document Intelligence (OCR fallback for scanned PDFs)
     azure_doc_intelligence_endpoint: str = ""

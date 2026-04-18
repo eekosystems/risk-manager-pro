@@ -210,38 +210,49 @@ class SharePointCrawler:
     async def list_airport_folders(self, drive_name: str | None = None) -> list[str]:
         """Return every airport folder name inside the configured airport root.
 
-        By default the airports live one level down, inside
-        `settings.sharepoint_airport_root_folder` (e.g. "RMP master directory").
-        When that setting is blank we fall back to listing the drive root — the
-        folders directly at the SharePoint site level.
+        `settings.sharepoint_airport_root_folder` is a (possibly nested) path
+        inside the drive whose children are the airport folders. Default is
+        "RMP Master Directory/Airport - Safety Risk Management Documents".
+        Graph path lookups are case-insensitive, so mixed-case folder names
+        resolve correctly. When the setting is blank we list the drive root.
         """
         drives = await self.list_drives()
-        root_path = (settings.sharepoint_airport_root_folder or "").strip("/")
+        configured_root = (settings.sharepoint_airport_root_folder or "").strip("/")
         folders: list[str] = []
+
         for drive in drives:
             if drive_name and drive.get("name", "").lower() != drive_name.lower():
                 continue
             drive_id = drive["id"]
-            if root_path:
-                url = f"{GRAPH_BASE_URL}/drives/{drive_id}/root:/{root_path}:/children"
+
+            if configured_root:
+                url = f"{GRAPH_BASE_URL}/drives/{drive_id}/root:/{configured_root}:/children"
             else:
                 url = f"{GRAPH_BASE_URL}/drives/{drive_id}/root/children"
+
             try:
+                count_before = len(folders)
                 while url:
                     data = await self._graph_get(url)
                     for item in data.get("value", []):
                         if "folder" in item:
                             folders.append(item.get("name", ""))
                     url = data.get("@odata.nextLink", "")
-            except RuntimeError as exc:
-                # Root folder missing on this drive — log and move on to the next drive.
-                logger.warning(
-                    "sharepoint_airport_root_not_found",
+                logger.info(
+                    "sharepoint_airport_root_resolved",
                     drive=drive.get("name"),
-                    root=root_path,
+                    configured_root=configured_root or "<drive root>",
+                    airports_found=len(folders) - count_before,
+                )
+            except RuntimeError as exc:
+                logger.warning(
+                    "sharepoint_airport_root_unreadable",
+                    drive=drive.get("name"),
+                    configured_root=configured_root or "<drive root>",
                     error=str(exc),
                 )
                 continue
+
         return sorted({f for f in folders if f})
 
     async def list_risk_outcome_files(
