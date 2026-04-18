@@ -208,28 +208,40 @@ class SharePointCrawler:
         return files
 
     async def list_airport_folders(self, drive_name: str | None = None) -> list[str]:
-        """Return every top-level folder name in the (selected) drive.
+        """Return every airport folder name inside the configured airport root.
 
-        Convention: each airport has its own top-level folder under the
-        SharePoint site, named with the airport's ICAO/FAA identifier
-        (e.g. `KSFO`) or a human-readable name. This drives the airport
-        pill row on the Risk Register page, independent of whether any
-        risk records exist in the DB yet.
+        By default the airports live one level down, inside
+        `settings.sharepoint_airport_root_folder` (e.g. "RMP master directory").
+        When that setting is blank we fall back to listing the drive root — the
+        folders directly at the SharePoint site level.
         """
         drives = await self.list_drives()
+        root_path = (settings.sharepoint_airport_root_folder or "").strip("/")
         folders: list[str] = []
         for drive in drives:
             if drive_name and drive.get("name", "").lower() != drive_name.lower():
                 continue
             drive_id = drive["id"]
-            url = f"{GRAPH_BASE_URL}/drives/{drive_id}/root/children"
-            while url:
-                data = await self._graph_get(url)
-                for item in data.get("value", []):
-                    if "folder" in item:
-                        folders.append(item.get("name", ""))
-                url = data.get("@odata.nextLink", "")
-        # De-duplicate + strip blanks, preserve sort order for stable UI
+            if root_path:
+                url = f"{GRAPH_BASE_URL}/drives/{drive_id}/root:/{root_path}:/children"
+            else:
+                url = f"{GRAPH_BASE_URL}/drives/{drive_id}/root/children"
+            try:
+                while url:
+                    data = await self._graph_get(url)
+                    for item in data.get("value", []):
+                        if "folder" in item:
+                            folders.append(item.get("name", ""))
+                    url = data.get("@odata.nextLink", "")
+            except RuntimeError as exc:
+                # Root folder missing on this drive — log and move on to the next drive.
+                logger.warning(
+                    "sharepoint_airport_root_not_found",
+                    drive=drive.get("name"),
+                    root=root_path,
+                    error=str(exc),
+                )
+                continue
         return sorted({f for f in folders if f})
 
     async def list_risk_outcome_files(
