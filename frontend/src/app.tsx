@@ -16,11 +16,17 @@ export function App() {
           element={
             <ProtectedRoute>
               <AppLayout>
-                {({ activeFunction, conversationId, setConversationId }) => (
+                {({
+                  activeFunction,
+                  conversationId,
+                  setConversationId,
+                  onStartChat,
+                }) => (
                   <ChatPage
                     activeFunction={activeFunction}
                     conversationId={conversationId}
                     setConversationId={setConversationId}
+                    onStartChat={onStartChat}
                   />
                 )}
               </AppLayout>

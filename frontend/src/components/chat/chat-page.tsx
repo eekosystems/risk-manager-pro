@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { CreateRiskModal } from "@/components/risk-register/create-risk-modal";
 import { useConversation, useEmailChatMessage, useSendMessage } from "@/hooks/use-chat";
 import { useUploadDocument } from "@/hooks/use-documents";
-import { useCreateRisk } from "@/hooks/use-risks";
 import { useToast } from "@/hooks/use-toast";
-import type { ChatMessage, CreateRiskEntryRequest, FunctionType } from "@/types/api";
+import type { ChatMessage, FunctionType } from "@/types/api";
 
 import { ChatInput } from "./chat-input";
 import { EmailChatModal } from "./email-chat-modal";
@@ -16,14 +14,12 @@ const WELCOME_MESSAGES: Record<FunctionType, string> = {
     "You're now in **Preliminary Hazard List (PHL)** mode. I'll help you " +
     "systematically identify potential hazards arising from system changes, " +
     "new operations, or modified procedures. Describe the system or change " +
-    "you'd like to analyze, or use the PHL Wizard from the sidebar for a " +
-    "step-by-step guided workflow.",
+    "you'd like to analyze and I'll walk you through it conversationally.",
   sra:
     "You're now in **Safety Risk Assessment (SRA)** mode. I'll guide you through " +
     "a structured risk evaluation following AC 150/5200-37A, including severity and " +
     "likelihood scoring, risk acceptance criteria, and mitigation planning. " +
-    "Describe the hazard you'd like to assess, or use the SRA Wizard for a " +
-    "guided workflow.",
+    "Describe the hazard you'd like to assess.",
   system:
     "You're now in **System Analysis** mode. I'll help you analyze system changes, " +
     "evaluate their safety impacts, and identify dependencies across your operations. " +
@@ -56,22 +52,22 @@ interface ChatPageProps {
   activeFunction: FunctionType;
   conversationId: string | null;
   setConversationId: (id: string | null) => void;
+  onStartChat: (fn: FunctionType) => void;
 }
 
 export function ChatPage({
   activeFunction,
   conversationId,
   setConversationId,
+  onStartChat,
 }: ChatPageProps) {
   const welcomeMessage = useMemo(() => buildWelcomeMessage(activeFunction), [activeFunction]);
   const [localMessages, setLocalMessages] = useState<ChatMessage[]>([
     welcomeMessage,
   ]);
   const [isTyping, setIsTyping] = useState(false);
-  const [showRiskModal, setShowRiskModal] = useState(false);
   const [emailTargetContent, setEmailTargetContent] = useState<string | null>(null);
   const { addToast } = useToast();
-  const createRiskMutation = useCreateRisk();
   const emailChatMutation = useEmailChatMessage();
 
   const { data: conversation } = useConversation(conversationId);
@@ -157,23 +153,12 @@ export function ChatPage({
   );
 
   const handleSaveAsRisk = useCallback(() => {
-    setShowRiskModal(true);
-  }, []);
-
-  const handleCreateRisk = useCallback(
-    (payload: CreateRiskEntryRequest) => {
-      createRiskMutation.mutate(payload, {
-        onSuccess: () => {
-          setShowRiskModal(false);
-          addToast("Risk entry created successfully", "success");
-        },
-        onError: () => {
-          addToast("Failed to create risk entry", "error");
-        },
-      });
-    },
-    [createRiskMutation, addToast],
-  );
+    onStartChat("risk_register");
+    addToast(
+      "Switched to Risk Register mode — describe the hazard you want to record.",
+      "success",
+    );
+  }, [onStartChat, addToast]);
 
   const handleEmail = useCallback((content: string) => {
     setEmailTargetContent(content);
@@ -216,15 +201,6 @@ export function ChatPage({
         onSend={handleSend}
         disabled={sendMessageMutation.isPending}
       />
-      {showRiskModal && (
-        <CreateRiskModal
-          onClose={() => setShowRiskModal(false)}
-          onSubmit={handleCreateRisk}
-          isPending={createRiskMutation.isPending}
-          defaultFunctionType={activeFunction}
-          conversationId={conversationId}
-        />
-      )}
       {emailTargetContent !== null && (
         <EmailChatModal
           content={emailTargetContent}

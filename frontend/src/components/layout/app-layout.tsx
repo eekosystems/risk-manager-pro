@@ -21,6 +21,7 @@ interface AppLayoutProps {
     activeFunction: FunctionType;
     conversationId: string | null;
     setConversationId: (id: string | null) => void;
+    onStartChat: (fn: FunctionType) => void;
   }) => React.ReactNode;
 }
 
@@ -34,6 +35,12 @@ export function AppLayout({ children }: AppLayoutProps) {
   const { activeOrganization, organizations, setActiveOrganization } =
     useOrganizationContext();
   const { canEdit } = useUserRole();
+
+  const startChat = (fn: FunctionType) => {
+    setActiveFunction(fn);
+    setConversationId(null);
+    setCurrentView("chat");
+  };
 
   const readOnlyNotice = (
     <div className="flex flex-1 items-center justify-center p-8">
@@ -77,13 +84,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         ) : currentView === "audit-log" ? (
           <AuditLogPage />
         ) : currentView === "risk-register" ? (
-          <RiskRegisterPage
-            onStartChatEntry={() => {
-              setActiveFunction("risk_register");
-              setConversationId(null);
-              setCurrentView("chat");
-            }}
-          />
+          <RiskRegisterPage onStartChatEntry={() => startChat("risk_register")} />
         ) : currentView === "phl-workflow" ? (
           canEdit ? (
             <PHLWizard
@@ -103,7 +104,12 @@ export function AppLayout({ children }: AppLayoutProps) {
             readOnlyNotice
           )
         ) : (
-          children({ activeFunction, conversationId, setConversationId })
+          children({
+            activeFunction,
+            conversationId,
+            setConversationId,
+            onStartChat: startChat,
+          })
         )}
       </main>
 

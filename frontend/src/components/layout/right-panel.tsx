@@ -112,28 +112,28 @@ export function RightPanel({
               </div>
               <div className="space-y-1">
                 <button
-                  onClick={() => onViewChange("phl-workflow")}
+                  onClick={() => onFunctionSelect("phl")}
                   className={clsx(
                     "flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all",
-                    currentView === "phl-workflow"
+                    activeFunction === "phl" && currentView === "chat"
                       ? "gradient-brand text-white shadow-md shadow-brand-500/30"
                       : "text-gray-600 hover:bg-brand-50 hover:text-brand-500",
                   )}
                 >
                   <AlertTriangle size={16} />
-                  PHL Wizard
+                  PHL Chat
                 </button>
                 <button
-                  onClick={() => onViewChange("sra-workflow")}
+                  onClick={() => onFunctionSelect("sra")}
                   className={clsx(
                     "flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all",
-                    currentView === "sra-workflow"
+                    activeFunction === "sra" && currentView === "chat"
                       ? "gradient-brand text-white shadow-md shadow-brand-500/30"
                       : "text-gray-600 hover:bg-brand-50 hover:text-brand-500",
                   )}
                 >
                   <Shield size={16} />
-                  SRA Wizard
+                  SRA Chat
                 </button>
               </div>
             </div>
@@ -214,14 +214,14 @@ export function RightPanel({
 
           <div className="mx-3 my-3 h-px w-8 bg-gray-200" />
 
-          {/* Workflow icons */}
+          {/* Workflow chat shortcuts */}
           <button
-            onClick={() => onViewChange("phl-workflow")}
-            aria-label="PHL Wizard"
-            title="PHL Wizard"
+            onClick={() => onFunctionSelect("phl")}
+            aria-label="PHL Chat"
+            title="PHL Chat"
             className={clsx(
               "flex h-10 w-10 items-center justify-center rounded-lg transition-all",
-              currentView === "phl-workflow"
+              activeFunction === "phl" && currentView === "chat"
                 ? "gradient-brand text-white shadow-md shadow-brand-500/30"
                 : "text-gray-400 hover:bg-brand-50 hover:text-brand-500",
             )}
@@ -229,12 +229,12 @@ export function RightPanel({
             <AlertTriangle size={20} />
           </button>
           <button
-            onClick={() => onViewChange("sra-workflow")}
-            aria-label="SRA Wizard"
-            title="SRA Wizard"
+            onClick={() => onFunctionSelect("sra")}
+            aria-label="SRA Chat"
+            title="SRA Chat"
             className={clsx(
               "flex h-10 w-10 items-center justify-center rounded-lg transition-all",
-              currentView === "sra-workflow"
+              activeFunction === "sra" && currentView === "chat"
                 ? "gradient-brand text-white shadow-md shadow-brand-500/30"
                 : "text-gray-400 hover:bg-brand-50 hover:text-brand-500",
             )}
