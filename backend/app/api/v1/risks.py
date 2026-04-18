@@ -83,9 +83,10 @@ async def create_risk_entry(
 @router.get("", response_model=PaginatedResponse[RiskEntryListItem])
 async def list_risk_entries(
     skip: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=100),
+    limit: int = Query(50, ge=1, le=500),
     status: str | None = Query(None),
     risk_level: str | None = Query(None),
+    airport_identifier: str | None = Query(None),
     current_user: User = Depends(require_any_member),
     organization: Organization = Depends(get_current_organization),
     service: RiskService = Depends(_get_risk_service),
@@ -96,6 +97,7 @@ async def list_risk_entries(
         limit=limit,
         status=status,
         risk_level=risk_level,
+        airport_identifier=airport_identifier,
     )
     items = [RiskEntryListItem.model_validate(e) for e in entries]
     total_pages = (total + limit - 1) // limit

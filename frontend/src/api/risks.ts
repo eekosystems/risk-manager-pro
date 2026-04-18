@@ -16,6 +16,7 @@ export interface GetRisksParams {
   limit?: number;
   status?: string;
   risk_level?: string;
+  airport_identifier?: string;
 }
 
 export async function getRisks(

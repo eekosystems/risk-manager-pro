@@ -108,9 +108,15 @@ class RiskService:
         limit: int = 50,
         status: str | None = None,
         risk_level: str | None = None,
+        airport_identifier: str | None = None,
     ) -> tuple[list[RiskEntry], int]:
         return await self._repo.list_for_organization(
-            organization_id, skip, limit, status=status, risk_level=risk_level
+            organization_id,
+            skip,
+            limit,
+            status=status,
+            risk_level=risk_level,
+            airport_identifier=airport_identifier,
         )
 
     async def update_risk_entry(
