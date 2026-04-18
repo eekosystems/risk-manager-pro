@@ -57,9 +57,7 @@ async def list_pending_changes(
     organization: Organization = Depends(get_current_organization),
     service: RRSyncService = Depends(_get_sync_service),
 ) -> DataResponse[list[PendingSyncChangeResponse]]:
-    items = await service.list_pending_changes(
-        organization_id=organization.id, status=status
-    )
+    items = await service.list_pending_changes(organization_id=organization.id, status=status)
     return DataResponse(
         data=[PendingSyncChangeResponse.model_validate(i) for i in items],
         meta=MetaResponse(request_id=str(organization.id)),

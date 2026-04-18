@@ -129,8 +129,7 @@ class RiskService:
 
         # Enforce closure approval gate before any state change.
         moving_to_closed = (
-            updates.get("record_status") == "closed"
-            or updates.get("status") == "closed"
+            updates.get("record_status") == "closed" or updates.get("status") == "closed"
         )
         if moving_to_closed:
             await self._sync.assert_closure_allowed(entry.id)

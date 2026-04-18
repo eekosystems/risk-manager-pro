@@ -92,9 +92,7 @@ class RiskRecordLink(Base):
         ForeignKey("risk_entries.id", ondelete="CASCADE"), index=True
     )
     airport_identifier: Mapped[str] = mapped_column(String(20), index=True)
-    status: Mapped[LinkStatus] = mapped_column(
-        String(20), default=LinkStatus.ACTIVE.value
-    )
+    status: Mapped[LinkStatus] = mapped_column(String(20), default=LinkStatus.ACTIVE.value)
     created_at: Mapped[datetime] = mapped_column(default=func.now())
     updated_at: Mapped[datetime] = mapped_column(default=func.now(), onupdate=func.now())
 
@@ -131,9 +129,7 @@ class PendingSyncChange(Base):
     )
     diff_json: Mapped[dict] = mapped_column(JSONB)  # {field: {old, new}}
     initiator_user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
-    reviewer_user_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("users.id"), default=None
-    )
+    reviewer_user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), default=None)
     review_note: Mapped[str | None] = mapped_column(Text, default=None)
     created_at: Mapped[datetime] = mapped_column(default=func.now())
     reviewed_at: Mapped[datetime | None] = mapped_column(default=None)
@@ -204,17 +200,13 @@ class ACPIntelligenceItem(Base):
     decision: Mapped[ACPDecision] = mapped_column(
         String(40), default=ACPDecision.PENDING.value, index=True
     )
-    decided_by: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("users.id"), default=None
-    )
+    decided_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), default=None)
     decided_at: Mapped[datetime | None] = mapped_column(default=None)
     decision_note: Mapped[str | None] = mapped_column(Text, default=None)
     linked_risk_entry_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("risk_entries.id", ondelete="SET NULL"), default=None
     )
-    created_by: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("users.id"), default=None
-    )
+    created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), default=None)
     created_at: Mapped[datetime] = mapped_column(default=func.now())
 
 
@@ -236,9 +228,7 @@ class ClosureApproval(Base):
     status: Mapped[ClosureApprovalStatus] = mapped_column(
         String(20), default=ClosureApprovalStatus.PENDING.value, index=True
     )
-    approver_user_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("users.id"), default=None
-    )
+    approver_user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), default=None)
     approval_note: Mapped[str | None] = mapped_column(Text, default=None)
     requested_at: Mapped[datetime] = mapped_column(default=func.now())
     resolved_at: Mapped[datetime | None] = mapped_column(default=None)

@@ -165,8 +165,7 @@ RR_TOOLS: list[dict[str, Any]] = [
                     "existing_controls": {
                         "type": "string",
                         "description": (
-                            "Narrative of controls already in place. 'None' if no "
-                            "controls exist."
+                            "Narrative of controls already in place. 'None' if no controls exist."
                         ),
                     },
                     "residual_risk_level": {
@@ -307,14 +306,10 @@ async def _search_risk_registry(
         )
     except Exception as exc:  # noqa: BLE001 — surface to LLM
         logger.error("rr_search_sharepoint_failed", airport=airport, exc_info=True)
-        return json.dumps(
-            {"ok": False, "error": f"SharePoint lookup failed: {exc}"}
-        )
+        return json.dumps({"ok": False, "error": f"SharePoint lookup failed: {exc}"})
 
     if keywords:
-        files = [
-            f for f in files if any(k in f.name.lower() for k in keywords)
-        ]
+        files = [f for f in files if any(k in f.name.lower() for k in keywords)]
 
     files_sorted = sorted(files, key=lambda f: f.name.lower())[:limit]
 
@@ -396,9 +391,7 @@ async def _save_risk_register_record(
         )
     except Exception as exc:  # noqa: BLE001 — surface to LLM
         logger.error("rr_tool_create_failed", exc_info=True)
-        return json.dumps(
-            {"ok": False, "error": f"Database error while saving: {exc}"}
-        )
+        return json.dumps({"ok": False, "error": f"Database error while saving: {exc}"})
 
     created_mitigations: list[dict[str, Any]] = []
     for m in mitigations_payload:
@@ -416,9 +409,7 @@ async def _save_risk_register_record(
             created_mitigations.append({"id": str(mit.id), "title": mit.title})
         except Exception as exc:  # noqa: BLE001 — partial failure shouldn't drop the record
             logger.error("rr_tool_mitigation_create_failed", exc_info=True)
-            created_mitigations.append(
-                {"title": m.get("title"), "error": str(exc)}
-            )
+            created_mitigations.append({"title": m.get("title"), "error": str(exc)})
 
     logger.info(
         "rr_tool_record_saved",

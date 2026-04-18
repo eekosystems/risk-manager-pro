@@ -211,9 +211,7 @@ class RRSyncService:
         )
         return pending
 
-    async def _resolve_client_org_for_airport(
-        self, airport_identifier: str
-    ) -> uuid.UUID | None:
+    async def _resolve_client_org_for_airport(self, airport_identifier: str) -> uuid.UUID | None:
         """Match airport identifier to a client organization by slug.
 
         Convention: a client airport's organization `slug` equals its ICAO/FAA
@@ -344,16 +342,10 @@ class RRSyncService:
             operational_domain=snapshot.get("operational_domain", source.operational_domain),
             sub_location=snapshot.get("sub_location", source.sub_location),
             hazard_category_5m=snapshot.get("hazard_category_5m", source.hazard_category_5m),
-            hazard_category_icao=snapshot.get(
-                "hazard_category_icao", source.hazard_category_icao
-            ),
-            risk_matrix_applied=snapshot.get(
-                "risk_matrix_applied", source.risk_matrix_applied
-            ),
+            hazard_category_icao=snapshot.get("hazard_category_icao", source.hazard_category_icao),
+            risk_matrix_applied=snapshot.get("risk_matrix_applied", source.risk_matrix_applied),
             existing_controls=snapshot.get("existing_controls", source.existing_controls),
-            residual_risk_level=snapshot.get(
-                "residual_risk_level", source.residual_risk_level
-            ),
+            residual_risk_level=snapshot.get("residual_risk_level", source.residual_risk_level),
             record_status=snapshot.get("record_status", source.record_status),
             validation_status=snapshot.get("validation_status", source.validation_status),
             source=(
@@ -361,9 +353,7 @@ class RRSyncService:
                 if pending.direction == PendingChangeDirection.FG_TO_CLIENT
                 else RecordSource.CLIENT_PUSH
             ),
-            acm_cross_reference=snapshot.get(
-                "acm_cross_reference", source.acm_cross_reference
-            ),
+            acm_cross_reference=snapshot.get("acm_cross_reference", source.acm_cross_reference),
         )
         self._db.add(twin)
         await self._db.flush()
@@ -378,9 +368,7 @@ class RRSyncService:
         link = RiskRecordLink(
             fg_risk_entry_id=fg_id,
             client_risk_entry_id=client_id,
-            airport_identifier=snapshot.get(
-                "airport_identifier", source.airport_identifier or ""
-            ),
+            airport_identifier=snapshot.get("airport_identifier", source.airport_identifier or ""),
             status=LinkStatus.ACTIVE,
         )
         self._db.add(link)
@@ -581,9 +569,7 @@ class RRSyncService:
         if entry is None:
             raise NotFoundError("RiskEntry", str(risk_entry_id))
         if entry.risk_level not in (RiskLevel.HIGH, RiskLevel.EXTREME):
-            raise RRSyncError(
-                "Closure approval is only required for High/Extreme records."
-            )
+            raise RRSyncError("Closure approval is only required for High/Extreme records.")
         approval = ClosureApproval(
             risk_entry_id=risk_entry_id,
             requested_by=requested_by,
@@ -619,9 +605,7 @@ class RRSyncService:
         if approval is None:
             raise NotFoundError("ClosureApproval", str(approval_id))
         if approval.status != ClosureApprovalStatus.PENDING:
-            raise RRSyncError(
-                f"Approval is already {approval.status.value}; cannot re-decide."
-            )
+            raise RRSyncError(f"Approval is already {approval.status.value}; cannot re-decide.")
         approval.status = (
             ClosureApprovalStatus.APPROVED if approve else ClosureApprovalStatus.REJECTED
         )
@@ -670,9 +654,7 @@ def _snapshot_entry(entry: RiskEntry) -> dict[str, Any]:
     return snapshot
 
 
-def compute_entry_diff(
-    before: dict[str, Any], after: RiskEntry
-) -> dict[str, dict[str, Any]]:
+def compute_entry_diff(before: dict[str, Any], after: RiskEntry) -> dict[str, dict[str, Any]]:
     """Compute the {field: {old, new}} diff between a pre-update snapshot and an entry."""
     diff: dict[str, dict[str, Any]] = {}
     after_snap = _snapshot_entry(after)
