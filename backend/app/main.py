@@ -59,7 +59,10 @@ class ServiceRegistry:
         self._search_indexer = SearchIndexer()
         self._graph_service = MicrosoftGraphService()
         self._sharepoint_crawler = SharePointCrawler()
-        self._risk_outcome_importer = RiskOutcomeImporter(self._sharepoint_crawler)
+        self._risk_outcome_importer = RiskOutcomeImporter(
+            crawler=self._sharepoint_crawler,
+            openai_client=self._openai_client,
+        )
         logger.info("service_registry_initialized")
 
     async def shutdown(self) -> None:
