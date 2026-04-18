@@ -60,6 +60,94 @@ class DrivesResponse(BaseModel):
     drives: list[DriveInfo]
 
 
+class AirportListResponse(BaseModel):
+    airports: list[str]
+
+
+class SharePointRiskRow(BaseModel):
+    airport_identifier: str
+    hazard: str
+    severity: int
+    likelihood: str
+    risk_level: str
+    source_file: str
+    source_url: str | None
+
+
+class SharePointParseNoteOut(BaseModel):
+    airport_identifier: str
+    source_file: str
+    message: str
+
+
+class RiskOutcomeSummary(BaseModel):
+    airports: list[str]
+    risks: list[SharePointRiskRow]
+    notes: list[SharePointParseNoteOut]
+    generated_at: float
+
+
+@router.get("/airports", response_model=DataResponse[AirportListResponse])
+async def list_airports(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    organization: Organization = Depends(get_current_organization),
+) -> DataResponse[AirportListResponse]:
+    """Return every top-level folder in SharePoint — one per airport.
+
+    Drives the airport-pill row on the Risk Register page so every airport
+    in the portfolio shows up even if no risk records exist yet.
+    """
+    crawler: SharePointCrawler = request.app.state.services.sharepoint_crawler
+    try:
+        airports = await crawler.list_airport_folders()
+    except RuntimeError as exc:
+        logger.warning("sharepoint_airports_unavailable", error=str(exc))
+        return DataResponse(
+            data=AirportListResponse(airports=[]),
+            meta=MetaResponse(request_id=""),
+        )
+    return DataResponse(
+        data=AirportListResponse(airports=airports),
+        meta=MetaResponse(request_id=""),
+    )
+
+
+@router.get(
+    "/risk-outcome-summary",
+    response_model=DataResponse[RiskOutcomeSummary],
+)
+async def risk_outcome_summary(
+    request: Request,
+    refresh: bool = Query(default=False),
+    current_user: User = Depends(get_current_user),
+    organization: Organization = Depends(get_current_organization),
+) -> DataResponse[RiskOutcomeSummary]:
+    """Parse every airport's `/risk-outcome/` folder and return aggregated risks.
+
+    Result is cached in-memory for 5 minutes to keep the Risk Register page
+    responsive — pass `?refresh=true` to force a re-scan.
+    """
+    importer = request.app.state.services.risk_outcome_importer
+    try:
+        summary = await importer.scan_all(force_refresh=refresh)
+    except RuntimeError as exc:
+        logger.warning("risk_outcome_summary_unavailable", error=str(exc))
+        return DataResponse(
+            data=RiskOutcomeSummary(airports=[], risks=[], notes=[], generated_at=0.0),
+            meta=MetaResponse(request_id=""),
+        )
+    return DataResponse(
+        data=RiskOutcomeSummary(
+            airports=summary.airports,
+            risks=[SharePointRiskRow(**r.__dict__) for r in summary.risks],
+            notes=[SharePointParseNoteOut(**n.__dict__) for n in summary.notes],
+            generated_at=summary.generated_at,
+        ),
+        meta=MetaResponse(request_id=""),
+    )
+
+
 @router.get("/drives", response_model=DataResponse[DrivesResponse])
 async def list_drives(
     request: Request,

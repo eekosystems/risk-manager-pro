@@ -207,6 +207,31 @@ class SharePointCrawler:
         )
         return files
 
+    async def list_airport_folders(self, drive_name: str | None = None) -> list[str]:
+        """Return every top-level folder name in the (selected) drive.
+
+        Convention: each airport has its own top-level folder under the
+        SharePoint site, named with the airport's ICAO/FAA identifier
+        (e.g. `KSFO`) or a human-readable name. This drives the airport
+        pill row on the Risk Register page, independent of whether any
+        risk records exist in the DB yet.
+        """
+        drives = await self.list_drives()
+        folders: list[str] = []
+        for drive in drives:
+            if drive_name and drive.get("name", "").lower() != drive_name.lower():
+                continue
+            drive_id = drive["id"]
+            url = f"{GRAPH_BASE_URL}/drives/{drive_id}/root/children"
+            while url:
+                data = await self._graph_get(url)
+                for item in data.get("value", []):
+                    if "folder" in item:
+                        folders.append(item.get("name", ""))
+                url = data.get("@odata.nextLink", "")
+        # De-duplicate + strip blanks, preserve sort order for stable UI
+        return sorted({f for f in folders if f})
+
     async def list_risk_outcome_files(
         self, airport_identifier: str | None = None
     ) -> list[SharePointFile]:

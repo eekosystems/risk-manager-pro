@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from app.services.microsoft_graph import MicrosoftGraphService
     from app.services.openai_client import AzureOpenAIClient
     from app.services.rag import RAGService
+    from app.services.risk_outcome_importer import RiskOutcomeImporter
     from app.services.search_indexer import SearchIndexer
     from app.services.sharepoint_crawler import SharePointCrawler
     from app.services.storage import BlobStorageService
@@ -41,11 +42,13 @@ class ServiceRegistry:
         self._search_indexer: SearchIndexer | None = None
         self._graph_service: MicrosoftGraphService | None = None
         self._sharepoint_crawler: SharePointCrawler | None = None
+        self._risk_outcome_importer: RiskOutcomeImporter | None = None
 
     async def startup(self) -> None:
         from app.services.microsoft_graph import MicrosoftGraphService
         from app.services.openai_client import AzureOpenAIClient
         from app.services.rag import RAGService
+        from app.services.risk_outcome_importer import RiskOutcomeImporter
         from app.services.search_indexer import SearchIndexer
         from app.services.sharepoint_crawler import SharePointCrawler
         from app.services.storage import BlobStorageService
@@ -56,6 +59,7 @@ class ServiceRegistry:
         self._search_indexer = SearchIndexer()
         self._graph_service = MicrosoftGraphService()
         self._sharepoint_crawler = SharePointCrawler()
+        self._risk_outcome_importer = RiskOutcomeImporter(self._sharepoint_crawler)
         logger.info("service_registry_initialized")
 
     async def shutdown(self) -> None:
@@ -108,6 +112,12 @@ class ServiceRegistry:
         if self._sharepoint_crawler is None:
             raise RuntimeError("ServiceRegistry not initialized — call startup() first")
         return self._sharepoint_crawler
+
+    @property
+    def risk_outcome_importer(self) -> RiskOutcomeImporter:
+        if self._risk_outcome_importer is None:
+            raise RuntimeError("ServiceRegistry not initialized — call startup() first")
+        return self._risk_outcome_importer
 
 
 service_registry = ServiceRegistry()

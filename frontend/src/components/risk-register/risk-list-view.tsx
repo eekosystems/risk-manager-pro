@@ -1,6 +1,18 @@
+import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { AlertTriangle, Clock, Loader2, Plus, ShieldAlert, Trash2, X } from "lucide-react";
+import {
+  AlertTriangle,
+  Clock,
+  ExternalLink,
+  Loader2,
+  Plus,
+  RefreshCw,
+  ShieldAlert,
+  Trash2,
+  X,
+} from "lucide-react";
 
+import { getRiskOutcomeSummary, type SharePointRiskRow } from "@/api/sharepoint";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { RiskMatrix } from "@/components/ui/risk-matrix";
@@ -26,6 +38,38 @@ const STATUS_LABELS: Record<RiskStatus, { label: string; className: string }> = 
 
 const ALL_AIRPORTS = "__all__";
 
+/**
+ * Adapt a SharePoint-extracted risk to the same shape `RiskEntryListItem`
+ * uses so it can be rendered by the matrix + drill-down alongside DB risks.
+ *
+ * Synthetic fields we don't have from the PDF extraction:
+ * - id: `sp:<file>:<hash>` so it's stable across renders and distinguishable
+ *   from DB ids
+ * - status: "open" (these are external observations, not tracked state)
+ * - validation_status: "user_reported" to flag they weren't RMP-validated
+ * - source: "fg_push" since they come from Faith Group's SharePoint
+ */
+function spToListItem(r: SharePointRiskRow, idx: number): RiskEntryListItem {
+  return {
+    id: `sp:${r.source_file}:${idx}`,
+    title: r.hazard,
+    hazard: r.hazard,
+    severity: r.severity,
+    likelihood: r.likelihood,
+    risk_level: r.risk_level,
+    status: "open",
+    function_type: "risk_register",
+    airport_identifier: r.airport_identifier,
+    operational_domain: null,
+    hazard_category_5m: null,
+    record_status: "monitoring",
+    validation_status: "user_reported",
+    source: "fg_push",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+}
+
 interface RiskListViewProps {
   onSelectRisk: (riskId: string) => void;
   onCreateNew: () => void;
@@ -47,19 +91,62 @@ export function RiskListView({ onSelectRisk, onCreateNew }: RiskListViewProps) {
   });
   const deleteMutation = useDeleteRisk();
 
-  const allRisks: RiskEntryListItem[] = useMemo(
+  // Pull the SharePoint risk-outcome scan — airport list + hazards extracted
+  // from each airport's /risk-outcome/ PDFs via LLM. Poll while scanning so
+  // the matrix + pills update live as more files are indexed.
+  const { data: spSummary, refetch: refetchSpSummary } = useQuery({
+    queryKey: ["sharepoint-risk-outcome-summary"],
+    queryFn: () => getRiskOutcomeSummary(false),
+    refetchInterval: (q) => {
+      const s = q.state.data?.status;
+      return s === "scanning" ? 5000 : false;
+    },
+  });
+
+  const dbRisks: RiskEntryListItem[] = useMemo(
     () => data?.data ?? [],
     [data?.data],
   );
 
+  // Merge DB-backed risks with SharePoint-extracted risks into one list for
+  // the 5x5 distribution + drill-down. Use a synthetic id so the drill-down
+  // can still key rows (SP risks have no DB id).
+  const allRisks: RiskEntryListItem[] = useMemo(() => {
+    const sp = (spSummary?.risks ?? []).map(spToListItem);
+    return [...dbRisks, ...sp];
+  }, [dbRisks, spSummary?.risks]);
+
+  // Side table: synthetic id → SharePoint URL, so clicking an SP-sourced
+  // row opens the PDF in a new tab instead of hitting the detail endpoint
+  // (which would 404 on the synthetic id).
+  const spUrlById: Map<string, string> = useMemo(() => {
+    const m = new Map<string, string>();
+    (spSummary?.risks ?? []).forEach((r, idx) => {
+      const id = `sp:${r.source_file}:${idx}`;
+      if (r.source_url) m.set(id, r.source_url);
+    });
+    return m;
+  }, [spSummary?.risks]);
+
+  function handleSelectRisk(riskId: string) {
+    if (riskId.startsWith("sp:")) {
+      const url = spUrlById.get(riskId);
+      if (url) window.open(url, "_blank", "noopener,noreferrer");
+      return;
+    }
+    onSelectRisk(riskId);
+  }
+
   // Every airport that shows up in the fetched dataset — this powers the pill row.
+  // Union of (SharePoint folder list) + (airports present in DB or SP risks).
   const airports: string[] = useMemo(() => {
     const s = new Set<string>();
+    for (const a of spSummary?.airports ?? []) s.add(a);
     for (const r of allRisks) {
       if (r.airport_identifier) s.add(r.airport_identifier);
     }
     return [...s].sort();
-  }, [allRisks]);
+  }, [allRisks, spSummary?.airports]);
 
   // Apply the airport pill filter.
   const risks: RiskEntryListItem[] = useMemo(() => {
@@ -133,6 +220,19 @@ export function RiskListView({ onSelectRisk, onCreateNew }: RiskListViewProps) {
 
   return (
     <div className="mx-auto max-w-7xl p-6">
+      {/* SharePoint scan status */}
+      {spSummary && (
+        <ScanStatusBanner
+          status={spSummary.status}
+          scanned={spSummary.scanned}
+          total={spSummary.total}
+          riskCount={spSummary.risks.length}
+          airportCount={spSummary.airports.length}
+          noteCount={spSummary.notes.length}
+          onRefresh={() => refetchSpSummary()}
+        />
+      )}
+
       {/* Airport pills */}
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
@@ -203,7 +303,7 @@ export function RiskListView({ onSelectRisk, onCreateNew }: RiskListViewProps) {
             <CellDrillDown
               selection={selectedCell}
               risks={cellRisks}
-              onSelectRisk={onSelectRisk}
+              onSelectRisk={handleSelectRisk}
               onClose={() => setSelectedCell(null)}
             />
           )}
@@ -259,10 +359,11 @@ export function RiskListView({ onSelectRisk, onCreateNew }: RiskListViewProps) {
             const levelCfg =
               RISK_LEVEL_CONFIG[risk.risk_level as RiskLevel] ?? RISK_LEVEL_CONFIG.low;
             const statusCfg = STATUS_LABELS[risk.status] ?? STATUS_LABELS.open;
+            const isSharePoint = risk.id.startsWith("sp:");
             return (
               <div
                 key={risk.id}
-                onClick={() => onSelectRisk(risk.id)}
+                onClick={() => handleSelectRisk(risk.id)}
                 className={`flex cursor-pointer items-center gap-4 px-5 py-4 transition-colors hover:bg-gray-50 ${
                   index < risks.length - 1 ? "border-b border-gray-100" : ""
                 }`}
@@ -285,40 +386,51 @@ export function RiskListView({ onSelectRisk, onCreateNew }: RiskListViewProps) {
                     >
                       {levelCfg.label}
                     </span>
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${statusCfg.className}`}
-                    >
-                      {statusCfg.label}
-                    </span>
+                    {isSharePoint ? (
+                      <span className="flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">
+                        <ExternalLink size={10} />
+                        SharePoint
+                      </span>
+                    ) : (
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${statusCfg.className}`}
+                      >
+                        {statusCfg.label}
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-3 text-[12px] text-slate-400">
                     <span className="truncate max-w-[300px]">{risk.hazard}</span>
-                    <span className="flex items-center gap-1">
-                      <Clock size={10} />
-                      {new Date(risk.updated_at).toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                      })}
-                    </span>
+                    {!isSharePoint && (
+                      <span className="flex items-center gap-1">
+                        <Clock size={10} />
+                        {new Date(risk.updated_at).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })}
+                      </span>
+                    )}
                   </div>
                 </div>
-                <button
-                  onClick={(e) => handleDelete(e, risk.id)}
-                  disabled={deleteMutation.isPending}
-                  className={`rounded-lg p-2 transition-colors ${
-                    deleteConfirm === risk.id
-                      ? "bg-red-50 text-red-500 hover:bg-red-100"
-                      : "text-gray-300 hover:bg-red-50 hover:text-red-500"
-                  }`}
-                  title={
-                    deleteConfirm === risk.id
-                      ? "Click again to confirm delete"
-                      : "Delete risk"
-                  }
-                >
-                  <Trash2 size={16} />
-                </button>
+                {!isSharePoint && (
+                  <button
+                    onClick={(e) => handleDelete(e, risk.id)}
+                    disabled={deleteMutation.isPending}
+                    className={`rounded-lg p-2 transition-colors ${
+                      deleteConfirm === risk.id
+                        ? "bg-red-50 text-red-500 hover:bg-red-100"
+                        : "text-gray-300 hover:bg-red-50 hover:text-red-500"
+                    }`}
+                    title={
+                      deleteConfirm === risk.id
+                        ? "Click again to confirm delete"
+                        : "Delete risk"
+                    }
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                )}
               </div>
             );
           })
@@ -329,6 +441,58 @@ export function RiskListView({ onSelectRisk, onCreateNew }: RiskListViewProps) {
 }
 
 // ---- Subcomponents ---------------------------------------------------------
+
+function ScanStatusBanner({
+  status,
+  scanned,
+  total,
+  riskCount,
+  airportCount,
+  noteCount,
+  onRefresh,
+}: {
+  status: string;
+  scanned: number;
+  total: number;
+  riskCount: number;
+  airportCount: number;
+  noteCount: number;
+  onRefresh: () => void;
+}) {
+  const scanning = status === "scanning";
+  return (
+    <div
+      className={`mb-3 flex items-center justify-between rounded-xl border px-3 py-2 text-[12px] ${
+        scanning
+          ? "border-brand-200 bg-brand-50 text-brand-700"
+          : "border-gray-200 bg-gray-50 text-slate-600"
+      }`}
+    >
+      <div className="flex items-center gap-2">
+        {scanning ? (
+          <Loader2 size={14} className="animate-spin" />
+        ) : (
+          <ShieldAlert size={14} />
+        )}
+        <span>
+          {scanning
+            ? `Extracting risks from SharePoint PDFs — ${scanned}/${total} files`
+            : `SharePoint: ${riskCount} risks across ${airportCount} airports`}
+          {noteCount > 0 && !scanning && (
+            <span className="ml-2 text-slate-400">({noteCount} files skipped)</span>
+          )}
+        </span>
+      </div>
+      <button
+        onClick={onRefresh}
+        className="flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2 py-0.5 font-medium text-slate-600 transition-colors hover:bg-gray-50"
+      >
+        <RefreshCw size={11} />
+        Refresh
+      </button>
+    </div>
+  );
+}
 
 function AirportPill({
   label,
