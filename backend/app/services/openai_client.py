@@ -92,11 +92,11 @@ class AzureOpenAIClient:
         """
         client = await self._get_client()
         try:
-            response = await client.chat.completions.create(
+            response = await client.chat.completions.create(  # type: ignore[call-overload]
                 model=settings.azure_openai_deployment_name,
-                messages=messages,  # type: ignore[arg-type]
-                tools=tools,  # type: ignore[arg-type]
-                tool_choice=tool_choice,  # type: ignore[arg-type]
+                messages=messages,
+                tools=tools,
+                tool_choice=tool_choice,
                 temperature=temperature,
                 max_completion_tokens=max_tokens,
             )

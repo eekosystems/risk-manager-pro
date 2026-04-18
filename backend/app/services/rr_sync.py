@@ -409,7 +409,7 @@ class RRSyncService:
         )
         twin_stmt = select(RiskEntry).where(RiskEntry.id == twin_id)
         twin = (await self._db.execute(twin_stmt)).scalar_one()
-        twin.record_status = RecordStatus.CLOSED  # type: ignore[assignment]
+        twin.record_status = RecordStatus.CLOSED
         await self._db.flush()
 
     # ------------------------------------------------------------------
@@ -465,7 +465,7 @@ class RRSyncService:
         occurred_at: datetime | None,
         external_url: str | None,
         external_ref: str | None,
-        raw_payload: dict | None,
+        raw_payload: dict[str, Any] | None,
         created_by: uuid.UUID | None,
     ) -> ACPIntelligenceItem:
         acp = await self.get_or_create_acp(organization_id, airport_identifier)

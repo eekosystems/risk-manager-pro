@@ -268,7 +268,8 @@ class ChatService:
                 )
                 tool_calls = response["tool_calls"]
                 if not tool_calls:
-                    return response["content"]
+                    content: str = response["content"]
+                    return content
 
                 loop_messages.append(
                     {

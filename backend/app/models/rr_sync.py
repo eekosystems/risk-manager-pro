@@ -15,6 +15,7 @@ from __future__ import annotations
 import enum
 import uuid
 from datetime import datetime  # noqa: TC003 — runtime required by SQLAlchemy Mapped[]
+from typing import Any
 
 from sqlalchemy import ForeignKey, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import JSONB
@@ -127,7 +128,7 @@ class PendingSyncChange(Base):
     status: Mapped[PendingChangeStatus] = mapped_column(
         String(20), default=PendingChangeStatus.PENDING.value, index=True
     )
-    diff_json: Mapped[dict] = mapped_column(JSONB)  # {field: {old, new}}
+    diff_json: Mapped[dict[str, Any]] = mapped_column(JSONB)  # {field: {old, new}}
     initiator_user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
     reviewer_user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), default=None)
     review_note: Mapped[str | None] = mapped_column(Text, default=None)
@@ -167,7 +168,7 @@ class AirportContextProfile(Base):
     # Structured bag for anything else (engagement history, runway config,
     # ATC notes) so we don't have to migrate every time a consultant wants
     # to capture a new dimension.
-    extra_json: Mapped[dict | None] = mapped_column(JSONB, default=None)
+    extra_json: Mapped[dict[str, Any] | None] = mapped_column(JSONB, default=None)
 
     created_at: Mapped[datetime] = mapped_column(default=func.now())
     updated_at: Mapped[datetime] = mapped_column(default=func.now(), onupdate=func.now())
@@ -195,7 +196,7 @@ class ACPIntelligenceItem(Base):
     occurred_at: Mapped[datetime | None] = mapped_column(default=None)
     external_url: Mapped[str | None] = mapped_column(String(1000), default=None)
     external_ref: Mapped[str | None] = mapped_column(String(255), default=None)
-    raw_payload: Mapped[dict | None] = mapped_column(JSONB, default=None)
+    raw_payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB, default=None)
 
     decision: Mapped[ACPDecision] = mapped_column(
         String(40), default=ACPDecision.PENDING.value, index=True

@@ -1,6 +1,7 @@
 import enum
 import uuid
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import Enum, ForeignKey, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
@@ -256,7 +257,7 @@ class RiskEntry(Base):
     related_record_ids: Mapped[list[uuid.UUID] | None] = mapped_column(
         ARRAY(PG_UUID(as_uuid=True)), default=None
     )
-    audit_trail_json: Mapped[dict | None] = mapped_column(JSONB, default=None)
+    audit_trail_json: Mapped[dict[str, Any] | None] = mapped_column(JSONB, default=None)
 
     created_at: Mapped[datetime] = mapped_column(default=func.now())
     updated_at: Mapped[datetime] = mapped_column(default=func.now(), onupdate=func.now())
