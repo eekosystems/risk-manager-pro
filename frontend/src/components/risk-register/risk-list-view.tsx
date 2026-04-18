@@ -47,7 +47,10 @@ export function RiskListView({ onSelectRisk, onCreateNew }: RiskListViewProps) {
   });
   const deleteMutation = useDeleteRisk();
 
-  const allRisks: RiskEntryListItem[] = data?.data ?? [];
+  const allRisks: RiskEntryListItem[] = useMemo(
+    () => data?.data ?? [],
+    [data?.data],
+  );
 
   // Every airport that shows up in the fetched dataset — this powers the pill row.
   const airports: string[] = useMemo(() => {
