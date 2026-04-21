@@ -207,45 +207,52 @@ def _airport_from_segments(segments: list[str]) -> str | None:
 
 
 _SYSTEM_PROMPT = (
-    "You extract hazards from aviation safety risk management documents. "
-    "You are thorough: hazards can appear as table rows, bulleted lists, "
-    "or inline prose — find them all. Return ONLY a JSON object matching "
-    "the requested shape. No commentary, no code fences."
+    "You extract hazards verbatim from aviation safety risk management "
+    "documents. You do not paraphrase, summarize, rewrite, shorten, or "
+    "interpret. You only return a hazard if its severity AND likelihood "
+    "are both explicitly stated in the source document alongside the "
+    "hazard. If anything is ambiguous, implied, or must be inferred, you "
+    "skip that hazard. Return ONLY a JSON object matching the requested "
+    "shape. No commentary, no code fences."
 )
 
 _USER_TEMPLATE = """\
-Extract EVERY hazard described in the following risk register / SRMD /
-SRMP document. Be thorough — hazards may appear as:
-- rows in a hazard analysis or risk assessment table
-- bulleted entries in a preliminary hazard list (PHL)
-- numbered items in a "hazards identified" section
-- inline prose describing a specific hazard with an assessed risk level
+Extract hazards from the following risk register / SRMD / SRMP document.
+
+STRICT RULES — no exceptions:
+1. Return the hazard text EXACTLY as it appears in the document. Do not
+   paraphrase, shorten, reword, summarize, rewrite, or clean up wording.
+   Copy the hazard description verbatim, character for character.
+2. Only include a hazard if BOTH its severity AND its likelihood are
+   EXPLICITLY stated in the document alongside (or in the same table row
+   as) the hazard. If either field is missing, implied, inferred from
+   context, or requires any judgment on your part, SKIP that hazard
+   entirely — do not include it in the output.
+3. Do NOT reverse-engineer severity or likelihood from a stated risk
+   level. If the source provides only a risk level (Low/Medium/High/
+   Extreme) and not both an explicit severity and an explicit likelihood,
+   SKIP that hazard.
+4. Do NOT translate or map descriptive terms to numbers or letters unless
+   the document itself explicitly defines a scoring scheme mapping its
+   terms to the FAA 1-5 / A-E convention. If in doubt, SKIP the hazard.
+5. Do NOT invent, combine, or synthesize hazards. Every returned row must
+   correspond to a single hazard entry present in the source text.
 
 Return ONLY this JSON shape (no prose):
 
 {{
   "risks": [
     {{
-      "hazard": "concise description of the hazard (required, under 250 chars)",
-      "severity": <integer 1-5, where 1=Minimal and 5=Catastrophic>,
-      "likelihood": "<letter A-E, where A=Frequent and E=Extremely Improbable>",
-      "risk_level": "<low | medium | high | extreme — optional>"
+      "hazard": "<verbatim hazard text as it appears in the document>",
+      "severity": <integer 1-5 exactly as stated in the document>,
+      "likelihood": "<letter A-E exactly as stated in the document>",
+      "risk_level": "<low | medium | high | extreme — include ONLY if explicitly stated in the source, otherwise omit>"
     }}
   ]
 }}
 
-Rules:
-- Include every hazard that has an identifiable severity AND likelihood
-  (either explicit scores, or descriptive words you can map — e.g.
-  'Major/Remote' → severity 3, likelihood C).
-- If the document uses a different numeric or letter scheme, translate to
-  the FAA 1-5 / A-E convention.
-- Include hazards that are associated with a stated Low/Medium/High/Extreme
-  risk level even if severity/likelihood aren't explicitly separate — pick
-  the severity and likelihood that would produce that risk level on the
-  FAA 5x5 matrix.
-- Deduplicate obvious duplicates but do not merge distinct hazards.
-- Return {{"risks": []}} only if the document truly contains no hazards.
+If no hazards in the document meet all of the rules above, return
+{{"risks": []}}.
 
 Document text (may be a chunk of a longer document):
 ---
@@ -397,7 +404,16 @@ async def _extract_risks_via_llm(
                 )
             )
             continue
-        hazard_text = str(row.get("hazard") or "").strip() or f"Hazard {idx + 1}"
+        hazard_text = str(row.get("hazard") or "").strip()
+        if not hazard_text:
+            notes.append(
+                SharePointParseNote(
+                    airport_identifier=airport,
+                    source_file=source_file,
+                    message=f"row {idx} missing hazard text",
+                )
+            )
+            continue
         dedup_key = (hazard_text.lower()[:120], severity, likelihood)
         if dedup_key in seen:
             continue
@@ -408,7 +424,7 @@ async def _extract_risks_via_llm(
         risks.append(
             SharePointRisk(
                 airport_identifier=airport,
-                hazard=hazard_text[:500],
+                hazard=hazard_text,
                 severity=severity,
                 likelihood=likelihood,
                 risk_level=risk_level,
