@@ -1,8 +1,10 @@
+import axios from "axios";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useConversation, useEmailChatMessage, useSendMessage } from "@/hooks/use-chat";
 import { useUploadDocument } from "@/hooks/use-documents";
 import { useToast } from "@/hooks/use-toast";
+import { logger } from "@/lib/logger";
 import type { ChatMessage, FunctionType } from "@/types/api";
 
 import { ChatInput } from "./chat-input";
@@ -124,8 +126,21 @@ export function ChatPage({
             setConversationId(data.conversation_id);
             setLocalMessages((prev) => [...prev, data.message]);
           },
-          onError: () => {
+          onError: (error) => {
             setIsTyping(false);
+            if (axios.isAxiosError(error)) {
+              logger.error("[chat] sendMessage failed", {
+                status: error.response?.status,
+                statusText: error.response?.statusText,
+                data: error.response?.data,
+                code: error.code,
+                message: error.message,
+                url: error.config?.url,
+                timeout: error.config?.timeout,
+              });
+            } else {
+              logger.error("[chat] sendMessage failed", error);
+            }
             addToast("Failed to send message. Please try again.", "error");
             setLocalMessages((prev) => [
               ...prev,
