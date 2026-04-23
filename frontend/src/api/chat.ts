@@ -19,7 +19,9 @@ export async function sendMessage(
   payload: ChatRequest,
 ): Promise<ChatResponse> {
   const response =
-    await apiClient.post<DataResponse<ChatResponse>>("/chat", payload);
+    await apiClient.post<DataResponse<ChatResponse>>("/chat", payload, {
+      timeout: 120_000,
+    });
   return response.data.data;
 }
 
