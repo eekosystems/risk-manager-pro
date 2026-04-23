@@ -124,6 +124,13 @@ export function ChatPage({
           onSuccess: (data) => {
             setIsTyping(false);
             setConversationId(data.conversation_id);
+            logger.warn("[chat] sendMessage success", {
+              conversation_id: data.conversation_id,
+              message_id: data.message.id,
+              content_length: data.message.content?.length ?? 0,
+              content_preview: data.message.content?.slice(0, 200) ?? null,
+              citations_count: data.message.citations?.length ?? 0,
+            });
             setLocalMessages((prev) => [...prev, data.message]);
           },
           onError: (error) => {
