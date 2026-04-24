@@ -59,11 +59,31 @@ class AzureOpenAIClient:
             if json_mode:
                 kwargs["response_format"] = {"type": "json_object"}
             response = await client.chat.completions.create(**kwargs)
-            content = response.choices[0].message.content or ""
-            logger.info(
-                "chat_completion_success",
-                tokens_used=response.usage.total_tokens if response.usage else 0,
-            )
+            choice = response.choices[0]
+            content = choice.message.content or ""
+            finish_reason = choice.finish_reason
+            prompt_tokens = response.usage.prompt_tokens if response.usage else 0
+            completion_tokens = response.usage.completion_tokens if response.usage else 0
+            total_tokens = response.usage.total_tokens if response.usage else 0
+            if not content:
+                logger.warning(
+                    "chat_completion_empty_content",
+                    finish_reason=finish_reason,
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                    total_tokens=total_tokens,
+                    max_tokens_requested=max_tokens,
+                    message_count=len(messages),
+                )
+            else:
+                logger.info(
+                    "chat_completion_success",
+                    finish_reason=finish_reason,
+                    content_length=len(content),
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                    total_tokens=total_tokens,
+                )
             return content
         except APIStatusError as e:
             logger.error(
