@@ -1,5 +1,5 @@
 import { Paperclip, Send, X } from "lucide-react";
-import { useCallback, useRef, useState, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
 
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { useFileUpload } from "@/hooks/use-file-upload";
@@ -7,13 +7,30 @@ import { useFileUpload } from "@/hooks/use-file-upload";
 interface ChatInputProps {
   onSend: (message: string, files: File[]) => void;
   disabled: boolean;
+  seedValue?: string | null;
+  onSeedConsumed?: () => void;
 }
 
-export function ChatInput({ onSend, disabled }: ChatInputProps) {
+export function ChatInput({ onSend, disabled, seedValue, onSeedConsumed }: ChatInputProps) {
   const [input, setInput] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { files, addFiles, removeFile, clearFiles } = useFileUpload();
+
+  useEffect(() => {
+    if (seedValue) {
+      setInput(seedValue);
+      onSeedConsumed?.();
+      requestAnimationFrame(() => {
+        const el = textareaRef.current;
+        if (!el) return;
+        el.focus();
+        el.setSelectionRange(el.value.length, el.value.length);
+        el.scrollTop = el.scrollHeight;
+      });
+    }
+  }, [seedValue, onSeedConsumed]);
 
   const handleSend = useCallback(() => {
     if (!input.trim() && files.length === 0) return;
@@ -93,6 +110,7 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
           />
 
           <textarea
+            ref={textareaRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 
 import { AnalyticsDashboard } from "@/components/analytics/analytics-dashboard";
 import { AuditLogPage } from "@/components/audit/audit-log-page";
@@ -21,7 +21,9 @@ interface AppLayoutProps {
     activeFunction: FunctionType;
     conversationId: string | null;
     setConversationId: (id: string | null) => void;
-    onStartChat: (fn: FunctionType) => void;
+    onStartChat: (fn: FunctionType, seed?: string) => void;
+    pendingInputSeed: string | null;
+    clearPendingInputSeed: () => void;
   }) => React.ReactNode;
 }
 
@@ -32,15 +34,21 @@ export function AppLayout({ children }: AppLayoutProps) {
   const [activeFunction, setActiveFunction] = useState<FunctionType>("general");
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<AppView>("chat");
+  const [pendingInputSeed, setPendingInputSeed] = useState<string | null>(null);
   const { activeOrganization, organizations, setActiveOrganization } =
     useOrganizationContext();
   const { canEdit } = useUserRole();
 
-  const startChat = (fn: FunctionType) => {
+  const startChat = (fn: FunctionType, seed?: string) => {
     setActiveFunction(fn);
     setConversationId(null);
     setCurrentView("chat");
+    setPendingInputSeed(seed ?? null);
   };
+
+  const clearPendingInputSeed = useCallback(() => {
+    setPendingInputSeed(null);
+  }, []);
 
   const readOnlyNotice = (
     <div className="flex flex-1 items-center justify-center p-8">
@@ -109,6 +117,8 @@ export function AppLayout({ children }: AppLayoutProps) {
             conversationId,
             setConversationId,
             onStartChat: startChat,
+            pendingInputSeed,
+            clearPendingInputSeed,
           })
         )}
       </main>

@@ -21,12 +21,16 @@ export function App() {
                   conversationId,
                   setConversationId,
                   onStartChat,
+                  pendingInputSeed,
+                  clearPendingInputSeed,
                 }) => (
                   <ChatPage
                     activeFunction={activeFunction}
                     conversationId={conversationId}
                     setConversationId={setConversationId}
                     onStartChat={onStartChat}
+                    pendingInputSeed={pendingInputSeed}
+                    clearPendingInputSeed={clearPendingInputSeed}
                   />
                 )}
               </AppLayout>

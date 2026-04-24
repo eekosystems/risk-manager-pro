@@ -40,6 +40,17 @@ const WELCOME_MESSAGES: Record<FunctionType, string> = {
     "hazard you'd like to record.",
 };
 
+function buildRiskRegisterSeed(assistantContent: string): string {
+  const trimmed = assistantContent.trim();
+  return (
+    "Please extract the hazard(s) from the analysis below and add them to the " +
+    "Risk Register. Ask me any follow-up questions you need (airport, operational " +
+    "domain, existing controls, etc.) before saving.\n\n" +
+    "--- Analysis from prior chat ---\n\n" +
+    trimmed
+  );
+}
+
 function buildWelcomeMessage(functionType: FunctionType): ChatMessage {
   return {
     id: `welcome-${functionType}`,
@@ -54,7 +65,9 @@ interface ChatPageProps {
   activeFunction: FunctionType;
   conversationId: string | null;
   setConversationId: (id: string | null) => void;
-  onStartChat: (fn: FunctionType) => void;
+  onStartChat: (fn: FunctionType, seed?: string) => void;
+  pendingInputSeed: string | null;
+  clearPendingInputSeed: () => void;
 }
 
 export function ChatPage({
@@ -62,6 +75,8 @@ export function ChatPage({
   conversationId,
   setConversationId,
   onStartChat,
+  pendingInputSeed,
+  clearPendingInputSeed,
 }: ChatPageProps) {
   const welcomeMessage = useMemo(() => buildWelcomeMessage(activeFunction), [activeFunction]);
   const [localMessages, setLocalMessages] = useState<ChatMessage[]>([
@@ -174,13 +189,17 @@ export function ChatPage({
     ],
   );
 
-  const handleSaveAsRisk = useCallback(() => {
-    onStartChat("risk_register");
-    addToast(
-      "Switched to Risk Register mode — describe the hazard you want to record.",
-      "success",
-    );
-  }, [onStartChat, addToast]);
+  const handleSaveAsRisk = useCallback(
+    (messageContent: string) => {
+      const seed = buildRiskRegisterSeed(messageContent);
+      onStartChat("risk_register", seed);
+      addToast(
+        "Carried the analysis into Risk Register mode — review and send to save.",
+        "success",
+      );
+    },
+    [onStartChat, addToast],
+  );
 
   const handleEmail = useCallback((content: string) => {
     setEmailTargetContent(content);
@@ -222,6 +241,8 @@ export function ChatPage({
       <ChatInput
         onSend={handleSend}
         disabled={sendMessageMutation.isPending}
+        seedValue={pendingInputSeed}
+        onSeedConsumed={clearPendingInputSeed}
       />
       {emailTargetContent !== null && (
         <EmailChatModal
