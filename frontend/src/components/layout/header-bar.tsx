@@ -1,4 +1,4 @@
-import { Search, Settings } from "lucide-react";
+import { Settings } from "lucide-react";
 
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { useUserRole } from "@/hooks/use-user-role";
@@ -54,13 +54,6 @@ export function HeaderBar({ currentView = "chat", onSettingsClick, onViewChange 
       </div>
 
       <div className="flex items-center gap-3">
-        <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5">
-          <Search size={16} className="text-gray-400" />
-          <span className="text-sm text-gray-400">Search conversations...</span>
-          <kbd className="ml-4 rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[11px] font-medium text-gray-400">
-            ⌘K
-          </kbd>
-        </div>
         <NotificationBell onNavigate={onViewChange} />
         {isAdmin && (
           <button
