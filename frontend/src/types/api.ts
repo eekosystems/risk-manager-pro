@@ -1,4 +1,25 @@
 export type FunctionType = "phl" | "sra" | "system" | "general" | "risk_register";
+
+export interface ConversationHit {
+  id: string;
+  title: string;
+  function_type: FunctionType;
+  snippet: string;
+  matched_message_id: string;
+  updated_at: string;
+}
+
+export interface DocumentHit {
+  id: string;
+  filename: string;
+  source_type: SourceType;
+  status: DocumentStatus;
+}
+
+export interface SearchResults {
+  conversations: ConversationHit[];
+  documents: DocumentHit[];
+}
 export type MessageRole = "user" | "assistant" | "system";
 export type DocumentStatus = "uploaded" | "processing" | "indexed" | "failed";
 export type SourceType = "client" | "faa" | "icao" | "easa" | "nasa_asrs" | "internal";

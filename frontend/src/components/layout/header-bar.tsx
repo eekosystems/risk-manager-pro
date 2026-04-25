@@ -1,4 +1,4 @@
-import { Settings } from "lucide-react";
+import { Search, Settings } from "lucide-react";
 
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { useUserRole } from "@/hooks/use-user-role";
@@ -8,6 +8,7 @@ import type { AppView } from "./app-layout";
 interface HeaderBarProps {
   currentView?: AppView;
   onSettingsClick?: () => void;
+  onSearchClick?: () => void;
   onViewChange?: (view: AppView) => void;
 }
 
@@ -38,7 +39,12 @@ const VIEW_HEADERS: Record<AppView, { title: string; subtitle: string }> = {
   },
 };
 
-export function HeaderBar({ currentView = "chat", onSettingsClick, onViewChange }: HeaderBarProps) {
+export function HeaderBar({
+  currentView = "chat",
+  onSettingsClick,
+  onSearchClick,
+  onViewChange,
+}: HeaderBarProps) {
   const header = VIEW_HEADERS[currentView];
   const { isAdmin } = useUserRole();
 
@@ -54,6 +60,18 @@ export function HeaderBar({ currentView = "chat", onSettingsClick, onViewChange 
       </div>
 
       <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={onSearchClick}
+          className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-left transition-colors hover:border-brand-300 hover:bg-brand-50/50"
+          aria-label="Search conversations and documents"
+        >
+          <Search size={16} className="text-gray-400" />
+          <span className="text-sm text-gray-400">Search conversations...</span>
+          <kbd className="ml-4 rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[11px] font-medium text-gray-400">
+            ⌘K
+          </kbd>
+        </button>
         <NotificationBell onNavigate={onViewChange} />
         {isAdmin && (
           <button

@@ -1,8 +1,9 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { AnalyticsDashboard } from "@/components/analytics/analytics-dashboard";
 import { AuditLogPage } from "@/components/audit/audit-log-page";
 import { RiskRegisterPage } from "@/components/risk-register/risk-register-page";
+import { SearchModal } from "@/components/search/search-modal";
 import { SettingsPage } from "@/components/settings/settings-page";
 import { PHLWizard } from "@/components/workflows/phl-wizard";
 import { SRAWizard } from "@/components/workflows/sra-wizard";
@@ -31,6 +32,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
   const [activeFunction, setActiveFunction] = useState<FunctionType>("general");
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<AppView>("chat");
@@ -48,6 +50,17 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   const clearPendingInputSeed = useCallback(() => {
     setPendingInputSeed(null);
+  }, []);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setShowSearch((open) => !open);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, []);
 
   const readOnlyNotice = (
@@ -85,6 +98,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         <HeaderBar
           currentView={currentView}
           onSettingsClick={() => setShowSettings(true)}
+          onSearchClick={() => setShowSearch(true)}
           onViewChange={setCurrentView}
         />
         {currentView === "analytics" ? (
@@ -141,6 +155,16 @@ export function AppLayout({ children }: AppLayoutProps) {
       {showSettings && (
         <SettingsPage onClose={() => setShowSettings(false)} />
       )}
+
+      <SearchModal
+        open={showSearch}
+        onClose={() => setShowSearch(false)}
+        onSelectConversation={(id) => {
+          setConversationId(id);
+          setCurrentView("chat");
+        }}
+        onViewChange={setCurrentView}
+      />
     </div>
   );
 }
