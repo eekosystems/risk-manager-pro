@@ -7,13 +7,10 @@ import { useToast } from "@/hooks/use-toast";
 import { logger } from "@/lib/logger";
 import type { ChatMessage, FunctionType } from "@/types/api";
 
-import { AssessmentStepper } from "./assessment-stepper";
 import { ChatInput } from "./chat-input";
 import { EmailChatModal } from "./email-chat-modal";
 import { MessageList } from "./message-list";
 import { WorkflowLauncher } from "./workflow-launcher";
-
-const ASSESSMENT_MODES: ReadonlySet<FunctionType> = new Set(["phl", "sra", "risk_register"]);
 
 const WELCOME_MESSAGES: Record<FunctionType, string> = {
   phl:
@@ -237,8 +234,6 @@ export function ChatPage({
     localMessages.length === 1 &&
     (localMessages[0]?.id.startsWith("welcome-") ?? false);
 
-  const showStepper = !isFreshChat && ASSESSMENT_MODES.has(activeFunction);
-
   return (
     <>
       {isFreshChat && (
@@ -246,11 +241,6 @@ export function ChatPage({
           activeFunction={activeFunction}
           onSelect={(fn) => onStartChat(fn)}
         />
-      )}
-      {showStepper && (
-        <div className="mx-auto w-full max-w-3xl px-4 pt-4">
-          <AssessmentStepper functionType={activeFunction} messages={localMessages} />
-        </div>
       )}
       <MessageList
         messages={localMessages}
