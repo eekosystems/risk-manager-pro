@@ -111,9 +111,7 @@ class DocumentRepository:
         await self._db.flush()
         return True
 
-    async def count_by_source_type(
-        self, organization_id: uuid.UUID
-    ) -> dict[str, dict[str, int]]:
+    async def count_by_source_type(self, organization_id: uuid.UUID) -> dict[str, dict[str, int]]:
         """Return per-source counts grouped by status, plus chunk totals.
 
         Shape: {"faa": {"indexed": 14, "failed": 0, ..., "total": 14, "chunks": 1208}}
