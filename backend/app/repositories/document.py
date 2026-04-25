@@ -110,3 +110,29 @@ class DocumentRepository:
         await self._db.delete(document)
         await self._db.flush()
         return True
+
+    async def count_by_source_type(
+        self, organization_id: uuid.UUID
+    ) -> dict[str, dict[str, int]]:
+        """Return per-source counts grouped by status, plus chunk totals.
+
+        Shape: {"faa": {"indexed": 14, "failed": 0, ..., "total": 14, "chunks": 1208}}
+        """
+        stmt = (
+            select(
+                Document.source_type,
+                Document.status,
+                func.count(),
+                func.coalesce(func.sum(Document.chunk_count), 0),
+            )
+            .where(Document.organization_id == organization_id)
+            .group_by(Document.source_type, Document.status)
+        )
+        rows = (await self._db.execute(stmt)).all()
+        out: dict[str, dict[str, int]] = {}
+        for source, status, count, chunk_total in rows:
+            bucket = out.setdefault(source.value, {})
+            bucket[status.value] = int(count)
+            bucket["total"] = bucket.get("total", 0) + int(count)
+            bucket["chunks"] = bucket.get("chunks", 0) + int(chunk_total)
+        return out

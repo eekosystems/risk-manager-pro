@@ -280,6 +280,18 @@ async def bulk_delete_documents(
     )
 
 
+@router.get("/stats/by-source", response_model=DataResponse[dict[str, dict[str, int]]])
+async def stats_by_source(
+    current_user: User = Depends(require_analyst_or_above),
+    organization: Organization = Depends(get_current_organization),
+    db: AsyncSession = Depends(get_db),
+) -> DataResponse[dict[str, dict[str, int]]]:
+    """Return per-source-type document counts (FAA, ICAO, EASA, NASA ASRS, client) with status + chunk totals."""
+    repo = DocumentRepository(db)
+    counts = await repo.count_by_source_type(organization.id)
+    return DataResponse(data=counts, meta=MetaResponse(request_id=""))
+
+
 @router.post("/process-all", response_model=DataResponse[ProcessAllResult])
 async def process_all_uploaded(
     request: Request,
