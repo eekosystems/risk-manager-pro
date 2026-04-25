@@ -10,7 +10,6 @@ import type { ChatMessage, FunctionType } from "@/types/api";
 import { ChatInput } from "./chat-input";
 import { EmailChatModal } from "./email-chat-modal";
 import { MessageList } from "./message-list";
-import { WorkflowLauncher } from "./workflow-launcher";
 
 const WELCOME_MESSAGES: Record<FunctionType, string> = {
   phl:
@@ -229,19 +228,8 @@ export function ChatPage({
     addToast("Copy failed — select the text manually", "error");
   }, [addToast]);
 
-  const isFreshChat =
-    !conversationId &&
-    localMessages.length === 1 &&
-    (localMessages[0]?.id.startsWith("welcome-") ?? false);
-
   return (
     <>
-      {isFreshChat && (
-        <WorkflowLauncher
-          activeFunction={activeFunction}
-          onSelect={(fn) => onStartChat(fn)}
-        />
-      )}
       <MessageList
         messages={localMessages}
         isTyping={isTyping}
