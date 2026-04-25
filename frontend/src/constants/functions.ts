@@ -38,9 +38,9 @@ export const FUNCTIONS: FunctionDefinition[] = [
   },
   {
     id: "risk_register",
-    name: "Risk Register",
-    shortName: "RR",
-    title: "Risk Register Entry",
+    name: "Hazard Entry",
+    shortName: "Hazard",
+    title: "Hazard Entry",
     description: "Conversational hazard entry into the Airport Risk Register",
     icon: ClipboardList,
   },

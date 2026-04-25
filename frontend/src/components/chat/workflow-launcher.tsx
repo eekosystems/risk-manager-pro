@@ -21,9 +21,9 @@ const WORKFLOW_OPTIONS: WorkflowOption[] = [
   },
   {
     id: "risk_register",
-    title: "Add to Risk Register",
+    title: "Hazard Entry",
     description:
-      "Record a hazard in the Airport Risk Register with category, scoring, and existing controls.",
+      "Walk through a hazard conversationally and add it to the Airport Risk Register with category, scoring, and existing controls.",
   },
   {
     id: "system",
