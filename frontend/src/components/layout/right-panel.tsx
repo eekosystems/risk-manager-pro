@@ -1,13 +1,9 @@
 import { clsx } from "clsx";
 import {
-  AlertTriangle,
-  BarChart3,
   Bot,
   ChevronRight,
   ScrollText,
-  Shield,
   ShieldAlert,
-  Workflow,
 } from "lucide-react";
 
 import { AiStatusCard } from "@/components/layout/panel/ai-status-card";
@@ -62,20 +58,8 @@ export function RightPanel({
               onFunctionSelect={onFunctionSelect}
             />
 
-            {/* Analytics + Risk Register + Audit Log nav */}
+            {/* Risk Register + Audit Log nav */}
             <div className="mt-2 space-y-1">
-              <button
-                onClick={() => onViewChange("analytics")}
-                className={clsx(
-                  "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all",
-                  currentView === "analytics"
-                    ? "gradient-brand text-white shadow-md shadow-brand-500/30"
-                    : "text-gray-600 hover:bg-brand-50 hover:text-brand-500",
-                )}
-              >
-                <BarChart3 size={18} />
-                Analytics
-              </button>
               <button
                 onClick={() => onViewChange("risk-register")}
                 className={clsx(
@@ -100,42 +84,6 @@ export function RightPanel({
                 <ScrollText size={18} />
                 Audit Log
               </button>
-            </div>
-
-            {/* Workflows section */}
-            <div className="mt-4">
-              <div className="mb-1.5 flex items-center gap-2 px-3">
-                <Workflow size={12} className="text-gray-400" />
-                <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
-                  Workflows
-                </span>
-              </div>
-              <div className="space-y-1">
-                <button
-                  onClick={() => onFunctionSelect("phl")}
-                  className={clsx(
-                    "flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all",
-                    activeFunction === "phl" && currentView === "chat"
-                      ? "gradient-brand text-white shadow-md shadow-brand-500/30"
-                      : "text-gray-600 hover:bg-brand-50 hover:text-brand-500",
-                  )}
-                >
-                  <AlertTriangle size={16} />
-                  PHL Chat
-                </button>
-                <button
-                  onClick={() => onFunctionSelect("sra")}
-                  className={clsx(
-                    "flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all",
-                    activeFunction === "sra" && currentView === "chat"
-                      ? "gradient-brand text-white shadow-md shadow-brand-500/30"
-                      : "text-gray-600 hover:bg-brand-50 hover:text-brand-500",
-                  )}
-                >
-                  <Shield size={16} />
-                  SRA Chat
-                </button>
-              </div>
             </div>
           </nav>
 
@@ -167,21 +115,6 @@ export function RightPanel({
 
           <div className="mx-3 my-3 h-px w-8 bg-gray-200" />
 
-          {/* Analytics icon */}
-          <button
-            onClick={() => onViewChange("analytics")}
-            aria-label="Analytics"
-            title="Analytics"
-            className={clsx(
-              "flex h-10 w-10 items-center justify-center rounded-lg transition-all",
-              currentView === "analytics"
-                ? "gradient-brand text-white shadow-md shadow-brand-500/30"
-                : "text-gray-400 hover:bg-brand-50 hover:text-brand-500",
-            )}
-          >
-            <BarChart3 size={20} />
-          </button>
-
           {/* Risk Register icon */}
           <button
             onClick={() => onViewChange("risk-register")}
@@ -210,36 +143,6 @@ export function RightPanel({
             )}
           >
             <ScrollText size={20} />
-          </button>
-
-          <div className="mx-3 my-3 h-px w-8 bg-gray-200" />
-
-          {/* Workflow chat shortcuts */}
-          <button
-            onClick={() => onFunctionSelect("phl")}
-            aria-label="PHL Chat"
-            title="PHL Chat"
-            className={clsx(
-              "flex h-10 w-10 items-center justify-center rounded-lg transition-all",
-              activeFunction === "phl" && currentView === "chat"
-                ? "gradient-brand text-white shadow-md shadow-brand-500/30"
-                : "text-gray-400 hover:bg-brand-50 hover:text-brand-500",
-            )}
-          >
-            <AlertTriangle size={20} />
-          </button>
-          <button
-            onClick={() => onFunctionSelect("sra")}
-            aria-label="SRA Chat"
-            title="SRA Chat"
-            className={clsx(
-              "flex h-10 w-10 items-center justify-center rounded-lg transition-all",
-              activeFunction === "sra" && currentView === "chat"
-                ? "gradient-brand text-white shadow-md shadow-brand-500/30"
-                : "text-gray-400 hover:bg-brand-50 hover:text-brand-500",
-            )}
-          >
-            <Shield size={20} />
           </button>
 
           {/* AI status at bottom */}

@@ -1,12 +1,11 @@
 import { clsx } from "clsx";
 import {
   ChevronRight,
-  FileText,
   MessageSquare,
   User,
 } from "lucide-react";
 
-import { RecentDocuments } from "@/components/layout/panel/recent-documents";
+import { DocumentDropZone } from "@/components/layout/panel/document-drop-zone";
 import { ConversationHistory } from "@/components/layout/sidebar/conversation-history";
 import { OrganizationSwitcher } from "@/components/layout/sidebar/organization-switcher";
 import { UserCard } from "@/components/layout/sidebar/user-card";
@@ -68,8 +67,8 @@ export function LeftSidebar({
             <ConversationHistory onConversationSelect={onConversationSelect} />
           </div>
 
-          <div className="mt-auto border-t border-gray-100 px-3 pt-3">
-            <RecentDocuments />
+          <div className="border-t border-gray-100 px-3 py-3">
+            <DocumentDropZone />
           </div>
 
           <UserCard />
@@ -85,14 +84,6 @@ export function LeftSidebar({
               className="flex h-10 w-10 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-brand-50 hover:text-brand-500"
             >
               <MessageSquare size={20} />
-            </button>
-            <button
-              onClick={onToggle}
-              aria-label="Recent documents"
-              title="Recent documents"
-              className="flex h-10 w-10 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-brand-50 hover:text-brand-500"
-            >
-              <FileText size={20} />
             </button>
           </nav>
 
