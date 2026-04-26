@@ -661,11 +661,24 @@ def _apply_import_rules(
 # ---------------------------------------------------------------------------
 
 
+# Bump this whenever the shape of SharePointRisk or _FileCacheEntry changes
+# in a way that requires re-extraction. Cached entries built under an older
+# version are invalidated automatically on the next scan, so deploys never
+# leave the in-memory cache speaking a stale data shape.
+#   v1: original (hazard, severity, likelihood, risk_level)
+#   v2: adds report_year, matrix_size, import_classification + risks_flagged
+_CACHE_SCHEMA_VERSION = "v2"
+
+
+def _build_cache_key(drive_item_id: str, size: int, content_type: str) -> str:
+    return f"{_CACHE_SCHEMA_VERSION}:{drive_item_id}:{size}:{content_type}"
+
+
 @dataclass
 class _FileCacheEntry:
     risks: list[SharePointRisk]
     notes: list[SharePointParseNote]
-    cache_key: str  # drive_item_id + size + content_type
+    cache_key: str  # schema version + drive_item_id + size + content_type
     cached_at: float = field(default_factory=time.time)
     # Rows the rule engine routed away from the live register. Empty in shadow
     # mode (every row stays in `risks` regardless of classification).
@@ -789,11 +802,11 @@ class RiskOutcomeImporter:
             airport_name = _airport_from_segments(segments)
             if not airport_name:
                 continue
-            cache_key = f"{f.drive_item_id}:{f.size}:{f.content_type}"
+            cache_key = _build_cache_key(f.drive_item_id, f.size, f.content_type)
             fresh_ids.add(f.drive_item_id)
             existing = self._file_cache.get(f.drive_item_id)
             if existing is not None and existing.cache_key == cache_key:
-                continue  # unchanged — keep cached entry
+                continue  # unchanged AND on the current schema version
             tasks.append((airport_name, f))
 
         # Evict cache entries for files that are no longer present.
@@ -883,7 +896,7 @@ class RiskOutcomeImporter:
                     self._file_cache[f.drive_item_id] = _FileCacheEntry(
                         risks=clean,
                         notes=notes,
-                        cache_key=f"{f.drive_item_id}:{f.size}:{f.content_type}",
+                        cache_key=_build_cache_key(f.drive_item_id, f.size, f.content_type),
                         risks_flagged=flagged,
                     )
                     self._scanned += 1
