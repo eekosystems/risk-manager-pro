@@ -72,6 +72,9 @@ class SharePointRiskRow(BaseModel):
     risk_level: str
     source_file: str
     source_url: str | None
+    report_year: int | None = None
+    matrix_size: str | None = None
+    import_classification: str = "clean"
 
 
 class SharePointParseNoteOut(BaseModel):
@@ -85,6 +88,7 @@ class RiskOutcomeSummary(BaseModel):
     risks: list[SharePointRiskRow]
     notes: list[SharePointParseNoteOut]
     generated_at: float
+    risks_flagged_for_review: list[SharePointRiskRow] = []
 
 
 @router.get("/airports", response_model=DataResponse[AirportListResponse])
@@ -143,6 +147,9 @@ async def risk_outcome_summary(
             risks=[SharePointRiskRow(**r.__dict__) for r in summary.risks],
             notes=[SharePointParseNoteOut(**n.__dict__) for n in summary.notes],
             generated_at=summary.generated_at,
+            risks_flagged_for_review=[
+                SharePointRiskRow(**r.__dict__) for r in summary.risks_flagged_for_review
+            ],
         ),
         meta=MetaResponse(request_id=""),
     )

@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
@@ -54,6 +55,13 @@ class SharePointRisk:
     risk_level: str  # "low" | "medium" | "high" | "extreme"
     source_file: str
     source_url: str | None
+    # Document-level metadata stamped onto every row from the same source file.
+    report_year: int | None = None
+    matrix_size: str | None = None  # "4x4" | "5x5" | "6x6" | "unknown"
+    # Result of the import-rule classifier. Stamped in BOTH shadow and enforce
+    # modes so it is always visible in the UI / logs. In shadow mode every row
+    # is still kept; in enforce mode the importer routes rows by this label.
+    import_classification: str = "clean"
 
 
 @dataclass
@@ -73,6 +81,10 @@ class SharePointRiskSummary:
     scanned: int  # files processed so far
     total: int  # files expected
     last_scan_completed_at: float | None
+    # Rows that pass extraction but fail import rules (4x4 post-2018, unknown
+    # year, etc.). Empty list in shadow mode — everything still flows through
+    # `risks`. Populated only when settings.risk_import_enforce is True.
+    risks_flagged_for_review: list[SharePointRisk] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -453,6 +465,198 @@ async def _extract_risks_via_llm(
 
 
 # ---------------------------------------------------------------------------
+# Document metadata extraction (report year + matrix size)
+# ---------------------------------------------------------------------------
+
+
+_METADATA_SYSTEM_PROMPT = (
+    "You read aviation safety risk-management documents and report two facts: "
+    "the report's publication or revision year, and the size of the risk "
+    "scoring matrix the document uses (4x4, 5x5, or 6x6). Return ONLY a JSON "
+    "object — no commentary, no code fences."
+)
+
+_METADATA_USER_TEMPLATE = """\
+Identify the following from this risk register / SRMD / SRMP document:
+
+1. report_year — the most recent revision, issue, effective, or publication
+   year shown in the document header, footer, signature block, or revision
+   history. Must be a 4-digit year between 1990 and 2099. If multiple years
+   appear, prefer the most recent one tied to "Revision", "Issued", "Effective",
+   "Date Approved", or "Updated". If no clear year is present, return null.
+
+2. matrix_size — the dimension of the severity x likelihood matrix the
+   document uses for risk scoring. Look at the matrix legend, scoring tables,
+   or the range of severity / likelihood values used. Return one of:
+   "4x4", "5x5", "6x6", or "unknown".
+
+Return ONLY this JSON shape:
+
+{{"report_year": <integer or null>, "matrix_size": "4x4" | "5x5" | "6x6" | "unknown"}}
+
+Document text (may be a chunk of a longer document):
+---
+{document_text}
+---
+
+Return ONLY the JSON object.
+"""
+
+
+_YEAR_REGEX = re.compile(r"\b(19[9]\d|20\d{2})\b")
+_REVISION_HINT_REGEX = re.compile(
+    r"(?:revision|revised|issue(?:d)?|effective|approved|updated|date)"
+    r"[\s:.\-]*\D{0,40}\b(19[9]\d|20\d{2})\b",
+    re.IGNORECASE,
+)
+
+
+def _regex_year_from_text(text: str) -> int | None:
+    """Cheap deterministic fallback when the LLM metadata call yields no year.
+
+    Strategy: prefer a 4-digit year that appears within ~40 chars of a hint
+    word (Revision / Issued / Effective / Approved / Updated / Date). If no
+    hinted match is found, return the most recent plausible year anywhere in
+    the first 8000 chars (likely the title page / header).
+    """
+    head = text[:8000]
+    hinted = [int(m.group(1)) for m in _REVISION_HINT_REGEX.finditer(head)]
+    if hinted:
+        return max(hinted)
+    plain = [int(m.group(1)) for m in _YEAR_REGEX.finditer(head)]
+    if not plain:
+        return None
+    # Cap at a reasonable upper bound to avoid future-dated junk.
+    return max(y for y in plain if y <= 2099)
+
+
+def _normalize_matrix_size(value: Any) -> str:
+    if not isinstance(value, str):
+        return "unknown"
+    s = value.strip().lower().replace(" ", "")
+    if s in {"4x4", "5x5", "6x6"}:
+        return s
+    return "unknown"
+
+
+async def _extract_doc_metadata(
+    *,
+    text: str,
+    source_file: str,
+    openai_client: AzureOpenAIClient,
+) -> tuple[int | None, str]:
+    """Return (report_year, matrix_size) for one source file.
+
+    Falls back to a regex year scan if the LLM call fails or returns null.
+    matrix_size defaults to "unknown" if neither the LLM nor any heuristic
+    can place it.
+    """
+    if not text.strip():
+        return None, "unknown"
+
+    # Use the head of the document — title page + first few sections is
+    # enough to identify revision year and matrix legend, and keeps cost low.
+    head = text[: _MAX_CHARS_PER_CHUNK // 3]
+    messages = [
+        {"role": "system", "content": _METADATA_SYSTEM_PROMPT},
+        {"role": "user", "content": _METADATA_USER_TEMPLATE.format(document_text=head)},
+    ]
+    report_year: int | None = None
+    matrix_size = "unknown"
+    try:
+        raw = await openai_client.chat_completion(
+            messages,
+            temperature=0.0,
+            max_tokens=200,
+            json_mode=True,
+        )
+        payload = _parse_json_payload(raw) or {}
+        year_val = payload.get("report_year")
+        if isinstance(year_val, int) and 1990 <= year_val <= 2099:
+            report_year = year_val
+        matrix_size = _normalize_matrix_size(payload.get("matrix_size"))
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "risk_outcome_metadata_extraction_failed",
+            source_file=source_file,
+            error=str(exc),
+        )
+
+    if report_year is None:
+        report_year = _regex_year_from_text(text)
+
+    logger.info(
+        "risk_outcome_metadata_extracted",
+        source_file=source_file,
+        report_year=report_year,
+        matrix_size=matrix_size,
+    )
+    return report_year, matrix_size
+
+
+# ---------------------------------------------------------------------------
+# Import-rule classifier
+# ---------------------------------------------------------------------------
+
+
+# Classification labels — keep stable, the frontend / logs key off these.
+CLASSIFICATION_CLEAN = "clean"
+CLASSIFICATION_DROP_PRE_MIN_YEAR = "drop_pre_min_year"
+CLASSIFICATION_DROP_6X6 = "drop_6x6_post_min_year"
+CLASSIFICATION_FLAG_4X4 = "flag_4x4_post_min_year"
+CLASSIFICATION_FLAG_UNKNOWN_YEAR = "flag_unknown_year"
+
+
+def _classify_for_import(report_year: int | None, matrix_size: str, min_year: int) -> str:
+    """Pure rule engine — deterministic, no I/O.
+
+    Rules (per the product spec):
+      • report < min_year (regardless of matrix)        -> drop
+      • report >= min_year, matrix=6x6                  -> drop
+      • report >= min_year, matrix=4x4                  -> flag for review
+      • report >= min_year, matrix=5x5                  -> clean
+      • report year unknown                             -> flag for review
+      • matrix unknown but year >= min_year             -> clean (give benefit of the doubt;
+                                                          the verbatim extractor's strict
+                                                          schema already filters non-5x5 values)
+    """
+    if report_year is None:
+        return CLASSIFICATION_FLAG_UNKNOWN_YEAR
+    if report_year < min_year:
+        return CLASSIFICATION_DROP_PRE_MIN_YEAR
+    if matrix_size == "6x6":
+        return CLASSIFICATION_DROP_6X6
+    if matrix_size == "4x4":
+        return CLASSIFICATION_FLAG_4X4
+    return CLASSIFICATION_CLEAN
+
+
+def _apply_import_rules(
+    risks: list[SharePointRisk],
+    *,
+    classification: str,
+    enforce: bool,
+) -> tuple[list[SharePointRisk], list[SharePointRisk]]:
+    """Stamp the classification on every row, then route per the rules.
+
+    Returns (clean, flagged). In shadow mode (enforce=False), every row is
+    returned in `clean` regardless of classification — the label is still
+    stamped so the UI / logs can show what *would* have happened.
+    """
+    for r in risks:
+        r.import_classification = classification
+
+    if not enforce:
+        return risks, []
+
+    if classification in (CLASSIFICATION_DROP_PRE_MIN_YEAR, CLASSIFICATION_DROP_6X6):
+        return [], []
+    if classification in (CLASSIFICATION_FLAG_4X4, CLASSIFICATION_FLAG_UNKNOWN_YEAR):
+        return [], risks
+    return risks, []
+
+
+# ---------------------------------------------------------------------------
 # Per-file cache entry
 # ---------------------------------------------------------------------------
 
@@ -463,6 +667,9 @@ class _FileCacheEntry:
     notes: list[SharePointParseNote]
     cache_key: str  # drive_item_id + size + content_type
     cached_at: float = field(default_factory=time.time)
+    # Rows the rule engine routed away from the live register. Empty in shadow
+    # mode (every row stays in `risks` regardless of classification).
+    risks_flagged: list[SharePointRisk] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -530,9 +737,11 @@ class RiskOutcomeImporter:
 
     def _build_summary_locked(self) -> SharePointRiskSummary:
         risks: list[SharePointRisk] = []
+        flagged: list[SharePointRisk] = []
         notes: list[SharePointParseNote] = list(self._notes)
         for entry in self._file_cache.values():
             risks.extend(entry.risks)
+            flagged.extend(entry.risks_flagged)
             notes.extend(entry.notes)
         return SharePointRiskSummary(
             airports=list(self._airports),
@@ -543,6 +752,7 @@ class RiskOutcomeImporter:
             scanned=self._scanned,
             total=self._total,
             last_scan_completed_at=self._last_completed,
+            risks_flagged_for_review=flagged,
         )
 
     async def _run_scan(self) -> None:
@@ -608,9 +818,16 @@ class RiskOutcomeImporter:
 
         async def process(airport: str, f: SharePointFile) -> None:
             async with sem:
+                clean: list[SharePointRisk] = []
+                flagged: list[SharePointRisk] = []
                 try:
                     data = await self._crawler.download_file(f)
                     text = await DocumentProcessor._extract_text_in_thread(data, f.content_type)
+                    report_year, matrix_size = await _extract_doc_metadata(
+                        text=text,
+                        source_file=f.name,
+                        openai_client=self._openai,
+                    )
                     risks, notes = await _extract_risks_via_llm(
                         text=text,
                         airport=airport,
@@ -618,8 +835,43 @@ class RiskOutcomeImporter:
                         source_url=f.web_url or None,
                         openai_client=self._openai,
                     )
+                    for r in risks:
+                        r.report_year = report_year
+                        r.matrix_size = matrix_size
+                    classification = _classify_for_import(
+                        report_year, matrix_size, settings.risk_import_min_year
+                    )
+                    clean, flagged = _apply_import_rules(
+                        risks,
+                        classification=classification,
+                        enforce=settings.risk_import_enforce,
+                    )
+                    logger.info(
+                        "risk_outcome_file_classified",
+                        airport=airport,
+                        source_file=f.name,
+                        report_year=report_year,
+                        matrix_size=matrix_size,
+                        classification=classification,
+                        rows_extracted=len(risks),
+                        rows_clean=len(clean),
+                        rows_flagged=len(flagged),
+                        rows_dropped=len(risks) - len(clean) - len(flagged),
+                        enforce=settings.risk_import_enforce,
+                    )
+                    if classification != CLASSIFICATION_CLEAN:
+                        notes.append(
+                            SharePointParseNote(
+                                airport_identifier=airport,
+                                source_file=f.name,
+                                message=(
+                                    f"import rule: {classification} "
+                                    f"(year={report_year}, matrix={matrix_size}); "
+                                    f"{'enforced' if settings.risk_import_enforce else 'shadow mode — kept anyway'}"
+                                ),
+                            )
+                        )
                 except Exception as exc:  # noqa: BLE001
-                    risks = []
                     notes = [
                         SharePointParseNote(
                             airport_identifier=airport,
@@ -629,9 +881,10 @@ class RiskOutcomeImporter:
                     ]
                 async with self._lock:
                     self._file_cache[f.drive_item_id] = _FileCacheEntry(
-                        risks=risks,
+                        risks=clean,
                         notes=notes,
                         cache_key=f"{f.drive_item_id}:{f.size}:{f.content_type}",
+                        risks_flagged=flagged,
                     )
                     self._scanned += 1
 

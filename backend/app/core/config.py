@@ -72,6 +72,15 @@ class Settings(BaseSettings):
     search_index_batch_size: int = 100
     processing_concurrency: int = 5
 
+    # Risk-outcome import filter rules
+    # When False (default), the importer runs in SHADOW mode: every classification
+    # is stamped on each row and logged, but nothing is filtered out. Flip to True
+    # to actually drop pre-2018 / 6x6-post-2018 reports and route 4x4-post-2018
+    # rows to the flagged-for-review queue.
+    risk_import_enforce: bool = False
+    # Reports earlier than this year are dropped on import when enforcement is on.
+    risk_import_min_year: int = 2018
+
     # SharePoint / Document Crawler
     sharepoint_tenant_id: str = ""
     sharepoint_client_id: str = ""
