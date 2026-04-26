@@ -17,6 +17,58 @@ import { RightPanel } from "./right-panel";
 
 export type AppView = "chat" | "risk-register" | "phl-workflow" | "sra-workflow" | "analytics" | "audit-log";
 
+const STORAGE_KEY = "rmp:layout:v1";
+const VALID_VIEWS: ReadonlySet<AppView> = new Set([
+  "chat",
+  "risk-register",
+  "phl-workflow",
+  "sra-workflow",
+  "analytics",
+  "audit-log",
+]);
+const VALID_FUNCTIONS: ReadonlySet<FunctionType> = new Set([
+  "phl",
+  "sra",
+  "system",
+  "general",
+  "risk_register",
+]);
+
+interface PersistedLayout {
+  currentView: AppView;
+  activeFunction: FunctionType;
+  conversationId: string | null;
+  leftOpen: boolean;
+  rightOpen: boolean;
+}
+
+function loadPersistedLayout(): Partial<PersistedLayout> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const out: Partial<PersistedLayout> = {};
+    if (typeof parsed.currentView === "string" && VALID_VIEWS.has(parsed.currentView as AppView)) {
+      out.currentView = parsed.currentView as AppView;
+    }
+    if (
+      typeof parsed.activeFunction === "string" &&
+      VALID_FUNCTIONS.has(parsed.activeFunction as FunctionType)
+    ) {
+      out.activeFunction = parsed.activeFunction as FunctionType;
+    }
+    if (typeof parsed.conversationId === "string" || parsed.conversationId === null) {
+      out.conversationId = parsed.conversationId as string | null;
+    }
+    if (typeof parsed.leftOpen === "boolean") out.leftOpen = parsed.leftOpen;
+    if (typeof parsed.rightOpen === "boolean") out.rightOpen = parsed.rightOpen;
+    return out;
+  } catch {
+    return {};
+  }
+}
+
 interface AppLayoutProps {
   children: (props: {
     activeFunction: FunctionType;
@@ -29,13 +81,18 @@ interface AppLayoutProps {
 }
 
 export function AppLayout({ children }: AppLayoutProps) {
-  const [leftOpen, setLeftOpen] = useState(true);
-  const [rightOpen, setRightOpen] = useState(true);
+  const [persisted] = useState(loadPersistedLayout);
+  const [leftOpen, setLeftOpen] = useState(persisted.leftOpen ?? true);
+  const [rightOpen, setRightOpen] = useState(persisted.rightOpen ?? true);
   const [showSettings, setShowSettings] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
-  const [activeFunction, setActiveFunction] = useState<FunctionType>("general");
-  const [conversationId, setConversationId] = useState<string | null>(null);
-  const [currentView, setCurrentView] = useState<AppView>("chat");
+  const [activeFunction, setActiveFunction] = useState<FunctionType>(
+    persisted.activeFunction ?? "general",
+  );
+  const [conversationId, setConversationId] = useState<string | null>(
+    persisted.conversationId ?? null,
+  );
+  const [currentView, setCurrentView] = useState<AppView>(persisted.currentView ?? "chat");
   const [pendingInputSeed, setPendingInputSeed] = useState<string | null>(null);
   const { activeOrganization, organizations, setActiveOrganization } =
     useOrganizationContext();
@@ -62,6 +119,23 @@ export function AppLayout({ children }: AppLayoutProps) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({
+          currentView,
+          activeFunction,
+          conversationId,
+          leftOpen,
+          rightOpen,
+        }),
+      );
+    } catch {
+      // ignore storage failures (quota, privacy mode)
+    }
+  }, [currentView, activeFunction, conversationId, leftOpen, rightOpen]);
 
   const readOnlyNotice = (
     <div className="flex flex-1 items-center justify-center p-8">
