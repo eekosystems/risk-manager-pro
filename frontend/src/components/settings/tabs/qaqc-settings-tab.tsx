@@ -11,6 +11,7 @@ import {
   type QaqcSettings,
 } from "@/api/settings";
 import { Button } from "@/components/ui/button";
+import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { useOrganizationContext } from "@/hooks/use-organization-context";
 import { useToast } from "@/hooks/use-toast";
 
@@ -95,7 +96,21 @@ export function QaqcSettingsTab() {
 
       {/* Reviewer selection */}
       <div>
-        <h3 className="mb-3 text-sm font-bold text-slate-700">Select Reviewers</h3>
+        <h3 className="mb-3 flex items-center gap-1.5 text-sm font-bold text-slate-700">
+          Select Reviewers
+          <InfoTooltip
+            label="About reviewers"
+            content={
+              <>
+                The team members who receive QA/QC notifications. Reviewers
+                see every AI-generated output and risk-register change so
+                they can audit quality. Only members of the active
+                organization can be selected — add them in Users &amp;
+                Roles first if a name is missing.
+              </>
+            }
+          />
+        </h3>
         <div className="space-y-2">
           {members && members.length > 0 ? (
             members.map((member) => {
@@ -152,7 +167,22 @@ export function QaqcSettingsTab() {
 
       {/* Delivery method */}
       <div>
-        <h3 className="mb-3 text-sm font-bold text-slate-700">Delivery Method</h3>
+        <h3 className="mb-3 flex items-center gap-1.5 text-sm font-bold text-slate-700">
+          Delivery Method
+          <InfoTooltip
+            label="About delivery method"
+            content={
+              <>
+                Where reviewers receive QA/QC alerts.{" "}
+                <strong>In-app</strong> shows a notification badge in the
+                app's bell icon. <strong>Email</strong> sends a message to
+                the reviewer's organization email address.{" "}
+                <strong>Both</strong> sends to in-app + email so nothing is
+                missed.
+              </>
+            }
+          />
+        </h3>
         <div className="grid grid-cols-3 gap-2">
           {(["in_app", "email", "both"] as DeliveryMode[]).map((mode) => (
             <button
@@ -177,7 +207,23 @@ export function QaqcSettingsTab() {
 
       {/* Digest frequency */}
       <div>
-        <h3 className="mb-3 text-sm font-bold text-slate-700">Digest Frequency</h3>
+        <h3 className="mb-3 flex items-center gap-1.5 text-sm font-bold text-slate-700">
+          Digest Frequency
+          <InfoTooltip
+            label="About digest frequency"
+            content={
+              <>
+                How often reviewers are notified. <strong>Immediate</strong>{" "}
+                sends one alert per event as it happens.{" "}
+                <strong>Daily</strong> bundles every event from the past 24
+                hours into one summary at the chosen UTC hour.{" "}
+                <strong>Weekly</strong> does the same on a 7-day cadence.
+                Use a digest if reviewers are getting too many individual
+                alerts.
+              </>
+            }
+          />
+        </h3>
         <div className="grid grid-cols-3 gap-2">
           {(["immediate", "daily", "weekly"] as DigestFrequency[]).map((freq) => (
             <button
@@ -220,7 +266,20 @@ export function QaqcSettingsTab() {
 
       {/* Notification toggles */}
       <div>
-        <h3 className="mb-3 text-sm font-bold text-slate-700">Notification Triggers</h3>
+        <h3 className="mb-3 flex items-center gap-1.5 text-sm font-bold text-slate-700">
+          Notification Triggers
+          <InfoTooltip
+            label="About notification triggers"
+            content={
+              <>
+                Which kinds of events generate a QA/QC alert. Turn off any
+                event type that's too noisy for reviewers to be useful —
+                for example, document indexing is off by default because
+                it can fire many times during a bulk upload.
+              </>
+            }
+          />
+        </h3>
         <div className="space-y-3">
           <ToggleRow
             label="AI Chat Responses"

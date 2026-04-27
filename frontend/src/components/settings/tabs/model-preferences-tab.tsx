@@ -8,6 +8,7 @@ import {
   type ModelSettings,
 } from "@/api/settings";
 import { SettingsSection } from "@/components/settings/settings-section";
+import { InfoTooltip } from "@/components/ui/info-tooltip";
 
 const DEFAULT_CONFIG: ModelSettings = {
   chat_model: "gpt-4o",
@@ -89,7 +90,23 @@ export function ModelPreferencesTab() {
       <div className="mb-8"><SettingsSection>
         <div className="mb-5 flex items-center gap-2">
           <Brain size={18} className="text-brand-500" />
-          <h3 className="text-sm font-bold text-slate-800">Chat Model</h3>
+          <h3 className="flex items-center gap-1.5 text-sm font-bold text-slate-800">
+            Chat Model
+            <InfoTooltip
+              label="About chat model"
+              content={
+                <>
+                  The underlying AI model that generates responses.
+                  Different models trade off capability, speed, and cost.
+                  GPT-4o is the strongest reasoning model; GPT-4o Mini is
+                  faster and cheaper but less rigorous on multi-step
+                  analysis. The "context window" is how much text (your
+                  documents + question + reply) the model can consider at
+                  once.
+                </>
+              }
+            />
+          </h3>
         </div>
 
         <div className="space-y-3">
@@ -135,8 +152,21 @@ export function ModelPreferencesTab() {
 
         <div className="space-y-5">
           <div>
-            <label className="mb-1.5 block text-[13px] font-semibold text-slate-700">
+            <label className="mb-1.5 flex items-center gap-1.5 text-[13px] font-semibold text-slate-700">
               Temperature
+              <InfoTooltip
+                label="About temperature"
+                content={
+                  <>
+                    Controls randomness in the AI's word choice. Near 0 the
+                    model picks the single most likely next word every time —
+                    deterministic and focused. Higher values let it sample
+                    less likely options, producing more varied or creative
+                    output. For safety analysis where consistency matters,
+                    keep between 0.1 and 0.4.
+                  </>
+                }
+              />
             </label>
             <input
               type="range"
@@ -161,8 +191,22 @@ export function ModelPreferencesTab() {
           </div>
 
           <div>
-            <label className="mb-1.5 block text-[13px] font-semibold text-slate-700">
+            <label className="mb-1.5 flex items-center gap-1.5 text-[13px] font-semibold text-slate-700">
               Top P
+              <InfoTooltip
+                label="About top P"
+                content={
+                  <>
+                    Also called "nucleus sampling." Restricts the AI to only
+                    pick from the most likely words whose combined probability
+                    adds up to this value. 1.0 = consider every word; 0.5 =
+                    only the smallest set of words that together cover 50% of
+                    the probability mass. Most users tune temperature OR top
+                    P, not both. Leave at 0.95 unless you have a specific
+                    reason.
+                  </>
+                }
+              />
             </label>
             <input
               type="range"
@@ -184,8 +228,20 @@ export function ModelPreferencesTab() {
           </div>
 
           <div>
-            <label className="mb-1.5 block text-[13px] font-semibold text-slate-700">
+            <label className="mb-1.5 flex items-center gap-1.5 text-[13px] font-semibold text-slate-700">
               Max Output Tokens
+              <InfoTooltip
+                label="About max output tokens"
+                content={
+                  <>
+                    Hard cap on the length of the AI's reply. A token is
+                    roughly ¾ of a word, so 4096 tokens ≈ a long memo. Higher
+                    values let the model produce longer responses; lower
+                    values keep replies concise and reduce cost. Truncates
+                    rather than warns if exceeded.
+                  </>
+                }
+              />
             </label>
             <input
               type="number"
@@ -198,8 +254,20 @@ export function ModelPreferencesTab() {
           </div>
 
           <div>
-            <label className="mb-1.5 block text-[13px] font-semibold text-slate-700">
+            <label className="mb-1.5 flex items-center gap-1.5 text-[13px] font-semibold text-slate-700">
               Frequency Penalty
+              <InfoTooltip
+                label="About frequency penalty"
+                content={
+                  <>
+                    Discourages the AI from repeating the same word too many
+                    times in one response. Higher values push it harder to
+                    vary its wording. Useful for long-form writing; usually
+                    left at 0 for analytical tasks where reusing technical
+                    terminology is appropriate.
+                  </>
+                }
+              />
             </label>
             <input
               type="range"
@@ -221,8 +289,20 @@ export function ModelPreferencesTab() {
           </div>
 
           <div>
-            <label className="mb-1.5 block text-[13px] font-semibold text-slate-700">
+            <label className="mb-1.5 flex items-center gap-1.5 text-[13px] font-semibold text-slate-700">
               Presence Penalty
+              <InfoTooltip
+                label="About presence penalty"
+                content={
+                  <>
+                    Encourages the AI to introduce new topics rather than
+                    keep circling back to ones it has already mentioned.
+                    Higher = more topic-broadening. Usually left at 0 for
+                    safety analysis since you generally want the model to
+                    stay on the asked subject.
+                  </>
+                }
+              />
             </label>
             <input
               type="range"
@@ -245,8 +325,21 @@ export function ModelPreferencesTab() {
 
           <div className="flex items-center justify-between">
             <div>
-              <span className="text-[13px] font-semibold text-slate-700">
+              <span className="flex items-center gap-1.5 text-[13px] font-semibold text-slate-700">
                 Stream Responses
+                <InfoTooltip
+                  label="About streaming"
+                  content={
+                    <>
+                      When on, the AI's reply appears word-by-word as it's
+                      generated, so you see progress immediately. When off,
+                      the full response is delivered all at once after
+                      generation completes. Streaming feels faster and is
+                      recommended unless you need the full response for
+                      automated processing.
+                    </>
+                  }
+                />
               </span>
               <p className="text-[12px] text-slate-400">
                 Show AI response as it generates (recommended)

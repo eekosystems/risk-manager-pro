@@ -8,6 +8,7 @@ import {
   type RagSettings,
 } from "@/api/settings";
 import { SettingsSection } from "@/components/settings/settings-section";
+import { InfoTooltip } from "@/components/ui/info-tooltip";
 
 const DEFAULT_CONFIG: RagSettings = {
   chunk_size: 512,
@@ -75,8 +76,23 @@ export function RagSettingsTab() {
         <div className="space-y-5">
           {/* Search Type */}
           <div>
-            <label className="mb-1.5 block text-[13px] font-semibold text-slate-700">
+            <label className="mb-1.5 flex items-center gap-1.5 text-[13px] font-semibold text-slate-700">
               Search Type
+              <InfoTooltip
+                label="About search type"
+                content={
+                  <>
+                    Controls how the system finds documents to answer your
+                    questions. <strong>Hybrid</strong> blends keyword matching
+                    (good for proper nouns and exact terms) with vector
+                    similarity (good for paraphrased concepts).{" "}
+                    <strong>Vector</strong> only relies on semantic meaning;{" "}
+                    <strong>Keyword</strong> only on literal word matches.
+                    Hybrid is recommended for safety documents where both
+                    regulatory citations and conceptual queries appear.
+                  </>
+                }
+              />
             </label>
             <div className="flex gap-2">
               {(["hybrid", "vector", "keyword"] as const).map((type) => (
@@ -101,8 +117,19 @@ export function RagSettingsTab() {
 
           {/* Top K Results */}
           <div>
-            <label className="mb-1.5 block text-[13px] font-semibold text-slate-700">
+            <label className="mb-1.5 flex items-center gap-1.5 text-[13px] font-semibold text-slate-700">
               Top K Results
+              <InfoTooltip
+                label="About top K"
+                content={
+                  <>
+                    How many of the most relevant document passages the AI
+                    sees when answering. Higher values give the model more
+                    context but can dilute focus and increase cost. 5–8 is a
+                    good range for most safety analysis queries.
+                  </>
+                }
+              />
             </label>
             <input
               type="range"
@@ -121,8 +148,19 @@ export function RagSettingsTab() {
 
           {/* Score Threshold */}
           <div>
-            <label className="mb-1.5 block text-[13px] font-semibold text-slate-700">
+            <label className="mb-1.5 flex items-center gap-1.5 text-[13px] font-semibold text-slate-700">
               Relevance Score Threshold
+              <InfoTooltip
+                label="About relevance threshold"
+                content={
+                  <>
+                    Minimum similarity score a passage must clear to be passed
+                    to the AI. Higher values produce stricter, more focused
+                    answers but may return fewer results. Lower values cast a
+                    wider net at the cost of noise. 70% is a balanced default.
+                  </>
+                }
+              />
             </label>
             <input
               type="range"
@@ -145,8 +183,19 @@ export function RagSettingsTab() {
 
           {/* Max Context Tokens */}
           <div>
-            <label className="mb-1.5 block text-[13px] font-semibold text-slate-700">
+            <label className="mb-1.5 flex items-center gap-1.5 text-[13px] font-semibold text-slate-700">
               Max Context Tokens
+              <InfoTooltip
+                label="About max context tokens"
+                content={
+                  <>
+                    Upper limit on how much retrieved document text the AI
+                    can consider for one answer. A "token" is roughly ¾ of a
+                    word. Higher = more context but slower and more expensive.
+                    The model also has a hard ceiling (e.g. 128K for GPT-4o).
+                  </>
+                }
+              />
             </label>
             <input
               type="number"
@@ -169,8 +218,20 @@ export function RagSettingsTab() {
 
         <div className="space-y-5">
           <div>
-            <label className="mb-1.5 block text-[13px] font-semibold text-slate-700">
+            <label className="mb-1.5 flex items-center gap-1.5 text-[13px] font-semibold text-slate-700">
               Chunk Size (tokens)
+              <InfoTooltip
+                label="About chunk size"
+                content={
+                  <>
+                    Documents are split into smaller passages ("chunks")
+                    before being indexed. Larger chunks preserve more
+                    surrounding context per passage; smaller chunks let
+                    retrieval pinpoint a specific paragraph. 512 tokens
+                    (~380 words) is a good default for SMS / regulatory text.
+                  </>
+                }
+              />
             </label>
             <input
               type="number"
@@ -181,8 +242,20 @@ export function RagSettingsTab() {
           </div>
 
           <div>
-            <label className="mb-1.5 block text-[13px] font-semibold text-slate-700">
+            <label className="mb-1.5 flex items-center gap-1.5 text-[13px] font-semibold text-slate-700">
               Chunk Overlap (tokens)
+              <InfoTooltip
+                label="About chunk overlap"
+                content={
+                  <>
+                    How many tokens at the end of one chunk are repeated at
+                    the start of the next. Overlap prevents a sentence or
+                    hazard description that sits on a chunk boundary from
+                    being lost. ~10% of chunk size (e.g. 50 for 512) is
+                    typical.
+                  </>
+                }
+              />
             </label>
             <input
               type="number"
@@ -195,8 +268,20 @@ export function RagSettingsTab() {
           </div>
 
           <div>
-            <label className="mb-1.5 block text-[13px] font-semibold text-slate-700">
+            <label className="mb-1.5 flex items-center gap-1.5 text-[13px] font-semibold text-slate-700">
               Embedding Model
+              <InfoTooltip
+                label="About embedding model"
+                content={
+                  <>
+                    The model that turns text into the numeric vectors used
+                    for similarity search. Larger models capture more nuance
+                    but cost more and produce bigger indexes. Changing this
+                    requires re-indexing every existing document — only
+                    switch when migrating off a legacy model.
+                  </>
+                }
+              />
             </label>
             <select
               value={config.embedding_model}
@@ -211,8 +296,20 @@ export function RagSettingsTab() {
 
           <div className="flex items-center justify-between">
             <div>
-              <span className="text-[13px] font-semibold text-slate-700">
+              <span className="flex items-center gap-1.5 text-[13px] font-semibold text-slate-700">
                 Enable Reranking
+                <InfoTooltip
+                  label="About reranking"
+                  content={
+                    <>
+                      A second-pass scoring step that re-orders the retrieved
+                      passages by relevance to the actual question, using a
+                      more expensive but more accurate model. Improves answer
+                      quality at the cost of slightly higher latency per
+                      query. Recommended on for safety-critical analysis.
+                    </>
+                  }
+                />
               </span>
               <p className="text-[12px] text-slate-400">
                 Rerank retrieved documents for better relevance
