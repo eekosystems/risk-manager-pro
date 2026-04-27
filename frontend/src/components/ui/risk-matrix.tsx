@@ -62,7 +62,11 @@ export function RiskMatrix({ selection, onSelect, riskPositions, readOnly }: Ris
             </tr>
           </thead>
           <tbody>
-            {LIKELIHOODS.map((l) => (
+            {/* Render likelihoods bottom-up: least-likely on top, most-likely
+                on the bottom row. Combined with severity 1=Minimal on the
+                left, this puts the safe corner (low/green) at top-left and
+                the danger corner (high/red) at bottom-right. */}
+            {[...LIKELIHOODS].reverse().map((l) => (
               <tr key={l}>
                 <td className="p-2 text-right text-xs font-semibold text-gray-600">
                   <div>{LIKELIHOOD_LABELS[l].full}</div>
