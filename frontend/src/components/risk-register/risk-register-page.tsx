@@ -1,8 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
 import { clsx } from "clsx";
 import { useState } from "react";
 
-import { listPendingSyncChanges } from "@/api/rr-sync";
 import { useRisk, useUpdateRisk } from "@/hooks/use-risks";
 import { useUserRole } from "@/hooks/use-user-role";
 import type { CreateRiskEntryRequest } from "@/types/api";
@@ -11,9 +9,17 @@ import { CreateRiskModal } from "./create-risk-modal";
 import { PortfolioView } from "./portfolio-view";
 import { RiskDetailView } from "./risk-detail-view";
 import { RiskListView } from "./risk-list-view";
-import { SyncReviewPanel } from "./sync-review-panel";
+// SyncReviewPanel import retained as a comment so the tab can be re-enabled
+// quickly when the sync workflow is needed again.
+// import { SyncReviewPanel } from "./sync-review-panel";
 
 type RRTab = "list" | "sync" | "portfolio";
+
+// Feature flag — flip to `true` to restore the "Sync Review" tab in the
+// Risk Register header. Hidden for now because the dual-register sync
+// workflow isn't in active use; all wiring (SyncReviewPanel, listPendingSyncChanges,
+// the pending-count badge) is preserved so re-enabling is a one-line change.
+const SYNC_REVIEW_TAB_ENABLED = false;
 
 interface RiskRegisterPageProps {
   onStartChatEntry: () => void;
@@ -27,12 +33,6 @@ export function RiskRegisterPage({ onStartChatEntry }: RiskRegisterPageProps) {
   const { isPlatformAdmin } = useUserRole();
   const updateMutation = useUpdateRisk();
   const { data: editingRisk } = useRisk(editingRiskId);
-  const { data: pendingSync } = useQuery({
-    queryKey: ["rr-sync-queue", "pending", "count"],
-    queryFn: () => listPendingSyncChanges("pending"),
-    staleTime: 30_000,
-  });
-  const pendingCount = pendingSync?.length ?? 0;
 
   function handleEdit(payload: CreateRiskEntryRequest) {
     if (!editingRiskId) return;
@@ -74,13 +74,11 @@ export function RiskRegisterPage({ onStartChatEntry }: RiskRegisterPageProps) {
           <TabButton active={tab === "list"} onClick={() => setTab("list")}>
             Risk Register
           </TabButton>
-          <TabButton
-            active={tab === "sync"}
-            onClick={() => setTab("sync")}
-            {...(pendingCount > 0 ? { badge: pendingCount } : {})}
-          >
-            Sync Review
-          </TabButton>
+          {SYNC_REVIEW_TAB_ENABLED && (
+            <TabButton active={tab === "sync"} onClick={() => setTab("sync")}>
+              Sync Review
+            </TabButton>
+          )}
           {isPlatformAdmin && (
             <TabButton
               active={tab === "portfolio"}
@@ -99,7 +97,7 @@ export function RiskRegisterPage({ onStartChatEntry }: RiskRegisterPageProps) {
             onCreateNew={onStartChatEntry}
           />
         )}
-        {tab === "sync" && <SyncReviewPanel />}
+        {/* Sync Review pane intentionally omitted while SYNC_REVIEW_TAB_ENABLED is false. */}
         {tab === "portfolio" && isPlatformAdmin && <PortfolioView />}
       </div>
 
