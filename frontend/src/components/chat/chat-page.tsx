@@ -205,6 +205,12 @@ export function ChatPage({
     setEmailTargetContent(content);
   }, []);
 
+  // Feature flag — flip to `true` to re-enable the "Send Email" button on
+  // every assistant message in the chat output. Backend email delivery is
+  // currently unreliable, so the action is hidden in the UI for now. All
+  // wiring (handleEmail, emailChatMutation, EmailChatModal) is preserved.
+  const EMAIL_ON_CHAT_OUTPUT_ENABLED = false;
+
   const handleSendEmail = useCallback(
     (payload: { to: string; subject: string; content: string }) => {
       emailChatMutation.mutate(payload, {
@@ -234,7 +240,7 @@ export function ChatPage({
         messages={localMessages}
         isTyping={isTyping}
         onSaveAsRisk={handleSaveAsRisk}
-        onEmail={handleEmail}
+        {...(EMAIL_ON_CHAT_OUTPUT_ENABLED ? { onEmail: handleEmail } : {})}
         onCopied={handleCopied}
         onCopyFailed={handleCopyFailed}
       />
