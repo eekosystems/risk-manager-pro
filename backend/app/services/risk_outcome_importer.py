@@ -265,6 +265,32 @@ STRICT RULES — no exceptions:
    Never emit two rows for the same hazard at different matrix
    positions. The register tracks inherent risk; mitigated values are
    captured separately on the mitigation record.
+7. SECTION HEADERS WITH INDENTED SUB-HAZARDS: many SRMP documents group
+   related hazards under a parent heading that itself has NO severity or
+   likelihood. Example:
+
+       3) Construction areas/equipment and Barricades:
+          a. Pilot confusion/deviation
+             Severity: Minor   Likelihood: Remote   Risk: 4C Low
+          b. Contractor Vehicle deviation
+             Severity: Hazardous   Likelihood: Extremely Remote   Risk: 2D Medium
+          c. Contractor Vehicle deviation (incursion only)
+             Severity: Minor   Likelihood: Remote   Risk: 4C Low
+          d. Contractor Pedestrian deviation
+             Severity: Minor   Likelihood: Remote   Risk: 4C Low
+
+   In this pattern the parent line ("Construction areas/equipment and
+   Barricades:") is a NON-EXTRACTABLE section header. DO NOT emit a row
+   for the parent. DO NOT aggregate the children up into the parent.
+   DO NOT pick the worst-case child S/L and assign it to the parent.
+   Instead, emit one row per sub-hazard (a, b, c, d, ...) using the
+   sub-hazard's own descriptive text as the `hazard` field (e.g.,
+   "Pilot confusion/deviation", "Contractor Vehicle deviation",
+   "Contractor Pedestrian deviation") and the sub-hazard's own
+   severity/likelihood. Apply the same logic to nested numbering
+   schemes (i/ii/iii, bullets, dashes, etc.) — any indented child with
+   its own explicit S/L is a hazard; any parent header without its own
+   explicit S/L is not.
 
 Return ONLY this JSON shape (no prose):
 
@@ -692,7 +718,12 @@ def _apply_import_rules(
 #       hazard (never the residual/mitigated pair), and the summary layer
 #       dedups across files within the same airport. Forces a full re-scan
 #       to flush stale duplicate rows from prior schema versions.
-_CACHE_SCHEMA_VERSION = "v4"
+#   v5: extraction prompt now treats parent section headers with indented
+#       sub-hazards as non-extractable; emits one row per sub-hazard
+#       (a/b/c/d, i/ii/iii, etc.) instead of rolling them up into the
+#       parent header. Forces a full re-scan to drop the rolled-up parent
+#       rows and surface the individual sub-hazards.
+_CACHE_SCHEMA_VERSION = "v5"
 
 
 def _build_cache_key(drive_item_id: str, size: int, content_type: str) -> str:
