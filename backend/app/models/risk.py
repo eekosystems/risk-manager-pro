@@ -125,11 +125,12 @@ LEGACY_STATUS_TO_RECORD_STATUS: dict[RiskStatus, RecordStatus] = {
 }
 
 
-# FAA Order 8040.4B risk matrix: RISK_MATRIX[likelihood][severity] -> RiskLevel
+# FG 5x5 risk matrix: RISK_MATRIX[likelihood][severity] -> RiskLevel
+# Severity stored as 1=Minimal..5=Catastrophic. Likelihood A=Frequent..E=Extremely Improbable.
 RISK_MATRIX: dict[str, dict[int, RiskLevel]] = {
     "A": {
-        1: RiskLevel.MEDIUM,
-        2: RiskLevel.HIGH,
+        1: RiskLevel.LOW,
+        2: RiskLevel.MEDIUM,
         3: RiskLevel.HIGH,
         4: RiskLevel.HIGH,
         5: RiskLevel.HIGH,
@@ -143,7 +144,7 @@ RISK_MATRIX: dict[str, dict[int, RiskLevel]] = {
     },
     "C": {
         1: RiskLevel.LOW,
-        2: RiskLevel.LOW,
+        2: RiskLevel.MEDIUM,
         3: RiskLevel.MEDIUM,
         4: RiskLevel.HIGH,
         5: RiskLevel.HIGH,
@@ -159,7 +160,7 @@ RISK_MATRIX: dict[str, dict[int, RiskLevel]] = {
         1: RiskLevel.LOW,
         2: RiskLevel.LOW,
         3: RiskLevel.LOW,
-        4: RiskLevel.LOW,
+        4: RiskLevel.MEDIUM,
         5: RiskLevel.MEDIUM,
     },
 }

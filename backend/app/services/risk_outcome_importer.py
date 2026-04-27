@@ -115,14 +115,14 @@ _RISK_LEVEL_ALIASES: dict[str, str] = {
     "extreme": "extreme", "red": "extreme", "critical": "extreme",
 }  # fmt: skip
 
-# FAA 8040.4B 5x5 — mirrors app.models.risk.RISK_MATRIX (duplicated to
-# avoid a circular import).
+# FG 5x5 — mirrors app.models.risk.RISK_MATRIX (duplicated to avoid a
+# circular import).
 _RISK_MATRIX: dict[str, dict[int, str]] = {
-    "A": {1: "medium", 2: "high", 3: "high", 4: "high", 5: "high"},
+    "A": {1: "low", 2: "medium", 3: "high", 4: "high", 5: "high"},
     "B": {1: "low", 2: "medium", 3: "high", 4: "high", 5: "high"},
-    "C": {1: "low", 2: "low", 3: "medium", 4: "high", 5: "high"},
+    "C": {1: "low", 2: "medium", 3: "medium", 4: "high", 5: "high"},
     "D": {1: "low", 2: "low", 3: "medium", 4: "medium", 5: "high"},
-    "E": {1: "low", 2: "low", 3: "low", 4: "low", 5: "medium"},
+    "E": {1: "low", 2: "low", 3: "low", 4: "medium", 5: "medium"},
 }
 
 
