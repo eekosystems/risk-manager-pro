@@ -1,6 +1,7 @@
 import axios from "axios";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { getDocumentById } from "@/api/documents";
 import { useConversation, useEmailChatMessage, useSendMessage } from "@/hooks/use-chat";
 import { useUploadDocument } from "@/hooks/use-documents";
 import { useToast } from "@/hooks/use-toast";
@@ -104,16 +105,63 @@ export function ChatPage({
   }, [conversationId, activeFunction]);
 
   const handleSend = useCallback(
-    (message: string, files: File[]) => {
-      for (const file of files) {
-        uploadDocumentMutation.mutate({ file }, {
-          onSuccess: () => {
-            addToast(`"${file.name}" uploaded successfully`, "success");
-          },
-          onError: () => {
+    async (message: string, files: File[]) => {
+      // When the user attaches files, the chat query has to wait for the
+      // document(s) to finish indexing into Azure AI Search — otherwise the
+      // RAG retrieval finds nothing about the just-uploaded file and the AI
+      // returns a generic "I don't have information" reply. The previous
+      // implementation fired uploads in the background while sending the
+      // chat message immediately, which is exactly the race that caused
+      // empty / no-output responses.
+      //
+      // Flow now:
+      //   1. await each upload → returns a document with status="uploaded"
+      //   2. poll GET /documents/{id} every 1.5s until status="indexed",
+      //      capped at 90s so a stuck/slow doc can't lock the user out
+      //   3. then send the chat message
+      const uploadedIds: string[] = [];
+      if (files.length > 0) {
+        addToast(
+          files.length === 1
+            ? `Indexing "${files[0]?.name}"…`
+            : `Indexing ${files.length} files…`,
+          "info",
+        );
+        for (const file of files) {
+          try {
+            const doc = await uploadDocumentMutation.mutateAsync({ file });
+            uploadedIds.push(doc.id);
+          } catch {
             addToast(`Failed to upload "${file.name}"`, "error");
-          },
-        });
+          }
+        }
+
+        const POLL_INTERVAL_MS = 1500;
+        const POLL_TIMEOUT_MS = 90_000;
+        const start = Date.now();
+        const stillPending = new Set(uploadedIds);
+        while (stillPending.size > 0 && Date.now() - start < POLL_TIMEOUT_MS) {
+          await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+          for (const id of [...stillPending]) {
+            try {
+              const doc = await getDocumentById(id);
+              if (doc.status === "indexed") {
+                stillPending.delete(id);
+              } else if (doc.status === "failed") {
+                stillPending.delete(id);
+                addToast(`Indexing failed for "${doc.filename}"`, "error");
+              }
+            } catch {
+              // Transient fetch error — keep polling until the timeout.
+            }
+          }
+        }
+        if (stillPending.size > 0) {
+          addToast(
+            "Indexing is taking longer than expected — sending your message now; the file may not be searchable yet.",
+            "warning",
+          );
+        }
       }
 
       if (!message) return;

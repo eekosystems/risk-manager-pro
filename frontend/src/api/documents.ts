@@ -32,6 +32,13 @@ export async function getDocuments(): Promise<DocumentItem[]> {
   return response.data.data;
 }
 
+export async function getDocumentById(documentId: string): Promise<DocumentItem> {
+  const response = await apiClient.get<DataResponse<DocumentItem>>(
+    `/documents/${documentId}`,
+  );
+  return response.data.data;
+}
+
 export async function deleteDocument(documentId: string): Promise<void> {
   await apiClient.delete(`/documents/${documentId}`);
 }
