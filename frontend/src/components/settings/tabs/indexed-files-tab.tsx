@@ -14,7 +14,6 @@ import {
   RefreshCw,
   Search,
   Trash2,
-  Upload,
 } from "lucide-react";
 
 import {
@@ -28,9 +27,14 @@ import {
   processAllDocuments,
   reindexDocument,
   syncFolder,
-  uploadDocument,
 } from "@/api/documents";
 import type { DocumentItem, DocumentStatus, SourceType } from "@/types/api";
+
+// All SharePoint syncs stamp documents with the "client" source type.
+// The user-facing source-type selector was removed because every synced
+// document is by definition a client document; non-client sources (FAA,
+// ICAO, etc.) are seeded server-side, not chosen at sync time.
+const DEFAULT_SOURCE_TYPE: SourceType = "client";
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -361,7 +365,6 @@ export function IndexedFilesTab() {
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
-  const [selectedSourceType, setSelectedSourceType] = useState<SourceType>("client");
   const [crawlResult, setCrawlResult] = useState<SharePointCrawlResult | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
@@ -384,13 +387,6 @@ export function IndexedFilesTab() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["documents"] });
       setDeleteConfirm(null);
-    },
-  });
-
-  const uploadMutation = useMutation({
-    mutationFn: uploadDocument,
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["documents"] });
     },
   });
 
@@ -438,7 +434,7 @@ export function IndexedFilesTab() {
   const [syncingFolder, setSyncingFolder] = useState<string | null>(null);
 
   const syncFolderMutation = useMutation({
-    mutationFn: (folderPath: string) => syncFolder(folderPath, selectedSourceType),
+    mutationFn: (folderPath: string) => syncFolder(folderPath, DEFAULT_SOURCE_TYPE),
     onSuccess: (result) => {
       setSyncResult(result);
       setSyncingFolder(null);
@@ -471,22 +467,9 @@ export function IndexedFilesTab() {
   const indexedCount = files.filter((f: DocumentItem) => f.status === "indexed").length;
   const totalSize = files.reduce((sum: number, f: DocumentItem) => sum + f.size_bytes, 0);
 
-  function handleFileUpload() {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = ".pdf,.docx,.doc,.txt";
-    input.onchange = (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (file) {
-        uploadMutation.mutate({ file, sourceType: selectedSourceType });
-      }
-    };
-    input.click();
-  }
-
   function handleSharePointSync() {
     setCrawlResult(null);
-    const params: CrawlSharePointParams = { sourceType: selectedSourceType };
+    const params: CrawlSharePointParams = { sourceType: DEFAULT_SOURCE_TYPE };
     crawlMutation.mutate(params);
   }
 
@@ -564,33 +547,8 @@ export function IndexedFilesTab() {
         </div>
       </div>
 
-      {/* Source Type + Actions */}
+      {/* Actions */}
       <div className="mb-4 flex items-center gap-3">
-        <select
-          value={selectedSourceType}
-          onChange={(e) => setSelectedSourceType(e.target.value as SourceType)}
-          className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-slate-800 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-        >
-          {(Object.entries(SOURCE_TYPE_LABELS) as [SourceType, { label: string }][]).map(
-            ([value, { label }]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ),
-          )}
-        </select>
-        <button
-          onClick={handleFileUpload}
-          disabled={uploadMutation.isPending}
-          className="flex items-center gap-2 rounded-xl bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-brand-500/20 transition-all hover:bg-brand-600 hover:shadow-lg hover:shadow-brand-500/30 disabled:opacity-50"
-        >
-          {uploadMutation.isPending ? (
-            <Loader2 size={16} className="animate-spin" />
-          ) : (
-            <Upload size={16} />
-          )}
-          Upload File
-        </button>
         <button
           onClick={handleSharePointSync}
           disabled={crawlMutation.isPending}
@@ -742,7 +700,7 @@ export function IndexedFilesTab() {
         {filteredFiles.length === 0 ? (
           <div className="p-8 text-center text-sm text-slate-400">
             {files.length === 0
-              ? "No documents uploaded yet. Upload a file or sync from SharePoint to get started."
+              ? "No documents indexed yet. Click Sync from SharePoint to get started."
               : "No files found matching your search."}
           </div>
         ) : (
