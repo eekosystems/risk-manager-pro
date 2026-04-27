@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { clsx } from "clsx";
 import {
   AlertTriangle,
   BarChart3,
+  ChevronDown,
   ClipboardList,
   Copy,
   Database,
@@ -149,26 +149,38 @@ export function PromptsTab() {
 
       {prompts && (
         <>
-          {/* Prompt selector tabs */}
-          <div className="mb-4 flex gap-2 overflow-x-auto">
-            {PROMPT_SECTIONS.map((section) => {
-              const Icon = section.icon;
-              return (
-                <button
-                  key={section.key}
-                  onClick={() => setActivePrompt(section.key)}
-                  className={clsx(
-                    "flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-all",
-                    activePrompt === section.key
-                      ? "gradient-brand text-white shadow-md shadow-brand-500/20"
-                      : "border border-gray-200 bg-white text-gray-600 hover:bg-gray-50",
-                  )}
-                >
-                  <Icon size={16} />
-                  {section.label}
-                </button>
-              );
-            })}
+          {/* Prompt selector */}
+          <div className="mb-4">
+            <label
+              htmlFor="prompt-selector"
+              className="mb-1.5 block text-[12px] font-semibold uppercase tracking-wider text-slate-500"
+            >
+              Active Prompt
+            </label>
+            <div className="relative max-w-md">
+              {activeSection && (
+                <activeSection.icon
+                  size={16}
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-brand-500"
+                />
+              )}
+              <select
+                id="prompt-selector"
+                value={activePrompt}
+                onChange={(e) => setActivePrompt(e.target.value as PromptKey)}
+                className="w-full appearance-none rounded-xl border border-gray-200 bg-white py-2.5 pl-10 pr-10 text-sm font-medium text-slate-800 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+              >
+                {PROMPT_SECTIONS.map((section) => (
+                  <option key={section.key} value={section.key}>
+                    {section.label}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown
+                size={16}
+                className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"
+              />
+            </div>
           </div>
 
           {/* Active prompt editor */}
