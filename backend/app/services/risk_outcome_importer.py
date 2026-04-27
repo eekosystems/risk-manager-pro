@@ -258,6 +258,13 @@ STRICT RULES — no exceptions:
    legend is missing or ambiguous, SKIP the hazard.
 5. Do NOT invent, combine, or synthesize hazards. Every returned row must
    correspond to a single hazard entry present in the source text.
+6. If a hazard row shows BOTH an initial/inherent risk pair AND a
+   residual/mitigated/post-control risk pair (common in SRMP tables that
+   include "Initial Risk" + "Residual Risk" or "Pre-Mitigation" +
+   "Post-Mitigation" columns), return ONLY the initial/inherent pair.
+   Never emit two rows for the same hazard at different matrix
+   positions. The register tracks inherent risk; mitigated values are
+   captured separately on the mitigation record.
 
 Return ONLY this JSON shape (no prose):
 
@@ -681,7 +688,11 @@ def _apply_import_rules(
 #       (Catastrophic..Minimal / Frequent..Extremely Improbable) instead of
 #       integers/letters, to defeat documents that use the inverted FAA
 #       1=Catastrophic convention vs the codebase's 5=Catastrophic storage.
-_CACHE_SCHEMA_VERSION = "v3"
+#   v4: extraction prompt now emits only the initial/inherent risk pair per
+#       hazard (never the residual/mitigated pair), and the summary layer
+#       dedups across files within the same airport. Forces a full re-scan
+#       to flush stale duplicate rows from prior schema versions.
+_CACHE_SCHEMA_VERSION = "v4"
 
 
 def _build_cache_key(drive_item_id: str, size: int, content_type: str) -> str:
@@ -763,16 +774,34 @@ class RiskOutcomeImporter:
             return self._build_summary_locked()
 
     def _build_summary_locked(self) -> SharePointRiskSummary:
-        risks: list[SharePointRisk] = []
+        all_risks: list[SharePointRisk] = []
         flagged: list[SharePointRisk] = []
         notes: list[SharePointParseNote] = list(self._notes)
         for entry in self._file_cache.values():
-            risks.extend(entry.risks)
+            all_risks.extend(entry.risks)
             flagged.extend(entry.risks_flagged)
             notes.extend(entry.notes)
+
+        # Cross-file dedup within the same airport: when the same hazard
+        # appears in multiple PDFs (older + newer SRMP revisions, or the
+        # same hazard tracked in two reports), keep only the row from the
+        # most recent report_year. Falls back to the first-seen row when
+        # neither has a year.
+        deduped: dict[tuple[str, str], SharePointRisk] = {}
+        for r in all_risks:
+            key = (r.airport_identifier, r.hazard.lower().strip()[:120])
+            existing = deduped.get(key)
+            if existing is None:
+                deduped[key] = r
+                continue
+            existing_year = existing.report_year or 0
+            new_year = r.report_year or 0
+            if new_year > existing_year:
+                deduped[key] = r
+
         return SharePointRiskSummary(
             airports=list(self._airports),
-            risks=risks,
+            risks=list(deduped.values()),
             notes=notes,
             generated_at=time.time(),
             status=self._status,

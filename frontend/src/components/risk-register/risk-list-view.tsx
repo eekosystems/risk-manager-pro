@@ -118,10 +118,27 @@ export function RiskListView({ onSelectRisk, onCreateNew }: RiskListViewProps) {
 
   // Merge DB-backed risks with SharePoint-extracted risks into one list for
   // the 5x5 distribution + drill-down. Use a synthetic id so the drill-down
-  // can still key rows (SP risks have no DB id).
+  // can still key rows (SP risks have no DB id). Dedup on (airport, hazard)
+  // so a hazard that exists in both the DB and a SharePoint PDF only appears
+  // once on the matrix — DB rows win because they're the validated/edited copy.
   const allRisks: RiskEntryListItem[] = useMemo(() => {
-    const sp = (spSummary?.risks ?? []).map(spToListItem);
-    return [...dbRisks, ...sp];
+    const seen = new Set<string>();
+    const merged: RiskEntryListItem[] = [];
+    const keyFor = (r: RiskEntryListItem) =>
+      `${r.airport_identifier ?? ""}::${(r.hazard ?? r.title ?? "").toLowerCase().trim().slice(0, 120)}`;
+    for (const r of dbRisks) {
+      const k = keyFor(r);
+      if (seen.has(k)) continue;
+      seen.add(k);
+      merged.push(r);
+    }
+    for (const r of (spSummary?.risks ?? []).map(spToListItem)) {
+      const k = keyFor(r);
+      if (seen.has(k)) continue;
+      seen.add(k);
+      merged.push(r);
+    }
+    return merged;
   }, [dbRisks, spSummary?.risks]);
 
   // Side table: synthetic id → SharePoint URL, so clicking an SP-sourced
