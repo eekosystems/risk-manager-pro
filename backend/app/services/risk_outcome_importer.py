@@ -244,9 +244,18 @@ STRICT RULES — no exceptions:
    level. If the source provides only a risk level (Low/Medium/High/
    Extreme) and not both an explicit severity and an explicit likelihood,
    SKIP that hazard.
-4. Do NOT translate or map descriptive terms to numbers or letters unless
-   the document itself explicitly defines a scoring scheme mapping its
-   terms to the FAA 1-5 / A-E convention. If in doubt, SKIP the hazard.
+4. Report severity and likelihood by their DESCRIPTIVE NAME, not the
+   number/letter the document happens to use. Different documents number
+   the scales in opposite directions; the descriptive name is unambiguous.
+   - severity must be one of: Catastrophic, Hazardous, Major, Minor, Minimal
+     (synonyms: Negligible = Minimal; Critical = Hazardous; Severe = Catastrophic;
+     Moderate = Major)
+   - likelihood must be one of: Frequent, Probable, Remote, Extremely Remote,
+     Extremely Improbable
+     (synonyms: Occasional = Probable; Improbable = Extremely Remote)
+   If the document only shows a number/letter without a descriptive label,
+   use the document's own legend / scoring table to translate. If the
+   legend is missing or ambiguous, SKIP the hazard.
 5. Do NOT invent, combine, or synthesize hazards. Every returned row must
    correspond to a single hazard entry present in the source text.
 
@@ -256,8 +265,8 @@ Return ONLY this JSON shape (no prose):
   "risks": [
     {{
       "hazard": "<verbatim hazard text as it appears in the document>",
-      "severity": <integer 1-5 exactly as stated in the document>,
-      "likelihood": "<letter A-E exactly as stated in the document>",
+      "severity": "<Catastrophic | Hazardous | Major | Minor | Minimal>",
+      "likelihood": "<Frequent | Probable | Remote | Extremely Remote | Extremely Improbable>",
       "risk_level": "<low | medium | high | extreme — include ONLY if explicitly stated in the source, otherwise omit>"
     }}
   ]
@@ -662,12 +671,17 @@ def _apply_import_rules(
 
 
 # Bump this whenever the shape of SharePointRisk or _FileCacheEntry changes
-# in a way that requires re-extraction. Cached entries built under an older
-# version are invalidated automatically on the next scan, so deploys never
-# leave the in-memory cache speaking a stale data shape.
+# in a way that requires re-extraction, OR when the LLM extraction prompt
+# changes meaning enough that previously-cached rows would now be wrong.
+# Cached entries built under an older version are invalidated automatically
+# on the next scan.
 #   v1: original (hazard, severity, likelihood, risk_level)
 #   v2: adds report_year, matrix_size, import_classification + risks_flagged
-_CACHE_SCHEMA_VERSION = "v2"
+#   v3: extraction prompt now asks for descriptive severity/likelihood NAMES
+#       (Catastrophic..Minimal / Frequent..Extremely Improbable) instead of
+#       integers/letters, to defeat documents that use the inverted FAA
+#       1=Catastrophic convention vs the codebase's 5=Catastrophic storage.
+_CACHE_SCHEMA_VERSION = "v3"
 
 
 def _build_cache_key(drive_item_id: str, size: int, content_type: str) -> str:
