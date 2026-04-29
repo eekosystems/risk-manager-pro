@@ -297,6 +297,7 @@ export function ChatPage({
         disabled={sendMessageMutation.isPending}
         seedValue={pendingInputSeed}
         onSeedConsumed={clearPendingInputSeed}
+        activeFunction={activeFunction}
       />
       {emailTargetContent !== null && (
         <EmailChatModal

@@ -2,6 +2,7 @@ import { clsx } from "clsx";
 import {
   Bot,
   ChevronRight,
+  Plus,
   ScrollText,
   ShieldAlert,
 } from "lucide-react";
@@ -18,6 +19,7 @@ interface RightPanelProps {
   onToggle: () => void;
   activeFunction: FunctionType;
   onFunctionSelect: (fn: FunctionType) => void;
+  onNewConversation: () => void;
   currentView: AppView;
   onViewChange: (view: AppView) => void;
 }
@@ -27,6 +29,7 @@ export function RightPanel({
   onToggle,
   activeFunction,
   onFunctionSelect,
+  onNewConversation,
   currentView,
   onViewChange,
 }: RightPanelProps) {
@@ -52,6 +55,13 @@ export function RightPanel({
 
       {isOpen ? (
         <div className="flex min-w-[300px] flex-col h-full overflow-y-auto px-3 py-4">
+          <button
+            onClick={onNewConversation}
+            className="mb-3 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-gray-300 px-3 py-2 text-sm font-medium text-gray-600 transition hover:border-brand-400 hover:bg-brand-50 hover:text-brand-600"
+          >
+            <Plus size={16} />
+            New Conversation
+          </button>
           <nav aria-label="Core functions">
             <CoreFunctionsNav
               activeFunction={activeFunction}
@@ -93,6 +103,15 @@ export function RightPanel({
         </div>
       ) : (
         <div className="flex flex-col items-center h-full py-3">
+          <button
+            onClick={onNewConversation}
+            aria-label="New Conversation"
+            title="New Conversation"
+            className="mb-2 flex h-10 w-10 items-center justify-center rounded-lg text-gray-400 transition hover:bg-brand-50 hover:text-brand-500"
+          >
+            <Plus size={20} />
+          </button>
+          <div className="mx-3 mb-2 h-px w-8 bg-gray-200" />
           {/* Collapsed nav icons */}
           <nav aria-label="Core functions" className="flex flex-col items-center gap-1">
             {FUNCTIONS.map((fn) => (

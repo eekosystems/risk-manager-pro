@@ -2,16 +2,30 @@ import { Paperclip, Send, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
 
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { FUNCTIONS } from "@/constants/functions";
 import { useFileUpload } from "@/hooks/use-file-upload";
+import type { FunctionType } from "@/types/api";
 
 interface ChatInputProps {
   onSend: (message: string, files: File[]) => void;
   disabled: boolean;
   seedValue?: string | null;
   onSeedConsumed?: () => void;
+  activeFunction?: FunctionType;
 }
 
-export function ChatInput({ onSend, disabled, seedValue, onSeedConsumed }: ChatInputProps) {
+export function ChatInput({
+  onSend,
+  disabled,
+  seedValue,
+  onSeedConsumed,
+  activeFunction,
+}: ChatInputProps) {
+  const modeLabel = activeFunction
+    ? FUNCTIONS.find((f) => f.id === activeFunction)?.shortName ??
+      FUNCTIONS.find((f) => f.id === activeFunction)?.name ??
+      null
+    : null;
   const [input, setInput] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -52,6 +66,12 @@ export function ChatInput({ onSend, disabled, seedValue, onSeedConsumed }: ChatI
   return (
     <div className="border-t border-gray-200 bg-white px-6 py-4">
       <div className="mx-auto max-w-3xl">
+        {modeLabel && (
+          <div className="mb-2 flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-gray-500">
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-brand-400" />
+            Mode: {modeLabel}
+          </div>
+        )}
         {files.length > 0 && (
           <div className="mb-2 flex flex-wrap gap-2">
             {files.map((f) => (
