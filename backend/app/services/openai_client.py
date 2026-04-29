@@ -4,16 +4,37 @@ from typing import Any
 import structlog
 from azure.identity.aio import DefaultAzureCredential, get_bearer_token_provider
 from openai import APIStatusError, AsyncAzureOpenAI, RateLimitError
-from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
+from tenacity import RetryCallState, retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from app.core.config import settings
 
 logger = structlog.get_logger(__name__)
 
+
+def _wait_honoring_retry_after(retry_state: RetryCallState) -> float:
+    """Prefer Azure OpenAI's Retry-After header; fall back to exponential backoff.
+
+    Azure's 429 responses tell us exactly how long the TPM/RPM bucket needs to
+    refill — usually 30-60s. Sleeping less than that just burns retry attempts.
+    """
+    exc = retry_state.outcome.exception() if retry_state.outcome else None
+    if isinstance(exc, RateLimitError):
+        response = getattr(exc, "response", None)
+        headers = getattr(response, "headers", None) if response is not None else None
+        if headers:
+            raw = headers.get("retry-after") or headers.get("Retry-After")
+            if raw:
+                try:
+                    return min(float(raw), 90.0)
+                except (TypeError, ValueError):
+                    pass
+    return wait_exponential(multiplier=2, min=4, max=60)(retry_state)
+
+
 _retry_on_rate_limit = retry(
     retry=retry_if_exception_type(RateLimitError),
-    wait=wait_exponential(multiplier=1, min=2, max=30),
-    stop=stop_after_attempt(3),
+    wait=_wait_honoring_retry_after,
+    stop=stop_after_attempt(6),
 )
 
 
