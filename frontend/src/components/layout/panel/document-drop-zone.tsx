@@ -1,40 +1,152 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { clsx } from "clsx";
-import { CheckCircle2, Loader2, Upload } from "lucide-react";
+import {
+  CheckCircle2,
+  FileText,
+  Loader2,
+  Upload,
+  XCircle,
+} from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 
-import { useUploadDocument } from "@/hooks/use-documents";
-import { useToast } from "@/hooks/use-toast";
+import { useDocuments, useUploadDocument } from "@/hooks/use-documents";
+import { useOrganizationContext } from "@/hooks/use-organization-context";
 import { validateFiles } from "@/lib/file-validation";
+import { logger } from "@/lib/logger";
+import type { DocumentItem, DocumentStatus } from "@/types/api";
 
-const SUCCESS_FLASH_MS = 2500;
+type Stage = "in-progress" | "success" | "failed";
+
+interface InFlight {
+  key: string;
+  filename: string;
+  failed: boolean;
+}
+
+const STORAGE_PREFIX = "rmp.uploadedDocs.";
+
+function storageKey(orgId: string): string {
+  return `${STORAGE_PREFIX}${orgId}`;
+}
+
+function readUploadedIds(orgId: string): string[] {
+  try {
+    const raw = window.localStorage.getItem(storageKey(orgId));
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((v): v is string => typeof v === "string");
+  } catch (err) {
+    logger.warn("Failed to read uploaded doc ids from localStorage", err);
+    return [];
+  }
+}
+
+function writeUploadedIds(orgId: string, ids: string[]): void {
+  try {
+    window.localStorage.setItem(storageKey(orgId), JSON.stringify(ids));
+  } catch (err) {
+    logger.warn("Failed to persist uploaded doc ids to localStorage", err);
+  }
+}
+
+function indexStageFor(status: DocumentStatus): Stage {
+  switch (status) {
+    case "indexed":
+      return "success";
+    case "failed":
+      return "failed";
+    case "uploaded":
+    case "processing":
+    default:
+      return "in-progress";
+  }
+}
+
+function StageIcon({ stage }: { stage: Stage }) {
+  if (stage === "success") {
+    return <CheckCircle2 size={12} className="text-green-600" />;
+  }
+  if (stage === "failed") {
+    return <XCircle size={12} className="text-red-500" />;
+  }
+  return <Loader2 size={12} className="animate-spin text-brand-500" />;
+}
 
 export function DocumentDropZone() {
   const uploadMutation = useUploadDocument();
-  const { addToast } = useToast();
+  const queryClient = useQueryClient();
+  const { activeOrganization } = useOrganizationContext();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [uploadErrors, setUploadErrors] = useState<string[]>([]);
-  const [recentSuccess, setRecentSuccess] = useState<string | null>(null);
-  const successTimerRef = useRef<number | null>(null);
+  const [inFlight, setInFlight] = useState<InFlight[]>([]);
+  const [uploadedIds, setUploadedIds] = useState<string[]>([]);
+  const { data: allDocuments } = useDocuments();
+
+  // Hydrate uploaded ids when org changes
+  useEffect(() => {
+    if (!activeOrganization) {
+      setUploadedIds([]);
+      return;
+    }
+    setUploadedIds(readUploadedIds(activeOrganization.id));
+  }, [activeOrganization]);
+
+  const persistIds = useCallback(
+    (next: string[]) => {
+      setUploadedIds(next);
+      if (activeOrganization) {
+        writeUploadedIds(activeOrganization.id, next);
+      }
+    },
+    [activeOrganization],
+  );
+
+  // Show only docs the user uploaded from this drop zone (tracked by id)
+  const myDocs = useMemo(() => {
+    if (!allDocuments || uploadedIds.length === 0) return [];
+    const idSet = new Set(uploadedIds);
+    return allDocuments
+      .filter((d) => idSet.has(d.id))
+      .sort(
+        (a, b) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      );
+  }, [allDocuments, uploadedIds]);
+
+  // If a tracked id no longer exists on the server (deleted elsewhere), prune it
+  useEffect(() => {
+    if (!allDocuments || uploadedIds.length === 0) return;
+    const serverIds = new Set(allDocuments.map((d) => d.id));
+    const filtered = uploadedIds.filter((id) => serverIds.has(id));
+    if (filtered.length !== uploadedIds.length) {
+      persistIds(filtered);
+    }
+  }, [allDocuments, uploadedIds, persistIds]);
+
+  const visibleInFlight = useMemo(() => {
+    if (!allDocuments) return inFlight;
+    const docNames = new Set(myDocs.map((d) => d.filename));
+    return inFlight.filter((f) => f.failed || !docNames.has(f.filename));
+  }, [inFlight, allDocuments, myDocs]);
+
+  const hasPending = useMemo(() => {
+    if (visibleInFlight.some((f) => !f.failed)) return true;
+    return myDocs.some(
+      (d) => d.status === "uploaded" || d.status === "processing",
+    );
+  }, [visibleInFlight, myDocs]);
 
   useEffect(() => {
-    return () => {
-      if (successTimerRef.current !== null) {
-        window.clearTimeout(successTimerRef.current);
-      }
-    };
-  }, []);
-
-  const flashSuccess = useCallback((filename: string) => {
-    setRecentSuccess(filename);
-    if (successTimerRef.current !== null) {
-      window.clearTimeout(successTimerRef.current);
-    }
-    successTimerRef.current = window.setTimeout(() => {
-      setRecentSuccess(null);
-      successTimerRef.current = null;
-    }, SUCCESS_FLASH_MS);
-  }, []);
+    if (!hasPending || !activeOrganization) return;
+    const interval = window.setInterval(() => {
+      void queryClient.invalidateQueries({
+        queryKey: ["documents", activeOrganization.id],
+      });
+    }, 3000);
+    return () => window.clearInterval(interval);
+  }, [hasPending, queryClient, activeOrganization]);
 
   const handleFiles = useCallback(
     (fileList: FileList) => {
@@ -45,21 +157,29 @@ export function DocumentDropZone() {
       }
       for (const vf of valid) {
         const filename = vf.file.name;
+        const key = `${filename}-${Date.now()}-${Math.random()}`;
+        setInFlight((prev) => [...prev, { key, filename, failed: false }]);
         uploadMutation.mutate(
           { file: vf.file },
           {
-            onSuccess: () => {
-              addToast(`Uploaded "${filename}"`, "success");
-              flashSuccess(filename);
+            onSuccess: (doc) => {
+              setInFlight((prev) => prev.filter((f) => f.key !== key));
+              persistIds(
+                uploadedIds.includes(doc.id)
+                  ? uploadedIds
+                  : [...uploadedIds, doc.id],
+              );
             },
             onError: () => {
-              addToast(`Failed to upload "${filename}"`, "error");
+              setInFlight((prev) =>
+                prev.map((f) => (f.key === key ? { ...f, failed: true } : f)),
+              );
             },
           },
         );
       }
     },
-    [uploadMutation, addToast, flashSuccess],
+    [uploadMutation, uploadedIds, persistIds],
   );
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -100,7 +220,18 @@ export function DocumentDropZone() {
     [handleFiles],
   );
 
-  const isUploading = uploadMutation.isPending;
+  const dismissFailedInFlight = useCallback((key: string) => {
+    setInFlight((prev) => prev.filter((f) => f.key !== key));
+  }, []);
+
+  const removeUploadedId = useCallback(
+    (id: string) => {
+      persistIds(uploadedIds.filter((x) => x !== id));
+    },
+    [uploadedIds, persistIds],
+  );
+
+  const totalCount = visibleInFlight.length + myDocs.length;
 
   return (
     <div className="flex flex-col gap-1.5">
@@ -113,6 +244,40 @@ export function DocumentDropZone() {
         onChange={handleFileChange}
       />
 
+      {totalCount > 0 && (
+        <div className="flex flex-col rounded-lg border border-gray-200 bg-white">
+          <div className="flex items-center justify-between border-b border-gray-100 px-2 py-1.5">
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+              Uploaded Files ({totalCount})
+            </span>
+            <div className="flex items-center gap-2 text-[9px] text-gray-400">
+              <span title="Upload">U</span>
+              <span title="Index">I</span>
+            </div>
+          </div>
+          <ul className="flex max-h-[180px] flex-col gap-0.5 overflow-y-auto px-1.5 py-1.5">
+            {visibleInFlight.map((f) => (
+              <FileRow
+                key={f.key}
+                filename={f.filename}
+                uploadStage={f.failed ? "failed" : "in-progress"}
+                indexStage="in-progress"
+                onDismiss={f.failed ? () => dismissFailedInFlight(f.key) : null}
+              />
+            ))}
+            {myDocs.map((doc: DocumentItem) => (
+              <FileRow
+                key={doc.id}
+                filename={doc.filename}
+                uploadStage="success"
+                indexStage={indexStageFor(doc.status)}
+                onDismiss={() => removeUploadedId(doc.id)}
+              />
+            ))}
+          </ul>
+        </div>
+      )}
+
       <button
         type="button"
         onClick={handleClick}
@@ -121,36 +286,25 @@ export function DocumentDropZone() {
         onDrop={handleDrop}
         className={clsx(
           "flex flex-col items-center gap-1.5 rounded-lg border-2 border-dashed px-3 py-4 text-center transition-colors",
-          recentSuccess && !isUploading
-            ? "border-green-400 bg-green-50"
-            : isDragOver
-              ? "border-brand-400 bg-brand-50"
-              : "border-gray-200 bg-gray-50 hover:border-brand-300 hover:bg-brand-50/50",
+          isDragOver
+            ? "border-brand-400 bg-brand-50"
+            : "border-gray-200 bg-gray-50 hover:border-brand-300 hover:bg-brand-50/50",
         )}
       >
-        {isUploading ? (
+        {uploadMutation.isPending ? (
           <Loader2 size={18} className="animate-spin text-brand-500" />
-        ) : recentSuccess ? (
-          <CheckCircle2 size={18} className="text-green-600" />
         ) : (
           <Upload
             size={18}
             className={clsx(isDragOver ? "text-brand-500" : "text-gray-400")}
           />
         )}
-        <span
-          className={clsx(
-            "text-[11px] font-medium",
-            recentSuccess && !isUploading ? "text-green-700" : "text-gray-500",
-          )}
-        >
-          {isUploading
+        <span className="text-[11px] font-medium text-gray-500">
+          {uploadMutation.isPending
             ? "Uploading..."
-            : recentSuccess
-              ? `Uploaded "${recentSuccess}"`
-              : isDragOver
-                ? "Drop files here"
-                : "Drop files or click to upload"}
+            : isDragOver
+              ? "Drop files here"
+              : "Drop files or click to upload"}
         </span>
         <span className="text-[10px] text-gray-400">PDF, DOCX, TXT (max 50 MB)</span>
       </button>
@@ -165,5 +319,56 @@ export function DocumentDropZone() {
         </div>
       )}
     </div>
+  );
+}
+
+interface FileRowProps {
+  filename: string;
+  uploadStage: Stage;
+  indexStage: Stage;
+  onDismiss: (() => void) | null;
+}
+
+function FileRow({ filename, uploadStage, indexStage, onDismiss }: FileRowProps) {
+  return (
+    <li
+      className="flex items-center gap-2 rounded-md px-1.5 py-1 hover:bg-gray-50"
+      title={filename}
+    >
+      <FileText size={12} className="shrink-0 text-gray-400" />
+      <span className="flex-1 truncate text-[11px] text-gray-700">{filename}</span>
+      <span
+        title={
+          uploadStage === "success"
+            ? "Uploaded"
+            : uploadStage === "failed"
+              ? "Upload failed"
+              : "Uploading"
+        }
+      >
+        <StageIcon stage={uploadStage} />
+      </span>
+      <span
+        title={
+          indexStage === "success"
+            ? "Indexed"
+            : indexStage === "failed"
+              ? "Indexing failed"
+              : "Indexing"
+        }
+      >
+        <StageIcon stage={indexStage} />
+      </span>
+      {onDismiss && (
+        <button
+          type="button"
+          onClick={onDismiss}
+          className="text-[9px] text-gray-400 hover:text-gray-600"
+          aria-label="Dismiss"
+        >
+          ×
+        </button>
+      )}
+    </li>
   );
 }
