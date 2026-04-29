@@ -13,6 +13,14 @@ export interface FunctionDefinition {
 
 export const FUNCTIONS: FunctionDefinition[] = [
   {
+    id: "system",
+    name: "System Analysis",
+    shortName: "SA",
+    title: "System Analysis",
+    description: "Analyze system changes and impacts",
+    icon: BarChart3,
+  },
+  {
     id: "phl",
     name: "Preliminary Hazard List",
     shortName: "PHL",
@@ -27,14 +35,6 @@ export const FUNCTIONS: FunctionDefinition[] = [
     title: "Risk Assessment",
     description: "Comprehensive risk evaluation and mitigation",
     icon: Shield,
-  },
-  {
-    id: "system",
-    name: "System Analysis",
-    shortName: "SA",
-    title: "System Analysis",
-    description: "Analyze system changes and impacts",
-    icon: BarChart3,
   },
   {
     id: "risk_register",
