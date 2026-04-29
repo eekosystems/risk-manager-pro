@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import uuid
 from typing import TYPE_CHECKING
 
@@ -307,11 +308,23 @@ async def _crawl_background(
     doc_ids: list[uuid.UUID] = []
 
     # Phase 1 — download and create DB records (fast, files appear in UI immediately)
+    duplicate_count = 0
     for file in files:
         try:
             data = await crawler.download_file(file)
+            content_hash = hashlib.sha256(data).hexdigest()
             async with async_session_factory() as db:
                 repo = DocumentRepository(db)
+                existing = await repo.find_by_content_hash(organization_id, content_hash)
+                if existing is not None:
+                    duplicate_count += 1
+                    logger.info(
+                        "crawl_skip_duplicate",
+                        filename=file.name,
+                        existing_filename=existing.filename,
+                        existing_id=str(existing.id),
+                    )
+                    continue
                 blob_path = f"{organization_id}/{uuid.uuid4()}/{file.name}"
                 await registry.storage_service.upload(blob_path, data, file.content_type)
                 document = await repo.create(
@@ -323,13 +336,19 @@ async def _crawl_background(
                     size_bytes=len(data),
                     source_type=source_type,
                     folder_path=file.folder_path,
+                    content_hash=content_hash,
                 )
                 await db.commit()
                 doc_ids.append(document.id)
         except Exception:
             logger.error("crawl_file_failed", filename=file.name, exc_info=True)
 
-    logger.info("crawl_download_phase_complete", downloaded=len(doc_ids), total=len(files))
+    logger.info(
+        "crawl_download_phase_complete",
+        downloaded=len(doc_ids),
+        total=len(files),
+        duplicates_skipped=duplicate_count,
+    )
 
     # Phase 2 — process concurrently in batches
     concurrency = settings.processing_concurrency
@@ -366,12 +385,22 @@ async def _sync_folder_background(
         except Exception:
             logger.error("sync_update_failed", filename=file.name, exc_info=True)
 
-    # Phase 1b — download new files
+    # Phase 1b — download new files (skip if content hash already exists in org)
     for file in to_create:
         try:
             data = await crawler.download_file(file)
+            content_hash = hashlib.sha256(data).hexdigest()
             async with async_session_factory() as db:
                 repo = DocumentRepository(db)
+                existing = await repo.find_by_content_hash(organization_id, content_hash)
+                if existing is not None:
+                    logger.info(
+                        "sync_skip_duplicate",
+                        filename=file.name,
+                        existing_filename=existing.filename,
+                        existing_id=str(existing.id),
+                    )
+                    continue
                 blob_path = f"{organization_id}/{uuid.uuid4()}/{file.name}"
                 await registry.storage_service.upload(blob_path, data, file.content_type)
                 document = await repo.create(
@@ -383,6 +412,7 @@ async def _sync_folder_background(
                     size_bytes=len(data),
                     source_type=source_type,
                     folder_path=file.folder_path,
+                    content_hash=content_hash,
                 )
                 await db.commit()
                 doc_ids.append(document.id)

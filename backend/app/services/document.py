@@ -1,3 +1,4 @@
+import hashlib
 import re
 import uuid
 
@@ -6,7 +7,7 @@ from azure.core.exceptions import AzureError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.exceptions import NotFoundError, ValidationError
+from app.core.exceptions import ConflictError, NotFoundError, ValidationError
 from app.models.document import Document, SourceType
 from app.models.user import User
 from app.repositories.document import DocumentRepository
@@ -88,6 +89,13 @@ class DocumentService:
                 f"File exceeds maximum size of {settings.max_file_size_bytes // (1024 * 1024)} MB"
             )
 
+        content_hash = hashlib.sha256(data).hexdigest()
+        existing = await self._repo.find_by_content_hash(organization_id, content_hash)
+        if existing is not None:
+            raise ConflictError(
+                f"Duplicate file: identical content already indexed as '{existing.filename}'."
+            )
+
         safe_filename = self._sanitize_filename(filename)
         blob_path = f"{organization_id}/{uuid.uuid4()}/{safe_filename}"
 
@@ -101,6 +109,7 @@ class DocumentService:
             content_type=content_type,
             size_bytes=len(data),
             source_type=source_type,
+            content_hash=content_hash,
         )
 
         logger.info(

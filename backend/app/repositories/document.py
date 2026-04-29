@@ -21,6 +21,7 @@ class DocumentRepository:
         size_bytes: int,
         source_type: SourceType = SourceType.CLIENT,
         folder_path: str | None = None,
+        content_hash: str | None = None,
     ) -> Document:
         document = Document(
             organization_id=organization_id,
@@ -31,10 +32,21 @@ class DocumentRepository:
             content_type=content_type,
             size_bytes=size_bytes,
             source_type=source_type,
+            content_hash=content_hash,
         )
         self._db.add(document)
         await self._db.flush()
         return document
+
+    async def find_by_content_hash(
+        self, organization_id: uuid.UUID, content_hash: str
+    ) -> Document | None:
+        stmt = select(Document).where(
+            Document.organization_id == organization_id,
+            Document.content_hash == content_hash,
+        )
+        result = await self._db.execute(stmt)
+        return result.scalars().first()
 
     async def get_by_id(
         self, document_id: uuid.UUID, organization_id: uuid.UUID

@@ -15,12 +15,34 @@ import { validateFiles } from "@/lib/file-validation";
 import { logger } from "@/lib/logger";
 import type { DocumentItem, DocumentStatus } from "@/types/api";
 
-type Stage = "in-progress" | "success" | "failed";
+type Stage = "in-progress" | "success" | "failed" | "duplicate";
 
 interface InFlight {
   key: string;
   filename: string;
   failed: boolean;
+  duplicate: boolean;
+  errorMessage: string | null;
+}
+
+function extractErrorMessage(err: unknown): {
+  status: number | null;
+  code: string | null;
+  message: string | null;
+} {
+  if (!err || typeof err !== "object") {
+    return { status: null, code: null, message: null };
+  }
+  const candidate = err as {
+    response?: {
+      status?: number;
+      data?: { error?: { code?: string; message?: string } };
+    };
+  };
+  const status = candidate.response?.status ?? null;
+  const code = candidate.response?.data?.error?.code ?? null;
+  const message = candidate.response?.data?.error?.message ?? null;
+  return { status, code, message };
 }
 
 const STORAGE_PREFIX = "rmp.uploadedDocs.";
@@ -69,6 +91,9 @@ function StageIcon({ stage }: { stage: Stage }) {
   }
   if (stage === "failed") {
     return <XCircle size={12} className="text-red-500" />;
+  }
+  if (stage === "duplicate") {
+    return <XCircle size={12} className="text-amber-500" />;
   }
   return <Loader2 size={12} className="animate-spin text-brand-500" />;
 }
@@ -135,11 +160,13 @@ export function DocumentDropZone() {
   const visibleInFlight = useMemo(() => {
     if (!allDocuments) return inFlight;
     const docNames = new Set(myDocs.map((d) => d.filename));
-    return inFlight.filter((f) => f.failed || !docNames.has(f.filename));
+    return inFlight.filter(
+      (f) => f.failed || f.duplicate || !docNames.has(f.filename),
+    );
   }, [inFlight, allDocuments, myDocs]);
 
   const hasPending = useMemo(() => {
-    if (visibleInFlight.some((f) => !f.failed)) return true;
+    if (visibleInFlight.some((f) => !f.failed && !f.duplicate)) return true;
     return myDocs.some(
       (d) => d.status === "uploaded" || d.status === "processing",
     );
@@ -165,7 +192,16 @@ export function DocumentDropZone() {
       for (const vf of valid) {
         const filename = vf.file.name;
         const key = `${filename}-${Date.now()}-${Math.random()}`;
-        setInFlight((prev) => [...prev, { key, filename, failed: false }]);
+        setInFlight((prev) => [
+          ...prev,
+          {
+            key,
+            filename,
+            failed: false,
+            duplicate: false,
+            errorMessage: null,
+          },
+        ]);
         uploadMutation.mutate(
           { file: vf.file },
           {
@@ -173,9 +209,20 @@ export function DocumentDropZone() {
               addUploadedId(doc.id);
               setInFlight((prev) => prev.filter((f) => f.key !== key));
             },
-            onError: () => {
+            onError: (err) => {
+              const { status, message } = extractErrorMessage(err);
+              const isDuplicate = status === 409;
               setInFlight((prev) =>
-                prev.map((f) => (f.key === key ? { ...f, failed: true } : f)),
+                prev.map((f) =>
+                  f.key === key
+                    ? {
+                        ...f,
+                        failed: !isDuplicate,
+                        duplicate: isDuplicate,
+                        errorMessage: message,
+                      }
+                    : f,
+                ),
               );
             },
           },
@@ -254,21 +301,31 @@ export function DocumentDropZone() {
             </div>
           </div>
           <ul className="flex max-h-[180px] flex-col gap-0.5 overflow-y-auto px-1.5 py-1.5">
-            {visibleInFlight.map((f) => (
-              <FileRow
-                key={f.key}
-                filename={f.filename}
-                uploadStage={f.failed ? "failed" : "in-progress"}
-                indexStage="in-progress"
-                onDismiss={f.failed ? () => dismissFailedInFlight(f.key) : null}
-              />
-            ))}
+            {visibleInFlight.map((f) => {
+              const stage: Stage = f.duplicate
+                ? "duplicate"
+                : f.failed
+                  ? "failed"
+                  : "in-progress";
+              const dismissable = f.failed || f.duplicate;
+              return (
+                <FileRow
+                  key={f.key}
+                  filename={f.filename}
+                  uploadStage={stage}
+                  indexStage={stage === "duplicate" ? "duplicate" : "in-progress"}
+                  errorMessage={f.errorMessage}
+                  onDismiss={dismissable ? () => dismissFailedInFlight(f.key) : null}
+                />
+              );
+            })}
             {myDocs.map((doc: DocumentItem) => (
               <FileRow
                 key={doc.id}
                 filename={doc.filename}
                 uploadStage="success"
                 indexStage={indexStageFor(doc.status)}
+                errorMessage={null}
                 onDismiss={() => removeUploadedId(doc.id)}
               />
             ))}
@@ -324,48 +381,62 @@ interface FileRowProps {
   filename: string;
   uploadStage: Stage;
   indexStage: Stage;
+  errorMessage: string | null;
   onDismiss: (() => void) | null;
 }
 
-function FileRow({ filename, uploadStage, indexStage, onDismiss }: FileRowProps) {
+function uploadTitle(stage: Stage, errorMessage: string | null): string {
+  if (stage === "success") return "Uploaded";
+  if (stage === "duplicate") return errorMessage ?? "Duplicate file — already indexed";
+  if (stage === "failed") return errorMessage ?? "Upload failed";
+  return "Uploading";
+}
+
+function indexTitle(stage: Stage): string {
+  if (stage === "success") return "Indexed";
+  if (stage === "duplicate") return "Skipped — duplicate";
+  if (stage === "failed") return "Indexing failed";
+  return "Indexing";
+}
+
+function FileRow({
+  filename,
+  uploadStage,
+  indexStage,
+  errorMessage,
+  onDismiss,
+}: FileRowProps) {
+  const isDuplicate = uploadStage === "duplicate";
   return (
     <li
-      className="flex items-center gap-2 rounded-md px-1.5 py-1 hover:bg-gray-50"
+      className={clsx(
+        "flex flex-col rounded-md px-1.5 py-1 hover:bg-gray-50",
+        isDuplicate && "bg-amber-50",
+      )}
       title={filename}
     >
-      <FileText size={12} className="shrink-0 text-gray-400" />
-      <span className="flex-1 truncate text-[11px] text-gray-700">{filename}</span>
-      <span
-        title={
-          uploadStage === "success"
-            ? "Uploaded"
-            : uploadStage === "failed"
-              ? "Upload failed"
-              : "Uploading"
-        }
-      >
-        <StageIcon stage={uploadStage} />
-      </span>
-      <span
-        title={
-          indexStage === "success"
-            ? "Indexed"
-            : indexStage === "failed"
-              ? "Indexing failed"
-              : "Indexing"
-        }
-      >
-        <StageIcon stage={indexStage} />
-      </span>
-      {onDismiss && (
-        <button
-          type="button"
-          onClick={onDismiss}
-          className="text-[9px] text-gray-400 hover:text-gray-600"
-          aria-label="Dismiss"
-        >
-          ×
-        </button>
+      <div className="flex items-center gap-2">
+        <FileText size={12} className="shrink-0 text-gray-400" />
+        <span className="flex-1 truncate text-[11px] text-gray-700">{filename}</span>
+        <span title={uploadTitle(uploadStage, errorMessage)}>
+          <StageIcon stage={uploadStage} />
+        </span>
+        <span title={indexTitle(indexStage)}>
+          <StageIcon stage={indexStage} />
+        </span>
+        {onDismiss && (
+          <button
+            type="button"
+            onClick={onDismiss}
+            className="text-[9px] text-gray-400 hover:text-gray-600"
+            aria-label="Dismiss"
+          >
+            ×
+          </button>
+        )}
+      </div>
+      {isDuplicate && errorMessage && (
+        <p className="ml-5 mt-0.5 text-[10px] text-amber-700">{errorMessage}</p>
       )}
     </li>
   );

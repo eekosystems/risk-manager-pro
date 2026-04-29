@@ -45,5 +45,6 @@ class Document(Base):
     )
     chunk_count: Mapped[int] = mapped_column(default=0)
     error_message: Mapped[str | None] = mapped_column(Text, default=None)
+    content_hash: Mapped[str | None] = mapped_column(String(64), default=None, index=True)
     created_at: Mapped[datetime] = mapped_column(default=func.now())
     updated_at: Mapped[datetime] = mapped_column(default=func.now(), onupdate=func.now())
