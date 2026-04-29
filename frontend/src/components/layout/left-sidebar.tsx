@@ -2,6 +2,7 @@ import { clsx } from "clsx";
 import {
   ChevronRight,
   MessageSquare,
+  Plus,
   User,
 } from "lucide-react";
 
@@ -15,6 +16,7 @@ interface LeftSidebarProps {
   isOpen: boolean;
   onToggle: () => void;
   onConversationSelect: (id: string) => void;
+  onNewConversation: () => void;
   activeOrganization: OrganizationSummary | null;
   organizations: OrganizationSummary[];
   onOrganizationSelect: (org: OrganizationSummary) => void;
@@ -24,6 +26,7 @@ export function LeftSidebar({
   isOpen,
   onToggle,
   onConversationSelect,
+  onNewConversation,
   activeOrganization,
   organizations,
   onOrganizationSelect,
@@ -64,6 +67,13 @@ export function LeftSidebar({
           )}
 
           <div className="flex-1 overflow-y-auto px-3 py-4">
+            <button
+              onClick={onNewConversation}
+              className="mb-2 flex w-full items-center justify-center gap-2 rounded-xl bg-brand-500 px-3 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-600"
+            >
+              <Plus size={16} />
+              New Conversation
+            </button>
             <ConversationHistory onConversationSelect={onConversationSelect} />
           </div>
 
@@ -77,6 +87,14 @@ export function LeftSidebar({
         <div className="flex flex-col items-center h-full py-3">
           {/* Collapsed section icons */}
           <nav className="flex flex-col items-center gap-1">
+            <button
+              onClick={onNewConversation}
+              aria-label="New Conversation"
+              title="New Conversation"
+              className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-500 text-white shadow-sm transition hover:bg-brand-600"
+            >
+              <Plus size={20} />
+            </button>
             <button
               onClick={onToggle}
               aria-label="Recent sessions"

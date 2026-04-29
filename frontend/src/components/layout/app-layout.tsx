@@ -159,6 +159,10 @@ export function AppLayout({ children }: AppLayoutProps) {
           setConversationId(id);
           setCurrentView("chat");
         }}
+        onNewConversation={() => {
+          setConversationId(null);
+          setCurrentView("chat");
+        }}
         activeOrganization={activeOrganization}
         organizations={organizations}
         onOrganizationSelect={(org) => {
@@ -218,10 +222,6 @@ export function AppLayout({ children }: AppLayoutProps) {
         activeFunction={activeFunction}
         onFunctionSelect={(fn) => {
           setActiveFunction(fn);
-          setCurrentView("chat");
-        }}
-        onNewConversation={() => {
-          setConversationId(null);
           setCurrentView("chat");
         }}
         currentView={currentView}
