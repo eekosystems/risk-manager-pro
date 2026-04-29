@@ -1,3 +1,4 @@
+import re
 import uuid
 from collections.abc import AsyncGenerator
 from typing import Any
@@ -53,6 +54,17 @@ def _resolve_prompt(function_type: FunctionType, prompts: PromptsPayload | None)
         FunctionType.RISK_REGISTER: prompts.risk_register_prompt,
     }
     return prompt_map[function_type]
+
+
+_FILENAME_RE = re.compile(
+    r"[^\s'\"<>(){},;]+\.(?:pdf|docx|doc|xlsx|xls|pptx|ppt|txt|csv)\b",
+    re.IGNORECASE,
+)
+
+
+def _extract_referenced_filenames(query: str) -> list[str]:
+    """Pull any document filenames the user typed into the query."""
+    return _FILENAME_RE.findall(query)
 
 
 def _filter_by_threshold(results: list[SearchResult], threshold: float) -> list[SearchResult]:
@@ -165,12 +177,21 @@ class ChatService:
     ) -> tuple[list[SearchResult], str]:
         """Run RAG search and return filtered results with a formatted context block."""
         search_results: list[SearchResult] = []
+        referenced_filenames = _extract_referenced_filenames(query)
         try:
-            search_results = await self._rag.hybrid_search(
-                query,
-                organization_id=organization_id,
-                top_k=top_k,
-            )
+            if referenced_filenames:
+                search_results = await self._rag.hybrid_search(
+                    query,
+                    organization_id=organization_id,
+                    top_k=max(top_k, 20),
+                    source_filter=referenced_filenames,
+                )
+            if not search_results:
+                search_results = await self._rag.hybrid_search(
+                    query,
+                    organization_id=organization_id,
+                    top_k=top_k,
+                )
         except Exception:  # Deliberately broad: RAG failure must not crash the chat flow
             logger.error(
                 "rag_search_failed",

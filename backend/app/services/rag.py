@@ -40,7 +40,11 @@ class RAGService:
         return self._search_client
 
     async def hybrid_search(
-        self, query: str, organization_id: uuid.UUID, top_k: int = 5
+        self,
+        query: str,
+        organization_id: uuid.UUID,
+        top_k: int = 5,
+        source_filter: list[str] | None = None,
     ) -> list[SearchResult]:
         try:
             validated_id = uuid.UUID(str(organization_id))
@@ -57,13 +61,20 @@ class RAGService:
         )
 
         sanitized_org_id = str(validated_id).replace("'", "''")
-        tenant_filter = f"tenant_id eq '{sanitized_org_id}'"
+        filter_parts = [f"tenant_id eq '{sanitized_org_id}'"]
+        if source_filter:
+            sources_clause = " or ".join(
+                f"source eq '{name.replace(chr(39), chr(39) + chr(39))}'"
+                for name in source_filter
+            )
+            filter_parts.append(f"({sources_clause})")
+        combined_filter = " and ".join(filter_parts)
 
         results: list[SearchResult] = []
         search_results = await client.search(
             search_text=query,
             vector_queries=[vector_query],
-            filter=tenant_filter,
+            filter=combined_filter,
             top=top_k,
             select=["content", "source", "source_type", "section", "chunk_id"],
         )
