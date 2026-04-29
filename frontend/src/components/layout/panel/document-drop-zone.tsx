@@ -94,13 +94,30 @@ export function DocumentDropZone() {
   }, [activeOrganization]);
 
   const persistIds = useCallback(
-    (next: string[]) => {
-      setUploadedIds(next);
-      if (activeOrganization) {
-        writeUploadedIds(activeOrganization.id, next);
-      }
+    (updater: (prev: string[]) => string[]) => {
+      setUploadedIds((prev) => {
+        const next = updater(prev);
+        if (activeOrganization) {
+          writeUploadedIds(activeOrganization.id, next);
+        }
+        return next;
+      });
     },
     [activeOrganization],
+  );
+
+  const addUploadedId = useCallback(
+    (id: string) => {
+      persistIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+    },
+    [persistIds],
+  );
+
+  const removeUploadedIdInternal = useCallback(
+    (id: string) => {
+      persistIds((prev) => prev.filter((x) => x !== id));
+    },
+    [persistIds],
   );
 
   // Show only docs the user uploaded from this drop zone (tracked by id)
@@ -114,16 +131,6 @@ export function DocumentDropZone() {
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
       );
   }, [allDocuments, uploadedIds]);
-
-  // If a tracked id no longer exists on the server (deleted elsewhere), prune it
-  useEffect(() => {
-    if (!allDocuments || uploadedIds.length === 0) return;
-    const serverIds = new Set(allDocuments.map((d) => d.id));
-    const filtered = uploadedIds.filter((id) => serverIds.has(id));
-    if (filtered.length !== uploadedIds.length) {
-      persistIds(filtered);
-    }
-  }, [allDocuments, uploadedIds, persistIds]);
 
   const visibleInFlight = useMemo(() => {
     if (!allDocuments) return inFlight;
@@ -163,12 +170,8 @@ export function DocumentDropZone() {
           { file: vf.file },
           {
             onSuccess: (doc) => {
+              addUploadedId(doc.id);
               setInFlight((prev) => prev.filter((f) => f.key !== key));
-              persistIds(
-                uploadedIds.includes(doc.id)
-                  ? uploadedIds
-                  : [...uploadedIds, doc.id],
-              );
             },
             onError: () => {
               setInFlight((prev) =>
@@ -179,7 +182,7 @@ export function DocumentDropZone() {
         );
       }
     },
-    [uploadMutation, uploadedIds, persistIds],
+    [uploadMutation, addUploadedId],
   );
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -224,12 +227,7 @@ export function DocumentDropZone() {
     setInFlight((prev) => prev.filter((f) => f.key !== key));
   }, []);
 
-  const removeUploadedId = useCallback(
-    (id: string) => {
-      persistIds(uploadedIds.filter((x) => x !== id));
-    },
-    [uploadedIds, persistIds],
-  );
+  const removeUploadedId = removeUploadedIdInternal;
 
   const totalCount = visibleInFlight.length + myDocs.length;
 
