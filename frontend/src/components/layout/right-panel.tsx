@@ -57,9 +57,11 @@ export function RightPanel({
               activeFunction={activeFunction}
               onFunctionSelect={onFunctionSelect}
             />
+          </nav>
 
+          <div className="mt-auto">
             {/* Risk Register + Audit Log nav */}
-            <div className="mt-2 space-y-1">
+            <nav aria-label="Records" className="space-y-1">
               <button
                 onClick={() => onViewChange("risk-register")}
                 className={clsx(
@@ -84,11 +86,11 @@ export function RightPanel({
                 <ScrollText size={18} />
                 Audit Log
               </button>
-            </div>
-          </nav>
+            </nav>
 
-          <div className="mt-auto px-2 pt-4">
-            <AiStatusCard />
+            <div className="px-2 pt-4">
+              <AiStatusCard />
+            </div>
           </div>
         </div>
       ) : (
@@ -113,40 +115,40 @@ export function RightPanel({
             ))}
           </nav>
 
-          <div className="mx-3 my-3 h-px w-8 bg-gray-200" />
+          {/* Records + AI status at bottom */}
+          <div className="mt-auto flex flex-col items-center gap-1">
+            {/* Risk Register icon */}
+            <button
+              onClick={() => onViewChange("risk-register")}
+              aria-label="Risk Register"
+              title="Risk Register"
+              className={clsx(
+                "flex h-10 w-10 items-center justify-center rounded-lg transition-all",
+                currentView === "risk-register"
+                  ? "gradient-brand text-white shadow-md shadow-brand-500/30"
+                  : "text-gray-400 hover:bg-brand-50 hover:text-brand-500",
+              )}
+            >
+              <ShieldAlert size={20} />
+            </button>
 
-          {/* Risk Register icon */}
-          <button
-            onClick={() => onViewChange("risk-register")}
-            aria-label="Risk Register"
-            title="Risk Register"
-            className={clsx(
-              "flex h-10 w-10 items-center justify-center rounded-lg transition-all",
-              currentView === "risk-register"
-                ? "gradient-brand text-white shadow-md shadow-brand-500/30"
-                : "text-gray-400 hover:bg-brand-50 hover:text-brand-500",
-            )}
-          >
-            <ShieldAlert size={20} />
-          </button>
+            {/* Audit Log icon */}
+            <button
+              onClick={() => onViewChange("audit-log")}
+              aria-label="Audit Log"
+              title="Audit Log"
+              className={clsx(
+                "flex h-10 w-10 items-center justify-center rounded-lg transition-all",
+                currentView === "audit-log"
+                  ? "gradient-brand text-white shadow-md shadow-brand-500/30"
+                  : "text-gray-400 hover:bg-brand-50 hover:text-brand-500",
+              )}
+            >
+              <ScrollText size={20} />
+            </button>
 
-          {/* Audit Log icon */}
-          <button
-            onClick={() => onViewChange("audit-log")}
-            aria-label="Audit Log"
-            title="Audit Log"
-            className={clsx(
-              "flex h-10 w-10 items-center justify-center rounded-lg transition-all",
-              currentView === "audit-log"
-                ? "gradient-brand text-white shadow-md shadow-brand-500/30"
-                : "text-gray-400 hover:bg-brand-50 hover:text-brand-500",
-            )}
-          >
-            <ScrollText size={20} />
-          </button>
+            <div className="my-1 h-px w-8 bg-gray-200" />
 
-          {/* AI status at bottom */}
-          <div className="mt-auto">
             <button
               onClick={onToggle}
               aria-label="AI status"
