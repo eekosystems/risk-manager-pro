@@ -22,7 +22,7 @@ export const FUNCTIONS: FunctionDefinition[] = [
   },
   {
     id: "phl",
-    name: "Preliminary Hazard List",
+    name: "Hazard Assessment",
     shortName: "PHL",
     title: "PHL Assessment",
     description: "Identify potential hazards from system changes",
