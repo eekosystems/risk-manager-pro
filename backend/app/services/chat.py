@@ -22,7 +22,6 @@ from app.services.prompts import (
 )
 from app.services.rag import RAGService, SearchResult
 from app.services.risk import RiskService
-from app.services.routing import classify_function
 from app.services.rr_tools import RR_TOOLS, execute_tool_call
 from app.services.settings import SettingsService
 from app.services.sharepoint_crawler import SharePointCrawler
@@ -351,10 +350,6 @@ class ChatService:
     async def process_message(
         self, request: ChatRequest, user: User, organization_id: uuid.UUID
     ) -> ChatResponse:
-        routed_function = await classify_function(
-            request.message, self._openai, fallback=request.function_type
-        )
-
         conversation = await self._resolve_conversation(request, user, organization_id)
 
         await self._repo.add_message(
@@ -383,12 +378,12 @@ class ChatService:
         messages = await self._prepare_messages(
             conversation_id=conversation.id,
             organization_id=organization_id,
-            function_type=routed_function,
+            function_type=request.function_type,
             prompts_config=prompts_config,
             context_block=context_block,
         )
 
-        if routed_function == FunctionType.RISK_REGISTER:
+        if request.function_type == FunctionType.RISK_REGISTER:
             assistant_content = await self._run_tool_loop(
                 messages=messages,
                 temperature=model_config.temperature,
@@ -450,10 +445,6 @@ class ChatService:
 
         Yields event dicts: {"event": "metadata"|"delta"|"done"|"error", ...}.
         """
-        routed_function = await classify_function(
-            request.message, self._openai, fallback=request.function_type
-        )
-
         conversation = await self._resolve_conversation(request, user, organization_id)
 
         await self._repo.add_message(
@@ -481,7 +472,7 @@ class ChatService:
         messages = await self._prepare_messages(
             conversation_id=conversation.id,
             organization_id=organization_id,
-            function_type=routed_function,
+            function_type=request.function_type,
             prompts_config=prompts_config,
             context_block=context_block,
         )
