@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { Database, RefreshCw, Zap } from "lucide-react";
+import { ChevronDown, ChevronUp, Database, RefreshCw, Zap } from "lucide-react";
+import { useState } from "react";
 
 import { getHealthStatus, type HealthStatus } from "@/api/health";
 
@@ -41,6 +42,8 @@ function statusLabel(health: HealthStatus | undefined): {
 }
 
 export function AiStatusCard() {
+  const [expanded, setExpanded] = useState(false);
+
   const { data: health } = useQuery<HealthStatus>({
     queryKey: ["health"],
     queryFn: getHealthStatus,
@@ -53,12 +56,39 @@ export function AiStatusCard() {
   const aiLabel = aiCheck ? checkLabel(aiCheck) : null;
   const searchLabel = searchCheck ? checkLabel(searchCheck) : null;
 
+  if (!expanded) {
+    return (
+      <button
+        type="button"
+        onClick={() => setExpanded(true)}
+        aria-expanded={false}
+        aria-label={`AI Status: ${status.text}. Click to expand.`}
+        className="flex w-full items-center gap-2 rounded-xl bg-slate-800 px-3 py-2 text-left transition hover:bg-slate-700/80"
+      >
+        <div className={`h-2 w-2 shrink-0 rounded-full ${status.dotColor}`} />
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-300">
+          AI {status.text}
+        </span>
+        <ChevronDown size={14} className="ml-auto text-slate-400" />
+      </button>
+    );
+  }
+
   return (
     <div className="rounded-xl bg-slate-800 p-4" role="status">
       <div className="mb-3 flex items-center justify-between">
         <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
           AI Status
         </span>
+        <button
+          type="button"
+          onClick={() => setExpanded(false)}
+          aria-expanded={true}
+          aria-label="Collapse AI status"
+          className="rounded p-1 text-slate-400 transition hover:bg-slate-700 hover:text-slate-200"
+        >
+          <ChevronUp size={14} />
+        </button>
       </div>
 
       <div className="mb-3 flex items-center gap-2">
