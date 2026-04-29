@@ -1,9 +1,19 @@
 # Azure Pipelines — Risk Manager Pro CI/CD
 # Triggers on PRs and pushes to main
 
-trigger: none
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    exclude:
+      - docs/**
+      - "*.md"
 
-pr: none
+pr:
+  branches:
+    include:
+      - main
 
 variables:
   - group: "RMP variable group"
