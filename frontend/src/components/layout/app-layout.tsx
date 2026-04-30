@@ -75,6 +75,7 @@ interface AppLayoutProps {
     conversationId: string | null;
     setConversationId: (id: string | null) => void;
     onStartChat: (fn: FunctionType, seed?: string) => void;
+    onFunctionRouted: (fn: FunctionType) => void;
     pendingInputSeed: string | null;
     clearPendingInputSeed: () => void;
   }) => React.ReactNode;
@@ -209,6 +210,7 @@ export function AppLayout({ children }: AppLayoutProps) {
             conversationId,
             setConversationId,
             onStartChat: startChat,
+            onFunctionRouted: setActiveFunction,
             pendingInputSeed,
             clearPendingInputSeed,
           })

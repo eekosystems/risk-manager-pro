@@ -98,6 +98,7 @@ export interface ChatResponse {
   conversation_id: string;
   message: ChatMessage;
   title: string;
+  routed_function_type: FunctionType;
 }
 
 export interface ConversationListItem {

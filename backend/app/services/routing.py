@@ -48,6 +48,13 @@ _RULES: list[tuple[re.Pattern[str], FunctionType]] = [
     (re.compile(r"\bSRA\b"), FunctionType.SRA),
     (
         re.compile(
+            r"\bassess(?:ing|ed|ment)?\s+(?:a|the|this|that)?\s*hazard",
+            re.IGNORECASE,
+        ),
+        FunctionType.SRA,
+    ),
+    (
+        re.compile(
             r"\b(?:identify|list|enumerate|find|show|extract)\s+"
             r"(?:the|all|any|any\s+of\s+the)?\s*hazards?\b",
             re.IGNORECASE,
@@ -62,6 +69,9 @@ _RULES: list[tuple[re.Pattern[str], FunctionType]] = [
         FunctionType.PHL,
     ),
     (re.compile(r"\bPHL\b"), FunctionType.PHL),
+    # Bare "hazard"/"hazards" — last in the PHL block so all the more-specific
+    # SRA / risk-register / "list hazards" rules win first.
+    (re.compile(r"\bhazards?\b", re.IGNORECASE), FunctionType.PHL),
     (
         re.compile(
             r"\b(?:analy[sz]e|breakdown\s+of)\s+(?:the\s+)?system\b",

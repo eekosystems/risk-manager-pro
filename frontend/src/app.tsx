@@ -21,6 +21,7 @@ export function App() {
                   conversationId,
                   setConversationId,
                   onStartChat,
+                  onFunctionRouted,
                   pendingInputSeed,
                   clearPendingInputSeed,
                 }) => (
@@ -29,6 +30,7 @@ export function App() {
                     conversationId={conversationId}
                     setConversationId={setConversationId}
                     onStartChat={onStartChat}
+                    onFunctionRouted={onFunctionRouted}
                     pendingInputSeed={pendingInputSeed}
                     clearPendingInputSeed={clearPendingInputSeed}
                   />

@@ -36,6 +36,7 @@ class ChatResponse(BaseModel):
     conversation_id: uuid.UUID
     message: MessageResponse
     title: str
+    routed_function_type: FunctionType
 
 
 class ConversationListItem(BaseModel):

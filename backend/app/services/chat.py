@@ -358,17 +358,16 @@ class ChatService:
 
         Guards (in order):
           1. Killswitch off → keep request.function_type.
-          2. Existing tool flow (RISK_REGISTER) on the conversation → never reroute.
-          3. Conversation already has assistant replies → keep request.function_type
-             so mid-conversation messages don't get rerouted on a partial sentence.
-          4. Otherwise classify and use the routed value.
+          2. Tool flow in progress on the conversation (RISK_REGISTER) →
+             never reroute; the wizard's multi-turn tool loop must not be
+             interrupted by a mid-flow user reply (e.g. "JFK") being
+             misclassified as something else.
+          3. Otherwise classify every turn so the UI can live-switch.
         """
         if not app_settings.chat_smart_routing:
             return request.function_type
         if conversation.function_type == FunctionType.RISK_REGISTER:
             return FunctionType.RISK_REGISTER
-        if any(m.role == MessageRole.ASSISTANT for m in (conversation.messages or [])):
-            return request.function_type
         return await classify_function(
             request.message, self._openai, fallback=request.function_type
         )
@@ -463,6 +462,7 @@ class ChatService:
                 created_at=assistant_msg.created_at,
             ),
             title=conversation.title,
+            routed_function_type=routed_function,
         )
 
     async def process_message_stream(
@@ -509,6 +509,7 @@ class ChatService:
             "event": "metadata",
             "conversation_id": str(conversation.id),
             "title": conversation.title,
+            "routed_function_type": routed_function.value,
         }
 
         buffered: list[str] = []

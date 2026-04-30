@@ -2,6 +2,7 @@ import axios from "axios";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { getDocumentById } from "@/api/documents";
+import { FUNCTIONS } from "@/constants/functions";
 import { useConversation, useEmailChatMessage, useSendMessage } from "@/hooks/use-chat";
 import { useUploadDocument } from "@/hooks/use-documents";
 import { useToast } from "@/hooks/use-toast";
@@ -104,6 +105,7 @@ interface ChatPageProps {
   conversationId: string | null;
   setConversationId: (id: string | null) => void;
   onStartChat: (fn: FunctionType, seed?: string) => void;
+  onFunctionRouted: (fn: FunctionType) => void;
   pendingInputSeed: string | null;
   clearPendingInputSeed: () => void;
 }
@@ -113,6 +115,7 @@ export function ChatPage({
   conversationId,
   setConversationId,
   onStartChat,
+  onFunctionRouted,
   pendingInputSeed,
   clearPendingInputSeed,
 }: ChatPageProps) {
@@ -230,8 +233,22 @@ export function ChatPage({
               content_length: data.message.content?.length ?? 0,
               content_preview: data.message.content?.slice(0, 200) ?? null,
               citations_count: data.message.citations?.length ?? 0,
+              routed_function_type: data.routed_function_type,
             });
             setLocalMessages((prev) => [...prev, data.message]);
+            if (
+              data.routed_function_type &&
+              data.routed_function_type !== activeFunction
+            ) {
+              onFunctionRouted(data.routed_function_type);
+              const target = FUNCTIONS.find(
+                (f) => f.id === data.routed_function_type,
+              );
+              addToast(
+                `Switched to ${target?.name ?? data.routed_function_type}`,
+                "info",
+              );
+            }
           },
           onError: (error) => {
             setIsTyping(false);
@@ -270,6 +287,7 @@ export function ChatPage({
       sendMessageMutation,
       uploadDocumentMutation,
       setConversationId,
+      onFunctionRouted,
       addToast,
     ],
   );
