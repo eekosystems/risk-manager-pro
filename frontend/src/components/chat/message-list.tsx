@@ -45,10 +45,19 @@ export function MessageList({
     lastMessageIdRef.current = last.id;
 
     if (isNewMessage && last.role === "assistant") {
-      messageRefs.current.get(last.id)?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
+      // Citations, action buttons, and timestamps all grow the message
+      // height after first paint, so a single smooth-scroll lands in the
+      // wrong place. Pin to the top instantly, then re-pin once the
+      // browser has finished laying out the new content.
+      const pin = () => {
+        messageRefs.current.get(last.id)?.scrollIntoView({
+          behavior: "auto",
+          block: "start",
+        });
+      };
+      pin();
+      requestAnimationFrame(pin);
+      window.setTimeout(pin, 80);
       return;
     }
     endRef.current?.scrollIntoView({ behavior: "smooth" });

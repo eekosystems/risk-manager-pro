@@ -258,7 +258,7 @@ export function MarkdownContent({
           {before}
         </ReactMarkdown>
       )}
-      <details open className="group my-3 rounded-xl border border-gray-200 bg-gray-50 open:bg-white">
+      <details className="group my-3 rounded-xl border border-gray-200 bg-gray-50 open:bg-white">
         <summary className="flex cursor-pointer list-none items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold text-gray-900 hover:bg-gray-100 [&::-webkit-details-marker]:hidden">
           <ChevronRight
             size={14}
