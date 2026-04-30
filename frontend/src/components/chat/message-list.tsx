@@ -33,10 +33,24 @@ export function MessageList({
   onCopyFailed,
 }: MessageListProps) {
   const endRef = useRef<HTMLDivElement>(null);
+  const messageRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const lastMessageIdRef = useRef<string | null>(null);
   const [selected, setSelected] = useState<SelectedCitation | null>(null);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
 
   useEffect(() => {
+    const last = messages[messages.length - 1];
+    if (!last) return;
+    const isNewMessage = last.id !== lastMessageIdRef.current;
+    lastMessageIdRef.current = last.id;
+
+    if (isNewMessage && last.role === "assistant") {
+      messageRefs.current.get(last.id)?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+      return;
+    }
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
 
@@ -62,8 +76,12 @@ export function MessageList({
         {messages.map((msg) => (
           <div
             key={msg.id}
+            ref={(el) => {
+              if (el) messageRefs.current.set(msg.id, el);
+              else messageRefs.current.delete(msg.id);
+            }}
             className={clsx(
-              "animate-slide-in",
+              "animate-slide-in scroll-mt-4",
               msg.role === "user" ? "flex justify-end" : "flex justify-start",
             )}
           >

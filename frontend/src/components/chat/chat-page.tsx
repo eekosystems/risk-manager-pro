@@ -14,31 +14,68 @@ import { MessageList } from "./message-list";
 
 const WELCOME_MESSAGES: Record<FunctionType, string> = {
   phl:
-    "You're now in **Preliminary Hazard List (PHL)** mode. I'll help you " +
-    "systematically identify potential hazards arising from system changes, " +
-    "new operations, or modified procedures. Describe the system or change " +
-    "you'd like to analyze and I'll walk you through it conversationally.",
+    "You're now in **Hazard Assessment** mode. I'll help you systematically " +
+    "identify and assess potential hazards arising from system changes, new " +
+    "operations, construction projects, or modified procedures. Describe the " +
+    "system or change, or upload a change document (e.g., Construction Safety " +
+    "and Phasing Plan (CSPP), operational change order, or system modification " +
+    "notice) that you'd like to analyze, and I'll walk you through it " +
+    "conversationally.\n\n" +
+    "To get started, I can help you with:\n\n" +
+    "- Generating a Preliminary Hazard List (PHL) from a described or uploaded system change\n" +
+    "- Categorizing hazards as Technical, Human, Organizational, or Environmental\n" +
+    "- Providing initial likelihood and severity screening for each identified hazard\n" +
+    "- Flagging any hazards that may require a full Safety Risk Assessment (SRA)\n\n" +
+    "All outputs are decision-support tools and require Safety Manager/SMS Manager " +
+    "or Accountable Executive review before implementation.",
   sra:
     "You're now in **Safety Risk Assessment (SRA)** mode. I'll guide you through " +
-    "a structured risk evaluation following AC 150/5200-37A, including severity and " +
-    "likelihood scoring, risk acceptance criteria, and mitigation planning. " +
-    "Describe the hazard you'd like to assess.",
+    "a structured risk evaluation following FAA Part 139 SMS regulatory guidance " +
+    "by default — if you'd like to use different evaluation criteria (e.g., ICAO, " +
+    "IATA, or a custom framework), just let me know before we begin. Describe the " +
+    "hazard you'd like to assess or upload a hazard document or Preliminary Hazard " +
+    "List (PHL) and I'll walk you through it conversationally.\n\n" +
+    "To get started, I can help you with:\n\n" +
+    "- Assigning likelihood and severity scores using your airport-specific or FAA 5×5 risk matrix\n" +
+    "- Calculating initial and residual risk scores with before/after comparison\n" +
+    "- Evaluating proposed controls using the hierarchy of controls (Eliminate → Substitute → Engineer → Administrative → PPE)\n" +
+    "- Determining ALARP status and whether Accountable Executive acceptance is required\n" +
+    "- Flagging High/Extreme risks for mandatory human review and escalation\n\n" +
+    "All outputs are decision-support tools and require Safety Manager/SMS Manager " +
+    "or Accountable Executive review and approval before implementation.",
   system:
-    "You're now in **System Analysis** mode. I'll help you analyze system changes, " +
-    "evaluate their safety impacts, and identify dependencies across your operations. " +
-    "Describe the system or change you'd like to analyze and I'll assist with a " +
-    "structured breakdown.",
+    "You're now in **System Analysis** mode. I'll help you define your system " +
+    "and/or analyze system changes, evaluate negative safety trends/data, and " +
+    "identify dependencies across your operational systems. Describe the system " +
+    "or change, or upload a change document that you'd like to analyze, and I'll " +
+    "assist with a structured breakdown.\n\n" +
+    "To get started, I can help you with:\n\n" +
+    "- Defining or describing a new or existing operational system\n" +
+    "- Analyzing a proposed system change and its safety impacts\n" +
+    "- Evaluating negative safety outcomes, lagging-indicator spikes, or adverse trends\n" +
+    "- Identifying system dependencies and potential failure points\n\n" +
+    "All outputs are decision-support tools and require Safety Manager/SMS Manager " +
+    "or Accountable Executive review before implementation.",
   general:
     "Welcome to Risk Manager Pro. I'm your AI-powered aviation safety assistant, " +
     "ready to help with any questions about aviation safety, regulatory compliance, " +
     "or your indexed documentation. Select a core function from the sidebar to focus " +
     "on a specific workflow, or ask me anything.",
   risk_register:
-    "You're now in **Risk Register** mode. I'll walk you through adding a hazard to " +
-    "the Airport Risk Register step by step — hazard description, credible outcome, " +
-    "operational domain, 5M/ICAO category, risk scoring, existing controls, and " +
-    "mitigation actions. Tell me the airport you're working on and describe the " +
-    "hazard you'd like to record.",
+    "You're now in **Risk Register** mode. I'll walk you through adding or updating " +
+    "a hazard in your Risk Register step by step — hazard description, worst credible " +
+    "outcome(s), operational domain, hazard category, risk scoring, existing controls, " +
+    "and mitigation actions. Tell me the organization you're working on and describe " +
+    "the hazard you'd like to record or upload a hazard report or SRA output and I'll " +
+    "extract the relevant information conversationally.\n\n" +
+    "To get started, I can help you with:\n\n" +
+    "- Recording a new hazard with full classification (Technical, Human, Organizational, or Environmental)\n" +
+    "- Assigning and documenting initial and residual risk scores against your organization-specific or FAA 5×5 risk matrix\n" +
+    "- Classifying the hazard entry as a Lagging, Leading, or Predictive indicator\n" +
+    "- Linking existing controls and mitigation actions with assigned owners and due dates\n" +
+    "- Flagging entries that require Accountable Executive review or a full Safety Risk Assessment (SRA)\n\n" +
+    "All outputs are decision-support tools and require Safety Manager/SMS Manager " +
+    "or Accountable Executive review and approval before the record is finalized.",
 };
 
 function buildRiskRegisterSeed(assistantContent: string): string {
