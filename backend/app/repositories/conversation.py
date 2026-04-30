@@ -1,4 +1,5 @@
 import uuid
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -7,6 +8,16 @@ from sqlalchemy.orm import selectinload
 from app.core.exceptions import NotFoundError
 from app.models.conversation import Conversation, ConversationStatus, FunctionType
 from app.models.message import Message, MessageRole
+
+
+def _strip_null_bytes(value: Any) -> Any:
+    if isinstance(value, str):
+        return value.replace("\x00", "")
+    if isinstance(value, list):
+        return [_strip_null_bytes(v) for v in value]
+    if isinstance(value, dict):
+        return {k: _strip_null_bytes(v) for k, v in value.items()}
+    return value
 
 
 class ConversationRepository:
@@ -86,9 +97,9 @@ class ConversationRepository:
         message = Message(
             conversation_id=conversation_id,
             role=role,
-            content=content,
-            citations=citations,
-            metadata_json=metadata,
+            content=_strip_null_bytes(content),
+            citations=_strip_null_bytes(citations),
+            metadata_json=_strip_null_bytes(metadata),
         )
         self._db.add(message)
         await self._db.flush()
