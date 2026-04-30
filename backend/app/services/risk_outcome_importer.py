@@ -320,7 +320,7 @@ Return ONLY the JSON object.
 # Per-chunk cap. Azure OpenAI gpt-4o has a 128k-token window (~450k chars);
 # 90k chars per chunk leaves plenty of room for the prompt + JSON response.
 _MAX_CHARS_PER_CHUNK = 90_000
-_MAX_PARALLEL_EXTRACTIONS = 4
+_MAX_PARALLEL_EXTRACTIONS = 2
 
 
 def _parse_json_payload(raw: str) -> dict[str, Any] | None:

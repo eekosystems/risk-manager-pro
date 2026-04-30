@@ -12,8 +12,8 @@ logger = structlog.get_logger(__name__)
 
 _retry_on_rate_limit = retry(
     retry=retry_if_exception_type(RateLimitError),
-    wait=wait_exponential(multiplier=1, min=2, max=30),
-    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=2, min=4, max=60),
+    stop=stop_after_attempt(6),
 )
 
 
