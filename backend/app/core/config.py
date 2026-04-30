@@ -72,6 +72,11 @@ class Settings(BaseSettings):
     search_index_batch_size: int = 100
     processing_concurrency: int = 5
 
+    # Killswitch for smart-routing of chat messages to the correct FunctionType.
+    # Set to false on the Container App to disable routing without a rebuild
+    # if it ever misbehaves in production.
+    chat_smart_routing: bool = True
+
     # Risk-outcome import filter rules
     # When False (default), the importer runs in SHADOW mode: every classification
     # is stamped on each row and logged, but nothing is filtered out. Flip to True

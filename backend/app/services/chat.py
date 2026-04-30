@@ -20,8 +20,10 @@ from app.services.prompts import (
     SRA_PROMPT,
     SYSTEM_ANALYSIS_PROMPT,
 )
+from app.core.config import settings as app_settings
 from app.services.rag import RAGService, SearchResult
 from app.services.risk import RiskService
+from app.services.routing import classify_function
 from app.services.rr_tools import RR_TOOLS, execute_tool_call
 from app.services.settings import SettingsService
 from app.services.sharepoint_crawler import SharePointCrawler
@@ -347,10 +349,35 @@ class ChatService:
             "created, and try again if anything is missing."
         )
 
+    async def _route_function_type(
+        self,
+        request: ChatRequest,
+        conversation: Conversation,
+    ) -> FunctionType:
+        """Pick the prompt for this turn. Falls back to request.function_type.
+
+        Guards (in order):
+          1. Killswitch off → keep request.function_type.
+          2. Existing tool flow (RISK_REGISTER) on the conversation → never reroute.
+          3. Conversation already has assistant replies → keep request.function_type
+             so mid-conversation messages don't get rerouted on a partial sentence.
+          4. Otherwise classify and use the routed value.
+        """
+        if not app_settings.chat_smart_routing:
+            return request.function_type
+        if conversation.function_type == FunctionType.RISK_REGISTER:
+            return FunctionType.RISK_REGISTER
+        if any(m.role == MessageRole.ASSISTANT for m in (conversation.messages or [])):
+            return request.function_type
+        return await classify_function(
+            request.message, self._openai, fallback=request.function_type
+        )
+
     async def process_message(
         self, request: ChatRequest, user: User, organization_id: uuid.UUID
     ) -> ChatResponse:
         conversation = await self._resolve_conversation(request, user, organization_id)
+        routed_function = await self._route_function_type(request, conversation)
 
         await self._repo.add_message(
             conversation_id=conversation.id,
@@ -378,12 +405,12 @@ class ChatService:
         messages = await self._prepare_messages(
             conversation_id=conversation.id,
             organization_id=organization_id,
-            function_type=request.function_type,
+            function_type=routed_function,
             prompts_config=prompts_config,
             context_block=context_block,
         )
 
-        if request.function_type == FunctionType.RISK_REGISTER:
+        if routed_function == FunctionType.RISK_REGISTER:
             assistant_content = await self._run_tool_loop(
                 messages=messages,
                 temperature=model_config.temperature,
@@ -446,6 +473,7 @@ class ChatService:
         Yields event dicts: {"event": "metadata"|"delta"|"done"|"error", ...}.
         """
         conversation = await self._resolve_conversation(request, user, organization_id)
+        routed_function = await self._route_function_type(request, conversation)
 
         await self._repo.add_message(
             conversation_id=conversation.id,
@@ -472,7 +500,7 @@ class ChatService:
         messages = await self._prepare_messages(
             conversation_id=conversation.id,
             organization_id=organization_id,
-            function_type=request.function_type,
+            function_type=routed_function,
             prompts_config=prompts_config,
             context_block=context_block,
         )
