@@ -38,16 +38,25 @@ export function MessageList({
   const [selected, setSelected] = useState<SelectedCitation | null>(null);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
 
+  const wasTypingRef = useRef(false);
   useEffect(() => {
     const last = messages[messages.length - 1];
     if (!last) return;
     const isNewMessage = last.id !== lastMessageIdRef.current;
+    const typingJustStarted = isTyping && !wasTypingRef.current;
+    wasTypingRef.current = isTyping;
+
+    // Re-renders with no new message (e.g. background refetch swapping
+    // localMessages with the server copy) must not scroll, or the view
+    // jumps off the top of the just-pinned assistant reply.
+    if (!isNewMessage && !typingJustStarted) return;
+
     lastMessageIdRef.current = last.id;
 
     if (isNewMessage && last.role === "assistant") {
-      // Citations, action buttons, and timestamps all grow the message
-      // height after first paint, so a single smooth-scroll lands in the
-      // wrong place. Pin to the top instantly, then re-pin once the
+      // Citations, action buttons, and timestamps grow the message
+      // height after first paint, so a single smooth-scroll lands in
+      // the wrong place. Pin to the top instantly, then re-pin once the
       // browser has finished laying out the new content.
       const pin = () => {
         messageRefs.current.get(last.id)?.scrollIntoView({
