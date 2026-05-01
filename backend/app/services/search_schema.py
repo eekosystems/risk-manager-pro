@@ -11,7 +11,6 @@ from azure.search.documents.indexes.models import (
     HnswParameters,
     SearchableField,
     SearchField,
-    SearchFieldDataType,
     SearchIndex,
     SimpleField,
     VectorSearch,
@@ -27,67 +26,29 @@ def build_index_schema(index_name: str | None = None) -> SearchIndex:
     """Build the Azure AI Search index schema (pure, no I/O)."""
     name = index_name or settings.azure_search_index_name
 
+    # The azure-search-documents stubs type the `type=` parameter as
+    # `str | SearchFieldDataType`, but mypy resolves the SearchFieldDataType
+    # members as plain Enum, which it then rejects. Passing the underlying
+    # string values satisfies both runtime and type-checker; the SDK accepts
+    # either form.
     fields = [
-        SimpleField(
-            name="chunk_id",
-            type=SearchFieldDataType.String,
-            key=True,
-            filterable=True,
-        ),
-        SimpleField(
-            name="document_id",
-            type=SearchFieldDataType.String,
-            filterable=True,
-        ),
-        SimpleField(
-            name="tenant_id",
-            type=SearchFieldDataType.String,
-            filterable=True,
-        ),
-        SearchableField(
-            name="source",
-            type=SearchFieldDataType.String,
-            filterable=True,
-            facetable=True,
-        ),
-        SimpleField(
-            name="source_type",
-            type=SearchFieldDataType.String,
-            filterable=True,
-            facetable=True,
-        ),
-        SearchableField(
-            name="section",
-            type=SearchFieldDataType.String,
-            filterable=True,
-        ),
-        SearchableField(
-            name="content",
-            type=SearchFieldDataType.String,
-            analyzer_name="en.microsoft",
-        ),
+        SimpleField(name="chunk_id", type="Edm.String", key=True, filterable=True),
+        SimpleField(name="document_id", type="Edm.String", filterable=True),
+        SimpleField(name="tenant_id", type="Edm.String", filterable=True),
+        SearchableField(name="source", type="Edm.String", filterable=True, facetable=True),
+        SimpleField(name="source_type", type="Edm.String", filterable=True, facetable=True),
+        SearchableField(name="section", type="Edm.String", filterable=True),
+        SearchableField(name="content", type="Edm.String", analyzer_name="en.microsoft"),
         SearchField(
             name="content_vector",
-            type=SearchFieldDataType.Collection(SearchFieldDataType.Single),
+            type="Collection(Edm.Single)",
             searchable=True,
             vector_search_dimensions=1536,
             vector_search_profile_name="rmp-vector-profile",
         ),
-        SimpleField(
-            name="page_number",
-            type=SearchFieldDataType.Int32,
-            filterable=True,
-        ),
-        SimpleField(
-            name="chunk_index",
-            type=SearchFieldDataType.Int32,
-            sortable=True,
-        ),
-        SimpleField(
-            name="created_at",
-            type=SearchFieldDataType.DateTimeOffset,
-            sortable=True,
-        ),
+        SimpleField(name="page_number", type="Edm.Int32", filterable=True),
+        SimpleField(name="chunk_index", type="Edm.Int32", sortable=True),
+        SimpleField(name="created_at", type="Edm.DateTimeOffset", sortable=True),
     ]
 
     vector_search = VectorSearch(
