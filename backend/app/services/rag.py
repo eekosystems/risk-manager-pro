@@ -64,8 +64,7 @@ class RAGService:
         filter_parts = [f"tenant_id eq '{sanitized_org_id}'"]
         if source_filter:
             sources_clause = " or ".join(
-                f"source eq '{name.replace(chr(39), chr(39) + chr(39))}'"
-                for name in source_filter
+                f"source eq '{name.replace(chr(39), chr(39) + chr(39))}'" for name in source_filter
             )
             filter_parts.append(f"({sources_clause})")
         combined_filter = " and ".join(filter_parts)

@@ -80,9 +80,7 @@ _RULES: list[tuple[re.Pattern[str], FunctionType]] = [
         FunctionType.SYSTEM_ANALYSIS,
     ),
     (
-        re.compile(
-            r"\bsystem\s+(?:analysis|change|impact|breakdown)\b", re.IGNORECASE
-        ),
+        re.compile(r"\bsystem\s+(?:analysis|change|impact|breakdown)\b", re.IGNORECASE),
         FunctionType.SYSTEM_ANALYSIS,
     ),
 ]
