@@ -1,5 +1,12 @@
 import { Paperclip, Send, X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from "react";
 
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { FUNCTIONS } from "@/constants/functions";
@@ -45,6 +52,13 @@ export function ChatInput({
       });
     }
   }, [seedValue, onSeedConsumed]);
+
+  useLayoutEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
+  }, [input]);
 
   const handleSend = useCallback(() => {
     if (!input.trim() && files.length === 0) return;
@@ -135,8 +149,8 @@ export function ChatInput({
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Describe system changes, ask about regulations, or request analysis..."
-            className="max-h-32 min-h-[24px] flex-1 resize-none bg-transparent text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none"
-            rows={1}
+            className="max-h-[200px] min-h-[44px] flex-1 resize-none overflow-y-auto bg-transparent text-sm leading-6 text-gray-800 placeholder:text-gray-400 focus:outline-none"
+            rows={2}
             disabled={disabled}
           />
 
