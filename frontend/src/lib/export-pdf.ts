@@ -37,6 +37,9 @@ const SPACE = {
 const LIST_INDENT = 14;
 const MARKER_GAP = 5;
 
+const CONFIDENTIALITY_TEXT =
+  "This output contains information intended only for the use of the individual or entity named above. If the reader is not the intended recipient or the employee or agent responsible for delivering it, any dissemination, publication or copying of this output is strictly prohibited.";
+
 function parseInlines(text: string): Run[] {
   const runs: Run[] = [];
   let i = 0;
@@ -281,7 +284,7 @@ export function exportTextToPdf(
   const doc = new jsPDF({ unit: "pt", format: "letter" });
   const marginX = 56;
   const marginTop = 56;
-  const marginBottom = 64;
+  const marginBottom = 96;
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   const contentWidth = pageWidth - marginX * 2;
@@ -290,13 +293,36 @@ export function exportTextToPdf(
   let pageNumber = 1;
 
   const drawFooter = () => {
+    const footerLineHeight = 9 * 1.3;
+    const wrappedFooter = doc.splitTextToSize(CONFIDENTIALITY_TEXT, contentWidth);
+    const blockHeight = wrappedFooter.length * footerLineHeight + 6;
+    const blockTop = pageHeight - marginBottom + 4;
+
+    doc.setDrawColor(220);
+    doc.setLineWidth(0.5);
+    doc.line(marginX, blockTop, pageWidth - marginX, blockTop);
+
+    doc.setFont(FONT, "bold");
+    doc.setFontSize(7.5);
+    doc.setTextColor(120);
+    doc.text("CONFIDENTIALITY WARNING", marginX, blockTop + 8);
+
+    doc.setFont(FONT, "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(110);
+    let footerY = blockTop + 8 + footerLineHeight;
+    for (const line of wrappedFooter) {
+      doc.text(line, marginX, footerY);
+      footerY += footerLineHeight;
+    }
+
     doc.setFont(FONT, "normal");
     doc.setFontSize(SIZE.meta);
     doc.setTextColor(140);
     doc.text(
       `Page ${pageNumber}`,
       pageWidth - marginX,
-      pageHeight - marginBottom / 2,
+      blockTop + blockHeight + 2,
       { align: "right" },
     );
     doc.setTextColor(30);
