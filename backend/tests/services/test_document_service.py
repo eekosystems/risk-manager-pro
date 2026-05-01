@@ -67,6 +67,7 @@ async def test_upload_stores_and_creates_document(
     )
 
     document_service._repo = AsyncMock()
+    document_service._repo.find_by_content_hash.return_value = None
     document_service._repo.create.return_value = doc
 
     result = await document_service.upload(

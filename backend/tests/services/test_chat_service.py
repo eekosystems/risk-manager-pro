@@ -74,6 +74,10 @@ async def test_process_message_creates_conversation(
     with (
         patch.object(chat_service, "_repo", mock_repo),
         patch.object(chat_service, "_settings", mock_settings),
+        patch(
+            "app.services.chat.classify_function",
+            AsyncMock(return_value=FunctionType.GENERAL),
+        ),
     ):
         request = ChatRequest(
             message="Test question",
@@ -204,6 +208,10 @@ async def test_process_message_handles_rag_failure(
     with (
         patch.object(chat_service, "_repo", mock_repo),
         patch.object(chat_service, "_settings", mock_settings),
+        patch(
+            "app.services.chat.classify_function",
+            AsyncMock(return_value=FunctionType.GENERAL),
+        ),
     ):
         request = ChatRequest(message="Test question")
         result = await chat_service.process_message(request, user, ORGANIZATION_ID)

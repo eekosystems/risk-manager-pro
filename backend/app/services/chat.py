@@ -6,6 +6,7 @@ from typing import Any
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings as app_settings
 from app.models.conversation import Conversation, FunctionType
 from app.models.message import MessageRole
 from app.models.user import User
@@ -20,7 +21,6 @@ from app.services.prompts import (
     SRA_PROMPT,
     SYSTEM_ANALYSIS_PROMPT,
 )
-from app.core.config import settings as app_settings
 from app.services.rag import RAGService, SearchResult
 from app.services.risk import RiskService
 from app.services.routing import classify_function

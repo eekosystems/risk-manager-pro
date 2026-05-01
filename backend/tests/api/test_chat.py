@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from httpx import AsyncClient
 
 from app.api.v1.chat import _get_chat_service
+from app.models.conversation import FunctionType
 from app.models.user import User
 
 
@@ -28,6 +29,7 @@ async def test_send_message(test_app: FastAPI, client: AsyncClient, test_user: U
             created_at="2024-01-01T00:00:00Z",
         ),
         title="Test conversation",
+        routed_function_type=FunctionType.GENERAL,
     )
     test_app.dependency_overrides[_get_chat_service] = lambda: mock_service
     response = await client.post(
