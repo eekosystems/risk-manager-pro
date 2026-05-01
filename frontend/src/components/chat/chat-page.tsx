@@ -1,5 +1,5 @@
 import axios from "axios";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { getDocumentById } from "@/api/documents";
 import { FUNCTIONS } from "@/constants/functions";
@@ -7,6 +7,7 @@ import { useConversation, useEmailChatMessage, useSendMessage } from "@/hooks/us
 import { useUploadDocument } from "@/hooks/use-documents";
 import { useToast } from "@/hooks/use-toast";
 import { logger } from "@/lib/logger";
+import type { Followup } from "@/lib/followups";
 import type { ChatMessage, FunctionType } from "@/types/api";
 
 import { ChatInput } from "./chat-input";
@@ -125,6 +126,8 @@ export function ChatPage({
   ]);
   const [isTyping, setIsTyping] = useState(false);
   const [emailTargetContent, setEmailTargetContent] = useState<string | null>(null);
+  const [followupSeed, setFollowupSeed] = useState<string | null>(null);
+  const lockedFunctionRef = useRef<FunctionType | null>(null);
   const { addToast } = useToast();
   const emailChatMutation = useEmailChatMessage();
 
@@ -217,11 +220,15 @@ export function ChatPage({
       setLocalMessages((prev) => [...prev, userMsg]);
       setIsTyping(true);
 
+      const locked = lockedFunctionRef.current;
+      lockedFunctionRef.current = null;
+
       sendMessageMutation.mutate(
         {
           message,
           conversation_id: conversationId,
-          function_type: activeFunction,
+          function_type: locked ?? activeFunction,
+          routing_locked: locked !== null,
         },
         {
           onSuccess: (data) => {
@@ -329,6 +336,16 @@ export function ChatPage({
     [emailChatMutation, addToast],
   );
 
+  const handleFollowupClick = useCallback((followup: Followup) => {
+    lockedFunctionRef.current = followup.mode;
+    setFollowupSeed(followup.prefill);
+  }, []);
+
+  const handleSeedConsumed = useCallback(() => {
+    setFollowupSeed(null);
+    clearPendingInputSeed();
+  }, [clearPendingInputSeed]);
+
   const handleCopied = useCallback(() => {
     addToast("Copied to clipboard", "success");
   }, [addToast]);
@@ -346,12 +363,13 @@ export function ChatPage({
         {...(EMAIL_ON_CHAT_OUTPUT_ENABLED ? { onEmail: handleEmail } : {})}
         onCopied={handleCopied}
         onCopyFailed={handleCopyFailed}
+        onFollowupClick={handleFollowupClick}
       />
       <ChatInput
         onSend={handleSend}
         disabled={sendMessageMutation.isPending}
-        seedValue={pendingInputSeed}
-        onSeedConsumed={clearPendingInputSeed}
+        seedValue={followupSeed ?? pendingInputSeed}
+        onSeedConsumed={handleSeedConsumed}
         activeFunction={activeFunction}
       />
       {emailTargetContent !== null && (

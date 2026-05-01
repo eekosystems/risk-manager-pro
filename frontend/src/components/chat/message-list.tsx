@@ -1,9 +1,17 @@
 import { clsx } from "clsx";
 import { format } from "date-fns";
-import { Check, Copy, Download, Mail, ShieldAlert } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  ArrowRight,
+  Check,
+  Copy,
+  Download,
+  Mail,
+  ShieldAlert,
+} from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { exportTextToPdf } from "@/lib/export-pdf";
+import { extractFollowups, type Followup } from "@/lib/followups";
 import type { ChatMessage, Citation } from "@/types/api";
 
 import { CitationChip } from "./citation-chip";
@@ -17,6 +25,7 @@ interface MessageListProps {
   onEmail?: (messageContent: string) => void;
   onCopied?: () => void;
   onCopyFailed?: () => void;
+  onFollowupClick?: (followup: Followup) => void;
 }
 
 interface SelectedCitation {
@@ -31,7 +40,25 @@ export function MessageList({
   onEmail,
   onCopied,
   onCopyFailed,
+  onFollowupClick,
 }: MessageListProps) {
+  const followupsByMessage = useMemo(() => {
+    const map = new Map<string, Followup[]>();
+    for (const m of messages) {
+      if (m.role !== "assistant" || m.id.startsWith("welcome")) continue;
+      const { followups } = extractFollowups(m.content);
+      if (followups.length > 0) map.set(m.id, followups);
+    }
+    return map;
+  }, [messages]);
+
+  const lastAssistantId = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i];
+      if (m && m.role === "assistant") return m.id;
+    }
+    return null;
+  }, [messages]);
   const endRef = useRef<HTMLDivElement>(null);
   const messageRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const lastMessageIdRef = useRef<string | null>(null);
@@ -145,6 +172,15 @@ export function MessageList({
                   </div>
                 )}
               </div>
+              {msg.role === "assistant" &&
+                msg.id === lastAssistantId &&
+                onFollowupClick &&
+                followupsByMessage.has(msg.id) && (
+                  <FollowupChips
+                    followups={followupsByMessage.get(msg.id)!}
+                    onClick={onFollowupClick}
+                  />
+                )}
               {msg.role === "assistant" && !msg.id.startsWith("welcome") && (
                 <ConfidentialityFooter />
               )}
@@ -223,6 +259,33 @@ function ActionButton({ icon, label, onClick }: ActionButtonProps) {
       {icon}
       {label}
     </button>
+  );
+}
+
+function FollowupChips({
+  followups,
+  onClick,
+}: {
+  followups: Followup[];
+  onClick: (followup: Followup) => void;
+}) {
+  return (
+    <div className="mt-3 flex flex-wrap gap-2">
+      {followups.map((f, i) => (
+        <button
+          key={`${f.mode}-${i}`}
+          type="button"
+          onClick={() => onClick(f)}
+          className="group inline-flex items-center gap-1.5 rounded-full border border-brand-200 bg-brand-50 px-3 py-1.5 text-xs font-medium text-brand-700 transition-colors hover:border-brand-300 hover:bg-brand-100"
+        >
+          <span>{f.label}</span>
+          <ArrowRight
+            size={12}
+            className="opacity-60 transition-opacity group-hover:opacity-100"
+          />
+        </button>
+      ))}
+    </div>
   );
 }
 

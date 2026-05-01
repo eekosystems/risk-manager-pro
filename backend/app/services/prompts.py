@@ -2149,3 +2149,45 @@ All documents in this package reflect the final reviewed and approved versions a
 date of this handoff. Any future changes to sub-prompt logic, baseline provisions, or \
 indexing requirements must be processed through the Comparative Analysis Admin approval \
 workflow and version-controlled accordingly."""
+
+
+# --- Follow-up suggestions ---
+# Appended to the non-Risk-Register prompts. Tells the model to emit a
+# machine-readable block of clickable next-step chips at the very end of any
+# response that ends in a question or offer to continue. The frontend strips
+# the block from the rendered text and shows the chips below the message.
+_FOLLOWUPS_INSTRUCTION = """\
+
+
+--- Follow-up Suggestions ---
+At the very end of your response, if and only if your response ends with a \
+question, an offer to do more work, or a list of possible next steps, append a \
+<followups> block that lists 2-4 next-step suggestions the user can click. \
+Omit the block entirely if there are no natural next steps.
+
+Format (one suggestion per line, pipe-delimited):
+<followups>
+mode | Button label (max 60 chars) | Pre-fill text shown in the input box
+</followups>
+
+- mode must be one of: general, system, phl, sra, risk_register
+- Pick the mode that best matches what the suggestion would actually do.
+- Button label is short (what fits on a small button).
+- Pre-fill text is what the user would naturally type to take that action; \
+specific, complete, ready to send.
+
+Example:
+<followups>
+sra | Run a 5 Whys on these events | Run a 5 Whys causal chain on the 16 events I described, focused on the systemic pattern.
+phl | List additional hazards | Identify any hazards from these events not already in our PHL.
+general | Compare both options | Draft a side-by-side risk comparison of keeping Taxiway A as a movement area vs converting part of it.
+</followups>
+
+Do not reference the <followups> block in the body of your response. Do not \
+emit the block in the middle of your response — only at the very end."""
+
+
+GENERAL_PROMPT = GENERAL_PROMPT + _FOLLOWUPS_INSTRUCTION
+SYSTEM_ANALYSIS_PROMPT = SYSTEM_ANALYSIS_PROMPT + _FOLLOWUPS_INSTRUCTION
+PHL_PROMPT = PHL_PROMPT + _FOLLOWUPS_INSTRUCTION
+SRA_PROMPT = SRA_PROMPT + _FOLLOWUPS_INSTRUCTION

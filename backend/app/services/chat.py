@@ -357,13 +357,17 @@ class ChatService:
         """Pick the prompt for this turn. Falls back to request.function_type.
 
         Guards (in order):
-          1. Killswitch off → keep request.function_type.
-          2. Tool flow in progress on the conversation (RISK_REGISTER) →
+          1. routing_locked → user clicked a follow-up chip; trust the mode
+             they confirmed and skip classification entirely.
+          2. Killswitch off → keep request.function_type.
+          3. Tool flow in progress on the conversation (RISK_REGISTER) →
              never reroute; the wizard's multi-turn tool loop must not be
              interrupted by a mid-flow user reply (e.g. "JFK") being
              misclassified as something else.
-          3. Otherwise classify every turn so the UI can live-switch.
+          4. Otherwise classify every turn so the UI can live-switch.
         """
+        if request.routing_locked:
+            return request.function_type
         if not app_settings.chat_smart_routing:
             return request.function_type
         if conversation.function_type == FunctionType.RISK_REGISTER:

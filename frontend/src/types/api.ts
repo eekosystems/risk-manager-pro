@@ -92,6 +92,7 @@ export interface ChatRequest {
   message: string;
   conversation_id?: string | null;
   function_type: FunctionType;
+  routing_locked?: boolean;
 }
 
 export interface ChatResponse {
