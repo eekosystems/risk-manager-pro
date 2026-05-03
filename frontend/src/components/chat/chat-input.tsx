@@ -29,9 +29,7 @@ export function ChatInput({
   activeFunction,
 }: ChatInputProps) {
   const modeLabel = activeFunction
-    ? FUNCTIONS.find((f) => f.id === activeFunction)?.shortName ??
-      FUNCTIONS.find((f) => f.id === activeFunction)?.name ??
-      null
+    ? FUNCTIONS.find((f) => f.id === activeFunction)?.name ?? null
     : null;
   const [input, setInput] = useState("");
   const [isDragging, setIsDragging] = useState(false);
