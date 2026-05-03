@@ -22,6 +22,7 @@ read concurrently while a scan is in flight.
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import json
 import re
 import time
@@ -31,6 +32,8 @@ from typing import TYPE_CHECKING, Any
 import structlog
 
 from app.core.config import settings
+from app.core.database import async_session_factory
+from app.repositories.risk_outcome_cache import RiskOutcomeCacheRepository
 from app.services.document_processor import DocumentProcessor
 from app.services.sharepoint_crawler import is_risk_outcome_folder, normalize_folder_name
 
@@ -69,6 +72,29 @@ class SharePointParseNote:
     airport_identifier: str
     source_file: str
     message: str
+
+
+def _risk_from_dict(d: dict[str, Any]) -> SharePointRisk:
+    return SharePointRisk(
+        airport_identifier=d["airport_identifier"],
+        hazard=d["hazard"],
+        severity=int(d["severity"]),
+        likelihood=d["likelihood"],
+        risk_level=d["risk_level"],
+        source_file=d["source_file"],
+        source_url=d.get("source_url"),
+        report_year=d.get("report_year"),
+        matrix_size=d.get("matrix_size"),
+        import_classification=d.get("import_classification", "clean"),
+    )
+
+
+def _note_from_dict(d: dict[str, Any]) -> SharePointParseNote:
+    return SharePointParseNote(
+        airport_identifier=d["airport_identifier"],
+        source_file=d["source_file"],
+        message=d["message"],
+    )
 
 
 @dataclass
@@ -773,6 +799,12 @@ class RiskOutcomeImporter:
         self._notes: list[SharePointParseNote] = []  # one-off scan notes, not per-file
         self._last_completed: float | None = None
 
+        # Set to True after the in-memory cache has been hydrated from the
+        # persistent table at least once. Hydration runs lazily at the start
+        # of the first scan so cold replicas don't re-extract files that
+        # another replica or a prior boot already processed.
+        self._hydrated: bool = False
+
     async def snapshot(self) -> SharePointRiskSummary:
         """Return the current known state without triggering a scan."""
         async with self._lock:
@@ -842,12 +874,102 @@ class RiskOutcomeImporter:
             risks_flagged_for_review=flagged,
         )
 
+    async def _hydrate_from_db(self) -> None:
+        """Load persisted cache rows into `_file_cache` once per process.
+
+        Filters out rows whose cache_key prefix doesn't match the current
+        schema version — those will be overwritten by the next extraction.
+        Errors are swallowed: hydration is an optimization, not a hard
+        dependency, and a transient DB hiccup should not block a scan.
+        """
+        if self._hydrated:
+            return
+        try:
+            async with async_session_factory() as session:
+                repo = RiskOutcomeCacheRepository(session)
+                rows = await repo.load_all()
+        except Exception:  # noqa: BLE001
+            logger.error("risk_outcome_cache_hydrate_failed", exc_info=True)
+            self._hydrated = True
+            return
+
+        prefix = f"{_CACHE_SCHEMA_VERSION}:"
+        loaded = 0
+        for row in rows:
+            if not row.cache_key.startswith(prefix):
+                continue
+            try:
+                risks = [_risk_from_dict(d) for d in row.risks_json]
+                flagged = [_risk_from_dict(d) for d in row.risks_flagged_json]
+                notes = [_note_from_dict(d) for d in row.notes_json]
+            except (KeyError, TypeError, ValueError):
+                logger.warning(
+                    "risk_outcome_cache_row_skipped_bad_shape",
+                    drive_item_id=row.drive_item_id,
+                )
+                continue
+            self._file_cache[row.drive_item_id] = _FileCacheEntry(
+                risks=risks,
+                notes=notes,
+                cache_key=row.cache_key,
+                risks_flagged=flagged,
+            )
+            loaded += 1
+
+        self._hydrated = True
+        logger.info(
+            "risk_outcome_cache_hydrated",
+            rows_loaded=loaded,
+            rows_total=len(rows),
+        )
+
+    async def _persist_entry(
+        self,
+        *,
+        drive_item_id: str,
+        airport: str,
+        source_file: str,
+        entry: _FileCacheEntry,
+    ) -> None:
+        """Write one extracted file's results to the persistent cache."""
+        try:
+            async with async_session_factory() as session:
+                repo = RiskOutcomeCacheRepository(session)
+                await repo.upsert(
+                    drive_item_id=drive_item_id,
+                    cache_key=entry.cache_key,
+                    airport_identifier=airport,
+                    source_file=source_file,
+                    risks_json=[dataclasses.asdict(r) for r in entry.risks],
+                    risks_flagged_json=[dataclasses.asdict(r) for r in entry.risks_flagged],
+                    notes_json=[dataclasses.asdict(n) for n in entry.notes],
+                )
+        except Exception:  # noqa: BLE001
+            logger.error(
+                "risk_outcome_cache_persist_failed",
+                drive_item_id=drive_item_id,
+                exc_info=True,
+            )
+
+    async def _persist_evictions(self, fresh_ids: set[str]) -> None:
+        """Drop persisted rows for files that are no longer in SharePoint."""
+        try:
+            async with async_session_factory() as session:
+                repo = RiskOutcomeCacheRepository(session)
+                deleted = await repo.delete_missing(fresh_ids)
+        except Exception:  # noqa: BLE001
+            logger.error("risk_outcome_cache_evict_failed", exc_info=True)
+            return
+        if deleted:
+            logger.info("risk_outcome_cache_evicted", rows_deleted=deleted)
+
     async def _run_scan(self) -> None:
         """Background scan: discover files, extract new/changed PDFs via LLM.
 
         Runs under an asyncio Task with no lock held; updates progress via
         the lock for each file as it completes.
         """
+        await self._hydrate_from_db()
         try:
             airports = await self._crawler.list_airport_folders()
             files = await self._crawler.list_risk_outcome_files()
@@ -900,6 +1022,10 @@ class RiskOutcomeImporter:
             )
             self._scanned = 0
             self._total = len(tasks)
+
+        # Persist evictions outside the in-memory lock so a slow DB call
+        # cannot block scan-progress reads from the API.
+        await self._persist_evictions(fresh_ids)
 
         sem = asyncio.Semaphore(_MAX_PARALLEL_EXTRACTIONS)
 
@@ -966,14 +1092,21 @@ class RiskOutcomeImporter:
                             message=f"scan failed: {exc}",
                         )
                     ]
+                entry = _FileCacheEntry(
+                    risks=clean,
+                    notes=notes,
+                    cache_key=_build_cache_key(f.drive_item_id, f.size, f.content_type),
+                    risks_flagged=flagged,
+                )
                 async with self._lock:
-                    self._file_cache[f.drive_item_id] = _FileCacheEntry(
-                        risks=clean,
-                        notes=notes,
-                        cache_key=_build_cache_key(f.drive_item_id, f.size, f.content_type),
-                        risks_flagged=flagged,
-                    )
+                    self._file_cache[f.drive_item_id] = entry
                     self._scanned += 1
+                await self._persist_entry(
+                    drive_item_id=f.drive_item_id,
+                    airport=airport,
+                    source_file=f.name,
+                    entry=entry,
+                )
 
         await asyncio.gather(*[process(a, f) for a, f in tasks])
 

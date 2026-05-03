@@ -6,6 +6,7 @@ from app.models.notification import Notification
 from app.models.organization import Organization
 from app.models.organization_membership import OrganizationMembership
 from app.models.risk import AirportSubLocation, Mitigation, RiskEntry
+from app.models.risk_outcome_cache import RiskOutcomeCache
 from app.models.risk_threshold import RiskAlertThreshold
 from app.models.rr_sync import (
     ACPIntelligenceItem,
@@ -35,6 +36,7 @@ __all__ = [
     "PendingSyncChange",
     "RiskAlertThreshold",
     "RiskEntry",
+    "RiskOutcomeCache",
     "RiskRecordLink",
     "User",
     "Workflow",
