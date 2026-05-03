@@ -2153,17 +2153,19 @@ workflow and version-controlled accordingly."""
 
 # --- Follow-up suggestions ---
 # Appended to the non-Risk-Register prompts. Tells the model to emit a
-# machine-readable block of clickable next-step chips at the very end of any
-# response that ends in a question or offer to continue. The frontend strips
-# the block from the rendered text and shows the chips below the message.
+# machine-readable block of clickable next-step chips at the very end of every
+# response. The frontend strips the block from the rendered text and shows the
+# chips below the message.
 _FOLLOWUPS_INSTRUCTION = """\
 
 
 --- Follow-up Suggestions ---
-At the very end of your response, if and only if your response ends with a \
-question, an offer to do more work, or a list of possible next steps, append a \
-<followups> block that lists 2-4 next-step suggestions the user can click. \
-Omit the block entirely if there are no natural next steps.
+At the very end of EVERY response, append a <followups> block listing 2-4 \
+next-step suggestions the user can click. This is mandatory — never omit it. \
+If no continuation is obvious, generate plausible adjacent next steps: dig \
+deeper into a sub-topic, broaden the scope, switch to a related mode (run an \
+SRA on a hazard you mentioned, add a hazard to the risk register, expand a \
+PHL), compare against regulatory guidance, or export/document the result.
 
 Format (one suggestion per line, pipe-delimited):
 <followups>
