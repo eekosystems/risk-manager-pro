@@ -6,7 +6,8 @@ export const ALLOWED_MIME_TYPES = new Set([
   "text/plain",
 ]);
 
-export const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024; // 50 MB
+export const MAX_FILE_SIZE_BYTES = 250 * 1024 * 1024; // 250 MB
+export const MAX_FILE_SIZE_LABEL = "250 MB";
 
 export interface ValidatedFile {
   id: string;
@@ -31,7 +32,7 @@ export function validateFiles(fileList: FileList): ValidationResult {
       continue;
     }
     if (f.size > MAX_FILE_SIZE_BYTES) {
-      errors.push(`"${f.name}" exceeds the 50 MB size limit`);
+      errors.push(`"${f.name}" exceeds the ${MAX_FILE_SIZE_LABEL} size limit`);
       continue;
     }
     valid.push({

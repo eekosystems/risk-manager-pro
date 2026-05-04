@@ -67,7 +67,7 @@ class Settings(BaseSettings):
     # Document processing
     chunk_size_tokens: int = 500
     chunk_overlap_tokens: int = 50
-    max_file_size_bytes: int = 50 * 1024 * 1024  # 50 MB
+    max_file_size_bytes: int = 250 * 1024 * 1024  # 250 MB
     embedding_batch_size: int = 100
     search_index_batch_size: int = 100
     processing_concurrency: int = 5

@@ -11,7 +11,7 @@ import { useQueryClient } from "@tanstack/react-query";
 
 import { useDocuments, useUploadDocument } from "@/hooks/use-documents";
 import { useOrganizationContext } from "@/hooks/use-organization-context";
-import { validateFiles } from "@/lib/file-validation";
+import { MAX_FILE_SIZE_LABEL, validateFiles } from "@/lib/file-validation";
 import { logger } from "@/lib/logger";
 import type { DocumentItem, DocumentStatus } from "@/types/api";
 
@@ -361,7 +361,7 @@ export function DocumentDropZone() {
               ? "Drop files here"
               : "Drop files or click to upload"}
         </span>
-        <span className="text-[10px] text-gray-400">PDF, DOCX, TXT (max 50 MB)</span>
+        <span className="text-[10px] text-gray-400">PDF, DOCX, TXT (max {MAX_FILE_SIZE_LABEL})</span>
       </button>
 
       {uploadErrors.length > 0 && (
