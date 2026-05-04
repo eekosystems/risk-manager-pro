@@ -1,4 +1,6 @@
 import axios from "axios";
+import { clsx } from "clsx";
+import { ArrowRight } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { getDocumentById } from "@/api/documents";
@@ -6,8 +8,8 @@ import { FUNCTIONS } from "@/constants/functions";
 import { useConversation, useEmailChatMessage, useSendMessage } from "@/hooks/use-chat";
 import { useUploadDocument } from "@/hooks/use-documents";
 import { useToast } from "@/hooks/use-toast";
+import { extractFollowups, type Followup } from "@/lib/followups";
 import { logger } from "@/lib/logger";
-import type { Followup } from "@/lib/followups";
 import type { ChatMessage, FunctionType } from "@/types/api";
 
 import { ChatInput } from "./chat-input";
@@ -116,6 +118,7 @@ export function ChatPage({
   const [isTyping, setIsTyping] = useState(false);
   const [emailTargetContent, setEmailTargetContent] = useState<string | null>(null);
   const [followupSeed, setFollowupSeed] = useState<string | null>(null);
+  const [inputIsEmpty, setInputIsEmpty] = useState(true);
   const lockedFunctionRef = useRef<FunctionType | null>(null);
   const { addToast } = useToast();
   const emailChatMutation = useEmailChatMessage();
@@ -340,6 +343,19 @@ export function ChatPage({
     addToast("Copy failed — select the text manually", "error");
   }, [addToast]);
 
+  const latestFollowups = useMemo<Followup[]>(() => {
+    for (let i = localMessages.length - 1; i >= 0; i--) {
+      const m = localMessages[i];
+      if (!m || m.role !== "assistant") continue;
+      if (m.id.startsWith("welcome")) return [];
+      return extractFollowups(m.content).followups;
+    }
+    return [];
+  }, [localMessages]);
+
+  const panelVisible =
+    latestFollowups.length > 0 && inputIsEmpty && !isTyping;
+
   return (
     <>
       <MessageList
@@ -348,15 +364,24 @@ export function ChatPage({
         {...(EMAIL_ON_CHAT_OUTPUT_ENABLED ? { onEmail: handleEmail } : {})}
         onCopied={handleCopied}
         onCopyFailed={handleCopyFailed}
-        onFollowupClick={handleFollowupClick}
       />
-      <ChatInput
-        onSend={handleSend}
-        disabled={sendMessageMutation.isPending}
-        seedValue={followupSeed ?? pendingInputSeed}
-        onSeedConsumed={handleSeedConsumed}
-        activeFunction={activeFunction}
-      />
+      <div className="relative">
+        <FollowupPanel
+          followups={latestFollowups}
+          visible={panelVisible}
+          onClick={handleFollowupClick}
+        />
+        <div className="relative z-10">
+          <ChatInput
+            onSend={handleSend}
+            disabled={sendMessageMutation.isPending}
+            seedValue={followupSeed ?? pendingInputSeed}
+            onSeedConsumed={handleSeedConsumed}
+            activeFunction={activeFunction}
+            onInputChange={(value) => setInputIsEmpty(value.trim().length === 0)}
+          />
+        </div>
+      </div>
       {emailTargetContent !== null && (
         <EmailChatModal
           content={emailTargetContent}
@@ -366,5 +391,54 @@ export function ChatPage({
         />
       )}
     </>
+  );
+}
+
+interface FollowupPanelProps {
+  followups: Followup[];
+  visible: boolean;
+  onClick: (followup: Followup) => void;
+}
+
+function FollowupPanel({ followups, visible, onClick }: FollowupPanelProps) {
+  return (
+    <div
+      className="pointer-events-none absolute inset-x-0 bottom-full overflow-hidden"
+      aria-hidden={!visible}
+    >
+      <div
+        className={clsx(
+          "transition-transform duration-300 ease-out",
+          visible
+            ? "translate-y-0 pointer-events-auto"
+            : "translate-y-full",
+        )}
+      >
+        <div className="mx-auto max-w-3xl px-6 pb-3">
+          <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-lg shadow-gray-900/10">
+            <p className="mb-3 text-xs font-medium uppercase tracking-wider text-gray-500">
+              What would you like to do next?
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {followups.map((f, i) => (
+                <button
+                  key={`${f.kind === "navigate" ? f.target : f.mode}-${i}`}
+                  type="button"
+                  onClick={() => onClick(f)}
+                  className="group inline-flex items-center justify-between gap-1.5 rounded-xl border border-brand-200 bg-brand-50 px-3 py-2.5 text-xs font-medium text-brand-700 transition-colors hover:border-brand-300 hover:bg-brand-100"
+                  tabIndex={visible ? 0 : -1}
+                >
+                  <span className="truncate text-left">{f.label}</span>
+                  <ArrowRight
+                    size={12}
+                    className="shrink-0 opacity-60 transition-opacity group-hover:opacity-100"
+                  />
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

@@ -19,6 +19,7 @@ interface ChatInputProps {
   seedValue?: string | null;
   onSeedConsumed?: () => void;
   activeFunction?: FunctionType;
+  onInputChange?: (value: string) => void;
 }
 
 export function ChatInput({
@@ -27,6 +28,7 @@ export function ChatInput({
   seedValue,
   onSeedConsumed,
   activeFunction,
+  onInputChange,
 }: ChatInputProps) {
   const modeLabel = activeFunction
     ? FUNCTIONS.find((f) => f.id === activeFunction)?.name ?? null
@@ -40,6 +42,7 @@ export function ChatInput({
   useEffect(() => {
     if (seedValue) {
       setInput(seedValue);
+      onInputChange?.(seedValue);
       onSeedConsumed?.();
       requestAnimationFrame(() => {
         const el = textareaRef.current;
@@ -49,7 +52,7 @@ export function ChatInput({
         el.scrollTop = el.scrollHeight;
       });
     }
-  }, [seedValue, onSeedConsumed]);
+  }, [seedValue, onSeedConsumed, onInputChange]);
 
   useLayoutEffect(() => {
     const el = textareaRef.current;
@@ -65,8 +68,9 @@ export function ChatInput({
       files.map((f) => f.file),
     );
     setInput("");
+    onInputChange?.("");
     clearFiles();
-  }, [input, files, onSend, clearFiles]);
+  }, [input, files, onSend, clearFiles, onInputChange]);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -144,7 +148,10 @@ export function ChatInput({
           <textarea
             ref={textareaRef}
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={(e) => {
+              setInput(e.target.value);
+              onInputChange?.(e.target.value);
+            }}
             onKeyDown={handleKeyDown}
             placeholder="Describe system changes, ask about regulations, or request analysis..."
             className="max-h-[200px] min-h-[44px] flex-1 resize-none overflow-y-auto bg-transparent text-sm leading-6 text-gray-800 placeholder:text-gray-400 focus:outline-none"
