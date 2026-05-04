@@ -409,9 +409,7 @@ class ChatService:
     ) -> ChatResponse:
         conversation = await self._resolve_conversation(request, user, organization_id)
         routed_function = await self._route_function_type(request, conversation)
-        await self._pin_risk_register_if_routed(
-            conversation, routed_function, organization_id
-        )
+        await self._pin_risk_register_if_routed(conversation, routed_function, organization_id)
 
         await self._repo.add_message(
             conversation_id=conversation.id,
@@ -509,9 +507,7 @@ class ChatService:
         """
         conversation = await self._resolve_conversation(request, user, organization_id)
         routed_function = await self._route_function_type(request, conversation)
-        await self._pin_risk_register_if_routed(
-            conversation, routed_function, organization_id
-        )
+        await self._pin_risk_register_if_routed(conversation, routed_function, organization_id)
 
         await self._repo.add_message(
             conversation_id=conversation.id,
