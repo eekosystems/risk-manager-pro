@@ -268,7 +268,7 @@ function FollowupChips({
     <div className="mt-3 flex flex-wrap gap-2">
       {followups.map((f, i) => (
         <button
-          key={`${f.mode}-${i}`}
+          key={`${f.kind === "navigate" ? f.target : f.mode}-${i}`}
           type="button"
           onClick={() => onClick(f)}
           className="group inline-flex items-center gap-1.5 rounded-full border border-brand-200 bg-brand-50 px-3 py-1.5 text-xs font-medium text-brand-700 transition-colors hover:border-brand-300 hover:bg-brand-100"
