@@ -376,11 +376,42 @@ class ChatService:
             request.message, self._openai, fallback=request.function_type
         )
 
+    async def _pin_risk_register_if_routed(
+        self,
+        conversation: Conversation,
+        routed_function: FunctionType,
+        organization_id: uuid.UUID,
+    ) -> None:
+        """Persist a flip into Risk Register on the conversation row.
+
+        When a chip click routes a non-Risk-Register conversation into
+        Risk Register, the first turn rides on `routing_locked=true` and
+        works fine. But the user's follow-up replies ("KSFO", "Severity 3")
+        come back with `routing_locked=false`, and the smart-routing
+        classifier won't recognize a one-word reply as Risk Register —
+        so the model loses RR_TOOLS and `save_risk_register_record` is
+        never called. Pinning the conversation's `function_type` here
+        means guard 3 in `_route_function_type` keeps every subsequent
+        turn in Risk Register until the chat ends.
+        """
+        if routed_function != FunctionType.RISK_REGISTER:
+            return
+        if conversation.function_type == FunctionType.RISK_REGISTER:
+            return
+        await self._repo.set_function_type(
+            conversation_id=conversation.id,
+            organization_id=organization_id,
+            function_type=FunctionType.RISK_REGISTER,
+        )
+
     async def process_message(
         self, request: ChatRequest, user: User, organization_id: uuid.UUID
     ) -> ChatResponse:
         conversation = await self._resolve_conversation(request, user, organization_id)
         routed_function = await self._route_function_type(request, conversation)
+        await self._pin_risk_register_if_routed(
+            conversation, routed_function, organization_id
+        )
 
         await self._repo.add_message(
             conversation_id=conversation.id,
@@ -478,6 +509,9 @@ class ChatService:
         """
         conversation = await self._resolve_conversation(request, user, organization_id)
         routed_function = await self._route_function_type(request, conversation)
+        await self._pin_risk_register_if_routed(
+            conversation, routed_function, organization_id
+        )
 
         await self._repo.add_message(
             conversation_id=conversation.id,

@@ -124,6 +124,21 @@ class ConversationRepository:
         result = await self._db.execute(stmt)
         return list(result.scalars().all())
 
+    async def set_function_type(
+        self,
+        conversation_id: uuid.UUID,
+        organization_id: uuid.UUID,
+        function_type: FunctionType,
+    ) -> bool:
+        conversation = await self.get_by_id(conversation_id, organization_id)
+        if not conversation:
+            return False
+        if conversation.function_type == function_type:
+            return False
+        conversation.function_type = function_type
+        await self._db.flush()
+        return True
+
     async def archive(
         self,
         conversation_id: uuid.UUID,
