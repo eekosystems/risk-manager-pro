@@ -1,13 +1,6 @@
 import { clsx } from "clsx";
 import { format } from "date-fns";
-import {
-  ArrowRight,
-  Check,
-  Copy,
-  Download,
-  Mail,
-  ShieldAlert,
-} from "lucide-react";
+import { ArrowRight, Check, Copy, Download, Mail } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { exportTextToPdf } from "@/lib/export-pdf";
@@ -26,7 +19,6 @@ import { MarkdownContent } from "./markdown-content";
 interface MessageListProps {
   messages: ChatMessage[];
   isTyping: boolean;
-  onSaveAsRisk?: (messageContent: string) => void;
   onEmail?: (messageContent: string) => void;
   onCopied?: () => void;
   onCopyFailed?: () => void;
@@ -41,7 +33,6 @@ interface SelectedCitation {
 export function MessageList({
   messages,
   isTyping,
-  onSaveAsRisk,
   onEmail,
   onCopied,
   onCopyFailed,
@@ -191,13 +182,6 @@ export function MessageList({
               )}
               {msg.role === "assistant" && !msg.id.startsWith("welcome") && (
                 <div className="mt-1 ml-1 flex flex-wrap items-center gap-1">
-                  {onSaveAsRisk && (
-                    <ActionButton
-                      icon={<ShieldAlert size={12} />}
-                      label="Add to Risk Registry"
-                      onClick={() => onSaveAsRisk(msg.content)}
-                    />
-                  )}
                   <ActionButton
                     icon={
                       copiedMessageId === msg.id ? (

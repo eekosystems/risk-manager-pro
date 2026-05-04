@@ -80,17 +80,6 @@ const WELCOME_MESSAGES: Record<FunctionType, string> = {
     "or Accountable Executive review and approval before the record is finalized.",
 };
 
-function buildRiskRegisterSeed(assistantContent: string): string {
-  const trimmed = assistantContent.trim();
-  return (
-    "Please extract the hazard(s) from the analysis below and add them to the " +
-    "Risk Register. Ask me any follow-up questions you need (airport, operational " +
-    "domain, existing controls, etc.) before saving.\n\n" +
-    "--- Analysis from prior chat ---\n\n" +
-    trimmed
-  );
-}
-
 function buildWelcomeMessage(functionType: FunctionType): ChatMessage {
   return {
     id: `welcome-${functionType}`,
@@ -301,18 +290,6 @@ export function ChatPage({
     ],
   );
 
-  const handleSaveAsRisk = useCallback(
-    (messageContent: string) => {
-      const seed = buildRiskRegisterSeed(messageContent);
-      onStartChat("risk_register", seed);
-      addToast(
-        "Carried the analysis into Risk Register mode — review and send to save.",
-        "success",
-      );
-    },
-    [onStartChat, addToast],
-  );
-
   const handleEmail = useCallback((content: string) => {
     setEmailTargetContent(content);
   }, []);
@@ -370,7 +347,6 @@ export function ChatPage({
       <MessageList
         messages={localMessages}
         isTyping={isTyping}
-        onSaveAsRisk={handleSaveAsRisk}
         {...(EMAIL_ON_CHAT_OUTPUT_ENABLED ? { onEmail: handleEmail } : {})}
         onCopied={handleCopied}
         onCopyFailed={handleCopyFailed}
