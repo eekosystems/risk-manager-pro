@@ -20,7 +20,6 @@ export function App() {
                   activeFunction,
                   conversationId,
                   setConversationId,
-                  onStartChat,
                   onFunctionRouted,
                   onNavigateRiskRegister,
                   pendingInputSeed,
@@ -30,7 +29,6 @@ export function App() {
                     activeFunction={activeFunction}
                     conversationId={conversationId}
                     setConversationId={setConversationId}
-                    onStartChat={onStartChat}
                     onFunctionRouted={onFunctionRouted}
                     onNavigateRiskRegister={onNavigateRiskRegister}
                     pendingInputSeed={pendingInputSeed}

@@ -74,7 +74,6 @@ interface AppLayoutProps {
     activeFunction: FunctionType;
     conversationId: string | null;
     setConversationId: (id: string | null) => void;
-    onStartChat: (fn: FunctionType, seed?: string) => void;
     onFunctionRouted: (fn: FunctionType) => void;
     onNavigateRiskRegister: () => void;
     pendingInputSeed: string | null;
@@ -210,7 +209,6 @@ export function AppLayout({ children }: AppLayoutProps) {
             activeFunction,
             conversationId,
             setConversationId,
-            onStartChat: startChat,
             onFunctionRouted: setActiveFunction,
             onNavigateRiskRegister: () => setCurrentView("risk-register"),
             pendingInputSeed,
