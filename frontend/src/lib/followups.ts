@@ -1,10 +1,17 @@
 import type { FunctionType } from "@/types/api";
 
-export interface Followup {
-  mode: FunctionType;
-  label: string;
-  prefill: string;
-}
+export type Followup =
+  | {
+      kind: "send";
+      mode: FunctionType;
+      label: string;
+      prefill: string;
+    }
+  | {
+      kind: "navigate";
+      target: "risk-register";
+      label: string;
+    };
 
 const MODE_MAP: Record<string, FunctionType> = {
   general: "general",
@@ -13,6 +20,10 @@ const MODE_MAP: Record<string, FunctionType> = {
   phl: "phl",
   sra: "sra",
   risk_register: "risk_register",
+};
+
+const NAV_MAP: Record<string, "risk-register"> = {
+  view_risk_register: "risk-register",
 };
 
 const FOLLOWUPS_RE = /<followups>([\s\S]*?)<\/followups>\s*$/i;
@@ -32,14 +43,22 @@ export function extractFollowups(content: string): {
     const line = rawLine.trim();
     if (!line) continue;
     const parts = line.split("|").map((p) => p.trim());
-    if (parts.length < 3) continue;
+    if (parts.length < 2) continue;
     const [modeRaw, label, ...prefillParts] = parts;
     if (!modeRaw || !label) continue;
-    const mode = MODE_MAP[modeRaw.toLowerCase()];
+    const modeKey = modeRaw.toLowerCase();
+
+    const navTarget = NAV_MAP[modeKey];
+    if (navTarget) {
+      followups.push({ kind: "navigate", target: navTarget, label });
+      continue;
+    }
+
+    const mode = MODE_MAP[modeKey];
     if (!mode) continue;
     const prefill = prefillParts.join(" | ").trim();
     if (!prefill) continue;
-    followups.push({ mode, label, prefill });
+    followups.push({ kind: "send", mode, label, prefill });
   }
 
   const cleaned = content.slice(0, match.index).trimEnd();
@@ -48,4 +67,16 @@ export function extractFollowups(content: string): {
 
 export function stripFollowupsBlock(content: string): string {
   return content.replace(FOLLOWUPS_RE, "").trimEnd();
+}
+
+// The PHL prompt asks the model to emit a `<rr_payload>...</rr_payload>` block
+// containing structured JSON for ingestion into the Risk Register. That block
+// is for downstream tooling — the user should never see it in chat. Strip it
+// (and any leading fenced-code wrapper the model occasionally adds around it)
+// before rendering.
+const RR_PAYLOAD_RE =
+  /(?:```[a-zA-Z]*\s*)?<rr_payload>[\s\S]*?<\/rr_payload>(?:\s*```)?/gi;
+
+export function stripRrPayloadBlock(content: string): string {
+  return content.replace(RR_PAYLOAD_RE, "").trimEnd();
 }

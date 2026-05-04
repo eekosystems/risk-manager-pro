@@ -107,6 +107,7 @@ interface ChatPageProps {
   setConversationId: (id: string | null) => void;
   onStartChat: (fn: FunctionType, seed?: string) => void;
   onFunctionRouted: (fn: FunctionType) => void;
+  onNavigateRiskRegister: () => void;
   pendingInputSeed: string | null;
   clearPendingInputSeed: () => void;
 }
@@ -117,6 +118,7 @@ export function ChatPage({
   setConversationId,
   onStartChat,
   onFunctionRouted,
+  onNavigateRiskRegister,
   pendingInputSeed,
   clearPendingInputSeed,
 }: ChatPageProps) {
@@ -336,10 +338,19 @@ export function ChatPage({
     [emailChatMutation, addToast],
   );
 
-  const handleFollowupClick = useCallback((followup: Followup) => {
-    lockedFunctionRef.current = followup.mode;
-    setFollowupSeed(followup.prefill);
-  }, []);
+  const handleFollowupClick = useCallback(
+    (followup: Followup) => {
+      if (followup.kind === "navigate") {
+        if (followup.target === "risk-register") {
+          onNavigateRiskRegister();
+        }
+        return;
+      }
+      lockedFunctionRef.current = followup.mode;
+      setFollowupSeed(followup.prefill);
+    },
+    [onNavigateRiskRegister],
+  );
 
   const handleSeedConsumed = useCallback(() => {
     setFollowupSeed(null);

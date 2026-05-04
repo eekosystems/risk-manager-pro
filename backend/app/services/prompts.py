@@ -592,7 +592,11 @@ Leading, Predictive, or hybrid, with confidence score and brief justification.
 Medium or higher for Full SRA.
 
 Output Requirements
-Structured JSON (for database ingestion into Risk Register). Human-readable \
+Structured JSON (for database ingestion into Risk Register) wrapped in a single \
+`<rr_payload>...</rr_payload>` block at the very end of the response, after the \
+human-readable content but before the `<followups>` block. The frontend hides \
+this block from the user — never reference it in your prose, never put it \
+inside a fenced code block, and never emit it twice. Human-readable \
 executive summary + full PHL table. Traceable citations explicitly noting "FG SRM \
 Document, Similar Airport [Identifier], [Date], 70% weighted precedent" and showing \
 the 70% weighting so the user can consider it and override. Clear recommendation: \
@@ -2152,10 +2156,10 @@ workflow and version-controlled accordingly."""
 
 
 # --- Follow-up suggestions ---
-# Appended to the non-Risk-Register prompts. Tells the model to emit a
-# machine-readable block of clickable next-step chips at the very end of every
-# response. The frontend strips the block from the rendered text and shows the
-# chips below the message.
+# Appended to every prompt. Tells the model to emit a machine-readable block
+# of clickable next-step chips at the very end of every response. The frontend
+# strips the block from the rendered text and shows the chips below the
+# message.
 _FOLLOWUPS_INSTRUCTION = """\
 
 
@@ -2172,11 +2176,15 @@ Format (one suggestion per line, pipe-delimited):
 mode | Button label (max 60 chars) | Pre-fill text shown in the input box
 </followups>
 
-- mode must be one of: general, system, phl, sra, risk_register
+- mode must be one of: general, system, phl, sra, risk_register, view_risk_register
 - Pick the mode that best matches what the suggestion would actually do.
 - Button label is short (what fits on a small button).
 - Pre-fill text is what the user would naturally type to take that action; \
 specific, complete, ready to send.
+- `view_risk_register` is a navigation chip that opens the Risk Register page \
+instead of sending a chat message. Use the literal label "View Risk Register". \
+The pre-fill field is ignored for this mode — pass a single hyphen `-` as a \
+placeholder.
 
 Example:
 <followups>
@@ -2189,7 +2197,23 @@ Do not reference the <followups> block in the body of your response. Do not \
 emit the block in the middle of your response — only at the very end."""
 
 
+# Risk Register replies must always include a chip that opens the Risk
+# Register page so the user can verify the record they just saved.
+_RISK_REGISTER_FOLLOWUPS_ADDENDUM = """\
+
+
+--- Risk Register Chip Requirement ---
+When responding in Risk Register mode, one of the chips in the <followups> \
+block MUST be a `view_risk_register` navigation chip with the literal label \
+"View Risk Register". The remaining 1-3 chips should be `risk_register` \
+(e.g. add another hazard, update an existing record) or `sra` (run an SRA on \
+the hazard just captured)."""
+
+
 GENERAL_PROMPT = GENERAL_PROMPT + _FOLLOWUPS_INSTRUCTION
 SYSTEM_ANALYSIS_PROMPT = SYSTEM_ANALYSIS_PROMPT + _FOLLOWUPS_INSTRUCTION
 PHL_PROMPT = PHL_PROMPT + _FOLLOWUPS_INSTRUCTION
 SRA_PROMPT = SRA_PROMPT + _FOLLOWUPS_INSTRUCTION
+RISK_REGISTER_PROMPT = (
+    RISK_REGISTER_PROMPT + _FOLLOWUPS_INSTRUCTION + _RISK_REGISTER_FOLLOWUPS_ADDENDUM
+)

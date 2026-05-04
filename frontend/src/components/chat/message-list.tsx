@@ -11,7 +11,12 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { exportTextToPdf } from "@/lib/export-pdf";
-import { extractFollowups, type Followup } from "@/lib/followups";
+import {
+  extractFollowups,
+  stripFollowupsBlock,
+  stripRrPayloadBlock,
+  type Followup,
+} from "@/lib/followups";
 import type { ChatMessage, Citation } from "@/types/api";
 
 import { CitationChip } from "./citation-chip";
@@ -202,19 +207,21 @@ export function MessageList({
                       )
                     }
                     label={copiedMessageId === msg.id ? "Copied" : "Copy"}
-                    onClick={() => handleCopy(msg.id, msg.content)}
+                    onClick={() =>
+                      handleCopy(msg.id, cleanForExport(msg.content))
+                    }
                   />
                   {onEmail && (
                     <ActionButton
                       icon={<Mail size={12} />}
                       label="Send Email"
-                      onClick={() => onEmail(msg.content)}
+                      onClick={() => onEmail(cleanForExport(msg.content))}
                     />
                   )}
                   <ActionButton
                     icon={<Download size={12} />}
                     label="Export PDF"
-                    onClick={() => exportTextToPdf(msg.content)}
+                    onClick={() => exportTextToPdf(cleanForExport(msg.content))}
                   />
                 </div>
               )}
@@ -260,6 +267,10 @@ function ActionButton({ icon, label, onClick }: ActionButtonProps) {
       {label}
     </button>
   );
+}
+
+function cleanForExport(content: string): string {
+  return stripRrPayloadBlock(stripFollowupsBlock(content));
 }
 
 function FollowupChips({

@@ -3,7 +3,7 @@ import { useMemo } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 
-import { stripFollowupsBlock } from "@/lib/followups";
+import { stripFollowupsBlock, stripRrPayloadBlock } from "@/lib/followups";
 import type { Citation } from "@/types/api";
 
 /* ------------------------------------------------------------------ */
@@ -203,7 +203,9 @@ export function MarkdownContent({
   citations,
   onCitationClick,
 }: MarkdownContentProps) {
-  const cleaned = stripLegacySections(stripFollowupsBlock(content));
+  const cleaned = stripLegacySections(
+    stripRrPayloadBlock(stripFollowupsBlock(content)),
+  );
   const processed = citations?.length
     ? preprocessCitations(cleaned)
     : cleaned;

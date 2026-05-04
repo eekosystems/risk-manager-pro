@@ -76,6 +76,7 @@ interface AppLayoutProps {
     setConversationId: (id: string | null) => void;
     onStartChat: (fn: FunctionType, seed?: string) => void;
     onFunctionRouted: (fn: FunctionType) => void;
+    onNavigateRiskRegister: () => void;
     pendingInputSeed: string | null;
     clearPendingInputSeed: () => void;
   }) => React.ReactNode;
@@ -211,6 +212,7 @@ export function AppLayout({ children }: AppLayoutProps) {
             setConversationId,
             onStartChat: startChat,
             onFunctionRouted: setActiveFunction,
+            onNavigateRiskRegister: () => setCurrentView("risk-register"),
             pendingInputSeed,
             clearPendingInputSeed,
           })
