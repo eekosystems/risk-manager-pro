@@ -120,6 +120,82 @@ def _build_context_block(results: list[SearchResult]) -> str:
     return "\n\n---\n\n".join(sections)
 
 
+# The frontend picks up suggestion chips by matching `<followups>...</followups>`
+# at the very end of the assistant content. The model is instructed to emit this
+# block on every reply, but on long outputs (especially PHL, which also emits an
+# `<rr_payload>` block) it occasionally truncates or omits it. The helpers below
+# detect that case and inject a mode-appropriate default so the user always sees
+# next-step chips.
+_FOLLOWUPS_END_RE = re.compile(
+    r"<followups>[\s\S]*?</followups>\s*$",
+    re.IGNORECASE,
+)
+_FOLLOWUPS_OPEN_RE = re.compile(r"<followups>", re.IGNORECASE)
+_FOLLOWUPS_CLOSE_RE = re.compile(r"</followups>", re.IGNORECASE)
+
+_DEFAULT_FOLLOWUPS_BY_FUNCTION: dict[FunctionType, str] = {
+    FunctionType.GENERAL: (
+        "sra | Run an SRA on a hazard | Run a Safety Risk Assessment on a hazard from this discussion.\n"
+        "phl | Generate a PHL | Generate a Preliminary Hazard List from the system or change we discussed.\n"
+        "general | Cite regulatory guidance | Cite the relevant FAA, ICAO, or EASA guidance for this topic.\n"
+        "view_risk_register | View Risk Register | -"
+    ),
+    FunctionType.SYSTEM_ANALYSIS: (
+        "phl | Generate PHL from this system | Generate a Preliminary Hazard List from this system description.\n"
+        "sra | Run an SRA | Run a Safety Risk Assessment on a hazard from this system.\n"
+        "system | Identify interfaces | What other systems or interfaces should we consider?\n"
+        "view_risk_register | View Risk Register | -"
+    ),
+    FunctionType.PHL: (
+        "sra | Run SRA on top hazard | Run a Safety Risk Assessment on the highest-risk hazard from this PHL.\n"
+        "risk_register | Add hazards to Risk Register | Add the hazards from this PHL to the Risk Register.\n"
+        "phl | Identify additional hazards | Identify additional hazards we may have missed in this PHL.\n"
+        "view_risk_register | View Risk Register | -"
+    ),
+    FunctionType.SRA: (
+        "risk_register | Add to Risk Register | Add this assessed hazard to the Risk Register.\n"
+        "sra | Re-run with different controls | Re-run this SRA evaluating different proposed controls.\n"
+        "general | Explain the residual score | Explain how the residual risk score was derived.\n"
+        "view_risk_register | View Risk Register | -"
+    ),
+    FunctionType.RISK_REGISTER: (
+        "view_risk_register | View Risk Register | -\n"
+        "risk_register | Add another hazard | I'd like to add another hazard to the Risk Register.\n"
+        "sra | Run SRA on this hazard | Run a Safety Risk Assessment on the hazard I just captured.\n"
+        "phl | Generate a related PHL | Generate a Preliminary Hazard List for the related system."
+    ),
+}
+
+
+def _build_default_followups_block(function_type: FunctionType) -> str:
+    body = _DEFAULT_FOLLOWUPS_BY_FUNCTION.get(
+        function_type, _DEFAULT_FOLLOWUPS_BY_FUNCTION[FunctionType.GENERAL]
+    )
+    return f"<followups>\n{body}\n</followups>"
+
+
+def _ensure_followups_block(content: str, function_type: FunctionType) -> tuple[str, str | None]:
+    """Guarantee the assistant content ends with a parseable <followups> block.
+
+    Returns (final_content, appended_text). `appended_text` is None when the
+    model already emitted a valid block; otherwise it is the suffix that was
+    appended (so streaming callers can replay it as deltas).
+    """
+    if _FOLLOWUPS_END_RE.search(content):
+        return content, None
+
+    cleaned = content
+    open_count = len(_FOLLOWUPS_OPEN_RE.findall(cleaned))
+    close_count = len(_FOLLOWUPS_CLOSE_RE.findall(cleaned))
+    if open_count > close_count:
+        last_open = list(_FOLLOWUPS_OPEN_RE.finditer(cleaned))[-1]
+        cleaned = cleaned[: last_open.start()].rstrip()
+
+    block = _build_default_followups_block(function_type)
+    suffix = ("\n\n" if cleaned else "") + block
+    return cleaned + suffix, suffix
+
+
 def _extract_citations(results: list[SearchResult]) -> list[CitationSchema]:
     total = len(results)
     return [
@@ -457,6 +533,18 @@ class ChatService:
                 temperature=model_config.temperature,
                 max_tokens=model_config.max_output_tokens,
             )
+
+        assistant_content, appended_followups = _ensure_followups_block(
+            assistant_content, routed_function
+        )
+        if appended_followups is not None:
+            logger.info(
+                "followups_block_injected",
+                conversation_id=str(conversation.id),
+                function_type=routed_function.value,
+                streaming=False,
+            )
+
         citations = _extract_citations(search_results) if search_results else None
 
         try:
@@ -566,6 +654,18 @@ class ChatService:
             return
 
         assistant_content = "".join(buffered)
+        assistant_content, appended_followups = _ensure_followups_block(
+            assistant_content, routed_function
+        )
+        if appended_followups is not None:
+            logger.info(
+                "followups_block_injected",
+                conversation_id=str(conversation.id),
+                function_type=routed_function.value,
+                streaming=True,
+            )
+            yield {"event": "delta", "content": appended_followups}
+
         citations = _extract_citations(search_results) if search_results else None
         assistant_msg = await self._repo.add_message(
             conversation_id=conversation.id,

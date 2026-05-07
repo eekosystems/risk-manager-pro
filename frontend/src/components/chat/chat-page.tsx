@@ -1,6 +1,6 @@
 import axios from "axios";
 import { clsx } from "clsx";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { getDocumentById } from "@/api/documents";
@@ -343,18 +343,37 @@ export function ChatPage({
     addToast("Copy failed — select the text manually", "error");
   }, [addToast]);
 
-  const latestFollowups = useMemo<Followup[]>(() => {
+  const { latestAssistantId, latestFollowups } = useMemo<{
+    latestAssistantId: string | null;
+    latestFollowups: Followup[];
+  }>(() => {
     for (let i = localMessages.length - 1; i >= 0; i--) {
       const m = localMessages[i];
       if (!m || m.role !== "assistant") continue;
-      if (m.id.startsWith("welcome")) return [];
-      return extractFollowups(m.content).followups;
+      if (m.id.startsWith("welcome")) {
+        return { latestAssistantId: null, latestFollowups: [] };
+      }
+      return {
+        latestAssistantId: m.id,
+        latestFollowups: extractFollowups(m.content).followups,
+      };
     }
-    return [];
+    return { latestAssistantId: null, latestFollowups: [] };
   }, [localMessages]);
 
+  const [dismissedFollowupId, setDismissedFollowupId] = useState<string | null>(
+    null,
+  );
+
   const panelVisible =
-    latestFollowups.length > 0 && inputIsEmpty && !isTyping;
+    latestFollowups.length > 0 &&
+    inputIsEmpty &&
+    !isTyping &&
+    dismissedFollowupId !== latestAssistantId;
+
+  const handleDismissFollowups = useCallback(() => {
+    setDismissedFollowupId(latestAssistantId);
+  }, [latestAssistantId]);
 
   return (
     <>
@@ -370,6 +389,7 @@ export function ChatPage({
           followups={latestFollowups}
           visible={panelVisible}
           onClick={handleFollowupClick}
+          onDismiss={handleDismissFollowups}
         />
         <div className="relative z-10">
           <ChatInput
@@ -398,9 +418,15 @@ interface FollowupPanelProps {
   followups: Followup[];
   visible: boolean;
   onClick: (followup: Followup) => void;
+  onDismiss: () => void;
 }
 
-function FollowupPanel({ followups, visible, onClick }: FollowupPanelProps) {
+function FollowupPanel({
+  followups,
+  visible,
+  onClick,
+  onDismiss,
+}: FollowupPanelProps) {
   return (
     <div
       className="pointer-events-none absolute inset-x-0 bottom-full overflow-hidden"
@@ -415,8 +441,17 @@ function FollowupPanel({ followups, visible, onClick }: FollowupPanelProps) {
         )}
       >
         <div className="mx-auto max-w-3xl px-6 pb-3">
-          <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-lg shadow-gray-900/10">
-            <p className="mb-3 text-xs font-medium uppercase tracking-wider text-gray-500">
+          <div className="relative rounded-2xl border border-gray-200 bg-white p-4 shadow-lg shadow-gray-900/10">
+            <button
+              type="button"
+              onClick={onDismiss}
+              tabIndex={visible ? 0 : -1}
+              aria-label="Dismiss suggestions"
+              className="absolute right-2 top-2 inline-flex h-6 w-6 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+            >
+              <X size={14} />
+            </button>
+            <p className="mb-3 pr-6 text-xs font-medium uppercase tracking-wider text-gray-500">
               What would you like to do next?
             </p>
             <div className="grid grid-cols-2 gap-2">
