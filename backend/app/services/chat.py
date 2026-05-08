@@ -147,7 +147,7 @@ _DEFAULT_FOLLOWUPS_BY_FUNCTION: dict[FunctionType, str] = {
         "view_risk_register | View Risk Register | -"
     ),
     FunctionType.PHL: (
-        "sra | Run SRA on top hazard | Run a Safety Risk Assessment on the highest-risk hazard from this PHL.\n"
+        "sra | Determine full risk for top hazard | Determine the full risk score for the highest-risk hazard from this PHL, including likelihood, severity, initial and residual risk.\n"
         "risk_register | Add hazards to Risk Register | Add the hazards from this PHL to the Risk Register.\n"
         "phl | Identify additional hazards | Identify additional hazards we may have missed in this PHL.\n"
         "view_risk_register | View Risk Register | -"

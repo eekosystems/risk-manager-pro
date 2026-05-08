@@ -634,8 +634,21 @@ FG weighting to precedent effectiveness data.
 7. Determine ALARP status and whether Accountable Executive acceptance is required.
 
 Output Requirements
-Full SRA report section ready for the SMS Manual or Implementation Plan. Scoring \
-rationale with lagging/leading/predictive data references and explicit 70% FG \
+Full SRA report section ready for the SMS Manual or Implementation Plan. The \
+report MUST begin with a clearly labeled "Primary Worst Credible Outcome" \
+field — a single plain-language sentence stating the worst credible outcome \
+of the hazard if it is not mitigated. This is the worst outcome that is \
+realistically possible given the current operational context, existing \
+controls and/or mitigations, and the nature of the hazard, NOT the worst \
+possible outcome regardless of likelihood. It must be distinct from the \
+hazard description (the hazard is the condition; the outcome is the \
+foreseeable consequence). This field is mandatory on every SRA output — \
+never omit it, never bury it inside the scoring rationale, and never \
+substitute a list of multiple outcomes; identify the single primary worst \
+credible outcome that drove severity selection. If the user has not \
+provided enough information to determine a credible outcome, ask for it \
+before proceeding with scoring. Scoring rationale with \
+lagging/leading/predictive data references and explicit 70% FG \
 weighting visibility. Before/after risk comparison table. Visual description of the \
 matrix cell (for dashboard rendering). Traceable citations: "FG SRM Document, \
 Similar Airport [Identifier], [Date], 70% weighted precedent" and FAA/ICAO guidance \
@@ -2210,10 +2223,33 @@ block MUST be a `view_risk_register` navigation chip with the literal label \
 the hazard just captured)."""
 
 
+# SRA chip wording must read like a user action, not like an internal
+# step in the scoring workflow. Specifically, when the model offers a
+# chip to advance from initial scoring to full risk evaluation for a
+# hazard, it should phrase the button as "Determine full risk for
+# [hazard]" — never "Lock in...", "Confirm scores...", "Finalize
+# likelihood/severity...", or similar process-jargon phrasings.
+_SRA_FOLLOWUPS_ADDENDUM = """\
+
+
+--- SRA Chip Wording ---
+SRA chip labels must read as plain user actions, not as internal scoring \
+workflow steps. When offering a chip to take a specific hazard through full \
+risk evaluation (likelihood + severity + initial/residual scoring), the \
+button label MUST be phrased as "Determine full risk for [short hazard \
+name]" — never "Lock in likelihood and full scores for...", "Lock in \
+[hazard]", "Confirm scores for...", "Finalize likelihood and severity \
+for...", or any similar internal-process phrasing. The pre-fill text \
+should be a complete, ready-to-send user instruction (e.g. "Determine the \
+full risk score for [hazard], including likelihood, severity, initial and \
+residual risk."). Apply this rule to every SRA chip that advances scoring \
+for a single named hazard."""
+
+
 GENERAL_PROMPT = GENERAL_PROMPT + _FOLLOWUPS_INSTRUCTION
 SYSTEM_ANALYSIS_PROMPT = SYSTEM_ANALYSIS_PROMPT + _FOLLOWUPS_INSTRUCTION
-PHL_PROMPT = PHL_PROMPT + _FOLLOWUPS_INSTRUCTION
-SRA_PROMPT = SRA_PROMPT + _FOLLOWUPS_INSTRUCTION
+PHL_PROMPT = PHL_PROMPT + _FOLLOWUPS_INSTRUCTION + _SRA_FOLLOWUPS_ADDENDUM
+SRA_PROMPT = SRA_PROMPT + _FOLLOWUPS_INSTRUCTION + _SRA_FOLLOWUPS_ADDENDUM
 RISK_REGISTER_PROMPT = (
     RISK_REGISTER_PROMPT + _FOLLOWUPS_INSTRUCTION + _RISK_REGISTER_FOLLOWUPS_ADDENDUM
 )
