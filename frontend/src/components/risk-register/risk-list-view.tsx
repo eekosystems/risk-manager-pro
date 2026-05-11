@@ -524,7 +524,7 @@ function ScanStatusBanner({
               onClick={() => setShowNotes((v) => !v)}
               className="ml-2 underline decoration-dotted text-slate-500 hover:text-slate-700"
             >
-              ({noteCount} {showNotes ? "▼" : "▸"} issues)
+              ({noteCount} {showNotes ? "▼" : "▸"} notes)
             </button>
           )}
         </span>
