@@ -7,7 +7,9 @@ import {
   RISK_MATRIX,
   SEVERITIES,
   SEVERITY_LABELS,
+  SPLIT_CELLS,
   type Likelihood,
+  type RiskLevel,
   type RiskMatrixSelection,
   type RiskPositionCount,
   type Severity,
@@ -25,6 +27,17 @@ const CELL_COLORS: Record<string, string> = {
   medium: "bg-yellow-200 hover:bg-yellow-300",
   high: "bg-red-200 hover:bg-red-300",
 };
+
+const RISK_LEVEL_HEX: Record<RiskLevel, string> = {
+  low: "#bbf7d0",
+  medium: "#fef08a",
+  high: "#fecaca",
+};
+
+function splitGradient(levels: [RiskLevel, RiskLevel]): string {
+  const [a, b] = levels;
+  return `linear-gradient(to bottom right, ${RISK_LEVEL_HEX[a]} 0%, ${RISK_LEVEL_HEX[a]} 49.5%, #334155 49.5%, #334155 50.5%, ${RISK_LEVEL_HEX[b]} 50.5%, ${RISK_LEVEL_HEX[b]} 100%)`;
+}
 
 export function RiskMatrix({ selection, onSelect, riskPositions, readOnly }: RiskMatrixProps) {
   const handleCellClick = (likelihood: Likelihood, severity: Severity) => {
@@ -70,6 +83,7 @@ export function RiskMatrix({ selection, onSelect, riskPositions, readOnly }: Ris
                 </td>
                 {SEVERITIES.map((s) => {
                   const riskLevel = RISK_MATRIX[l][s];
+                  const splitLevels = SPLIT_CELLS[l]?.[s];
                   const isSelected =
                     selection?.likelihood === l && selection?.severity === s;
                   const count = positionMap.get(`${l}-${s}`);
@@ -77,16 +91,28 @@ export function RiskMatrix({ selection, onSelect, riskPositions, readOnly }: Ris
                     <td key={s} className="p-1">
                       <button
                         onClick={() => handleCellClick(l, s)}
+                        style={
+                          splitLevels
+                            ? { backgroundImage: splitGradient(splitLevels) }
+                            : undefined
+                        }
                         className={clsx(
                           "relative flex h-14 w-full items-center justify-center rounded-lg border-2 text-xs font-bold transition-all",
-                          CELL_COLORS[riskLevel],
+                          !splitLevels && CELL_COLORS[riskLevel],
                           readOnly ? "cursor-default" : "",
                           isSelected
                             ? "border-gray-900 ring-2 ring-gray-900/20 scale-105"
                             : "border-transparent",
                         )}
                       >
-                        {RISK_LEVEL_CONFIG[riskLevel].label}
+                        {splitLevels ? (
+                          <span className="flex w-full items-center justify-between px-1.5 text-[10px] leading-tight">
+                            <span>{RISK_LEVEL_CONFIG[splitLevels[0]].label}</span>
+                            <span>{RISK_LEVEL_CONFIG[splitLevels[1]].label}</span>
+                          </span>
+                        ) : (
+                          RISK_LEVEL_CONFIG[riskLevel].label
+                        )}
                         {count != null && (
                           <span className="absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-slate-800 px-1 text-[10px] font-bold text-white shadow-sm">
                             {count}

@@ -62,3 +62,14 @@ export interface RiskPositionCount {
 
 export const SEVERITIES: Severity[] = [1, 2, 3, 4, 5];
 export const LIKELIHOODS: Likelihood[] = ["A", "B", "C", "D", "E"];
+
+/**
+ * Cells where operator matrices disagree. Rendered with a diagonal split
+ * (top-left = first level, bottom-right = second level) instead of a single
+ * color. Tuple order matches visual order: [upper-left, lower-right].
+ */
+export const SPLIT_CELLS: Partial<
+  Record<Likelihood, Partial<Record<Severity, [RiskLevel, RiskLevel]>>>
+> = {
+  D: { 1: ["medium", "high"] },
+};
