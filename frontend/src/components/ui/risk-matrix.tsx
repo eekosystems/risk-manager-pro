@@ -36,7 +36,7 @@ const RISK_LEVEL_HEX: Record<RiskLevel, string> = {
 
 function splitGradient(levels: [RiskLevel, RiskLevel]): string {
   const [a, b] = levels;
-  return `linear-gradient(to bottom right, ${RISK_LEVEL_HEX[a]} 0%, ${RISK_LEVEL_HEX[a]} 49.5%, #334155 49.5%, #334155 50.5%, ${RISK_LEVEL_HEX[b]} 50.5%, ${RISK_LEVEL_HEX[b]} 100%)`;
+  return `linear-gradient(to top right, ${RISK_LEVEL_HEX[a]} 0%, ${RISK_LEVEL_HEX[a]} 49.5%, #334155 49.5%, #334155 50.5%, ${RISK_LEVEL_HEX[b]} 50.5%, ${RISK_LEVEL_HEX[b]} 100%)`;
 }
 
 export function RiskMatrix({ selection, onSelect, riskPositions, readOnly }: RiskMatrixProps) {
@@ -58,17 +58,23 @@ export function RiskMatrix({ selection, onSelect, riskPositions, readOnly }: Ris
   return (
     <div className="flex flex-col gap-4">
       {/* Matrix Grid */}
-      <div className="overflow-x-auto">
-        <table className="border-collapse">
+      <div>
+        <table className="w-full table-fixed border-collapse">
+          <colgroup>
+            <col className="w-28" />
+            {SEVERITIES.map((s) => (
+              <col key={s} />
+            ))}
+          </colgroup>
           <thead>
             <tr>
-              <th className="w-36 p-2" />
+              <th className="p-2" />
               {SEVERITIES.map((s) => (
                 <th
                   key={s}
-                  className="min-w-[72px] p-2 text-center text-xs font-semibold text-gray-600"
+                  className="p-2 text-center text-xs font-semibold text-gray-600"
                 >
-                  <div>{SEVERITY_LABELS[s].full}</div>
+                  <div className="truncate">{SEVERITY_LABELS[s].full}</div>
                   <div className="text-[10px] text-gray-400">({SEVERITY_LABELS[s].short})</div>
                 </th>
               ))}
