@@ -162,6 +162,8 @@ export function AppLayout({ children }: AppLayoutProps) {
         }}
         onNewConversation={() => {
           setConversationId(null);
+          setActiveFunction("general");
+          setPendingInputSeed(null);
           setCurrentView("chat");
         }}
         activeOrganization={activeOrganization}
