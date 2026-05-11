@@ -105,14 +105,7 @@ export function RiskMatrix({ selection, onSelect, riskPositions, readOnly }: Ris
                             : "border-transparent",
                         )}
                       >
-                        {splitLevels ? (
-                          <span className="flex w-full items-center justify-between px-1.5 text-[10px] leading-tight">
-                            <span>{RISK_LEVEL_CONFIG[splitLevels[0]].label}</span>
-                            <span>{RISK_LEVEL_CONFIG[splitLevels[1]].label}</span>
-                          </span>
-                        ) : (
-                          RISK_LEVEL_CONFIG[riskLevel].label
-                        )}
+                        {splitLevels ? null : RISK_LEVEL_CONFIG[riskLevel].label}
                         {count != null && (
                           <span className="absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-slate-800 px-1 text-[10px] font-bold text-white shadow-sm">
                             {count}

@@ -67,9 +67,11 @@ export const LIKELIHOODS: Likelihood[] = ["A", "B", "C", "D", "E"];
  * Cells where operator matrices disagree. Rendered with a diagonal split
  * (top-left = first level, bottom-right = second level) instead of a single
  * color. Tuple order matches visual order: [upper-left, lower-right].
+ * Severity key is the stored value (1=Minimal..5=Catastrophic), which renders
+ * in the column labeled `6 - severity` (so stored 5 = displayed "1").
  */
 export const SPLIT_CELLS: Partial<
   Record<Likelihood, Partial<Record<Severity, [RiskLevel, RiskLevel]>>>
 > = {
-  D: { 1: ["medium", "high"] },
+  D: { 5: ["medium", "high"] },
 };
