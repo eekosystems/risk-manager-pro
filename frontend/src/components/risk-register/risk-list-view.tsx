@@ -189,10 +189,6 @@ export function RiskListView({ onSelectRisk, onCreateNew }: RiskListViewProps) {
     );
   }, [risks, selectedCell]);
 
-  const highCount = risks.filter(
-    (r) => r.risk_level === "high" || r.risk_level === "extreme",
-  ).length;
-
   const riskPositions: RiskPositionCount[] = useMemo(() => {
     const counts = new Map<string, number>();
     for (const r of risks) {
@@ -281,13 +277,6 @@ export function RiskListView({ onSelectRisk, onCreateNew }: RiskListViewProps) {
             No airport identifiers on current records
           </span>
         )}
-      </div>
-
-      <div className="mb-6">
-        <div className="inline-block rounded-2xl border border-gray-200 bg-white px-5 py-4">
-          <div className="text-2xl font-bold text-brand-600">{highCount}</div>
-          <div className="text-[12px] text-slate-500">High / Extreme</div>
-        </div>
       </div>
 
       {/* Risk Distribution + Drill-down panel */}
