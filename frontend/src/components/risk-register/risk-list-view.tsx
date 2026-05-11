@@ -189,8 +189,6 @@ export function RiskListView({ onSelectRisk, onCreateNew }: RiskListViewProps) {
     );
   }, [risks, selectedCell]);
 
-  const total = risks.length;
-  const openCount = risks.filter((r) => r.status === "open").length;
   const highCount = risks.filter(
     (r) => r.risk_level === "high" || r.risk_level === "extreme",
   ).length;
@@ -285,20 +283,8 @@ export function RiskListView({ onSelectRisk, onCreateNew }: RiskListViewProps) {
         )}
       </div>
 
-      {/* Stats cards */}
-      <div className="mb-6 grid grid-cols-3 gap-4">
-        <div className="rounded-2xl border border-gray-200 bg-white p-4">
-          <div className="text-2xl font-bold text-brand-500">{total}</div>
-          <div className="text-[12px] text-slate-500">
-            Total Risks
-            {airportFilter !== ALL_AIRPORTS ? ` — ${airportFilter}` : ""}
-          </div>
-        </div>
-        <div className="rounded-2xl border border-gray-200 bg-white p-4">
-          <div className="text-2xl font-bold text-brand-600">{openCount}</div>
-          <div className="text-[12px] text-slate-500">Open</div>
-        </div>
-        <div className="rounded-2xl border border-gray-200 bg-white p-4">
+      <div className="mb-6">
+        <div className="inline-block rounded-2xl border border-gray-200 bg-white px-5 py-4">
           <div className="text-2xl font-bold text-brand-600">{highCount}</div>
           <div className="text-[12px] text-slate-500">High / Extreme</div>
         </div>
