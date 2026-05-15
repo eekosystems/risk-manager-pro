@@ -135,34 +135,34 @@ _FOLLOWUPS_CLOSE_RE = re.compile(r"</followups>", re.IGNORECASE)
 
 _DEFAULT_FOLLOWUPS_BY_FUNCTION: dict[FunctionType, str] = {
     FunctionType.GENERAL: (
-        "sra | Run an SRA on a hazard | Run a Safety Risk Assessment on a hazard from this discussion.\n"
-        "phl | Generate a PHL | Generate a Preliminary Hazard List from the system or change we discussed.\n"
-        "general | Cite regulatory guidance | Cite the relevant FAA, ICAO, or EASA guidance for this topic.\n"
-        "view_risk_register | View Risk Register | -"
+        "forward | sra | Run an SRA on a hazard | Run a Safety Risk Assessment on a hazard from this discussion.\n"
+        "confirm | general | Confirm Output Accuracy | Confirm the output above is accurate before we proceed.\n"
+        "clarify | general | Cite Relevant Regulatory Guidance | Cite the relevant FAA, ICAO, or EASA guidance for this topic.\n"
+        "explore | view_risk_register | View Risk Register | -"
     ),
     FunctionType.SYSTEM_ANALYSIS: (
-        "phl | Generate PHL from this system | Generate a Preliminary Hazard List from this system description.\n"
-        "sra | Run an SRA | Run a Safety Risk Assessment on a hazard from this system.\n"
-        "system | Identify interfaces | What other systems or interfaces should we consider?\n"
-        "view_risk_register | View Risk Register | -"
+        "forward | phl | Generate PHL From This System | Generate a Preliminary Hazard List from this system description.\n"
+        "confirm | general | Confirm System Analysis Accuracy | Confirm the system analysis above is accurate before we proceed.\n"
+        "clarify | system | Examine Other System Interfaces | What other systems or interfaces should we consider in this analysis?\n"
+        "explore | sra | Run SRA On A Hazard | Run a Safety Risk Assessment on a hazard from this system."
     ),
     FunctionType.PHL: (
-        "sra | Determine full risk for top hazard | Determine the full risk score for the highest-risk hazard from this PHL, including likelihood, severity, initial and residual risk.\n"
-        "risk_register | Add hazards to Risk Register | Add the hazards from this PHL to the Risk Register.\n"
-        "phl | Identify additional hazards | Identify additional hazards we may have missed in this PHL.\n"
-        "view_risk_register | View Risk Register | -"
+        "forward | sra | Determine Full Risk For Top Hazard | Determine the full risk score for the highest-risk hazard from this PHL, including likelihood, severity, initial and residual risk.\n"
+        "confirm | general | Confirm PHL Accuracy | Confirm the hazards identified above are accurate and complete before we proceed.\n"
+        "revise | phl | Identify Additional Missed Hazards | Identify additional hazards we may have missed in this PHL.\n"
+        "explore | risk_register | Add Hazards To Risk Register | Add the hazards from this PHL to the Risk Register."
     ),
     FunctionType.SRA: (
-        "risk_register | Add to Risk Register | Add this assessed hazard to the Risk Register.\n"
-        "sra | Re-run with different controls | Re-run this SRA evaluating different proposed controls.\n"
-        "general | Explain the residual score | Explain how the residual risk score was derived.\n"
-        "view_risk_register | View Risk Register | -"
+        "forward | risk_register | Add Assessed Hazard To Register | Add this assessed hazard to the Risk Register.\n"
+        "confirm | general | Confirm Risk Scoring Accuracy | Confirm the risk scoring above is correct before we proceed.\n"
+        "revise | sra | Re-Run With Different Controls | Re-run this SRA evaluating different proposed controls.\n"
+        "clarify | general | Explain The Residual Risk Score | Explain how the residual risk score was derived."
     ),
     FunctionType.RISK_REGISTER: (
-        "view_risk_register | View Risk Register | -\n"
-        "risk_register | Add another hazard | I'd like to add another hazard to the Risk Register.\n"
-        "sra | Run SRA on this hazard | Run a Safety Risk Assessment on the hazard I just captured.\n"
-        "phl | Generate a related PHL | Generate a Preliminary Hazard List for the related system."
+        "forward | view_risk_register | View Risk Register | -\n"
+        "confirm | general | Confirm Risk Register Entry | Confirm the Risk Register entry above is accurate before we proceed.\n"
+        "revise | risk_register | Add Another Hazard To Register | I'd like to add another hazard to the Risk Register.\n"
+        "explore | sra | Run SRA On Captured Hazard | Run a Safety Risk Assessment on the hazard I just captured."
     ),
 }
 

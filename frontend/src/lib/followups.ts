@@ -1,14 +1,24 @@
 import type { FunctionType } from "@/types/api";
 
+export type FollowupSlot =
+  | "forward"
+  | "confirm"
+  | "validate"
+  | "revise"
+  | "clarify"
+  | "explore";
+
 export type Followup =
   | {
       kind: "send";
+      slot?: FollowupSlot;
       mode: FunctionType;
       label: string;
       prefill: string;
     }
   | {
       kind: "navigate";
+      slot?: FollowupSlot;
       target: "risk-register";
       label: string;
     };
@@ -26,7 +36,56 @@ const NAV_MAP: Record<string, "risk-register"> = {
   view_risk_register: "risk-register",
 };
 
+const SLOT_SET: ReadonlySet<FollowupSlot> = new Set([
+  "forward",
+  "confirm",
+  "validate",
+  "revise",
+  "clarify",
+  "explore",
+]);
+
+// Stable display order: Forward top-left, Confirm/Validate top-right,
+// contextual chips on the bottom row.
+const SLOT_ORDER: Record<FollowupSlot, number> = {
+  forward: 0,
+  confirm: 1,
+  validate: 1,
+  revise: 2,
+  clarify: 3,
+  explore: 4,
+};
+
 const FOLLOWUPS_RE = /<followups>([\s\S]*?)<\/followups>\s*$/i;
+
+function parseSlot(token: string): FollowupSlot | null {
+  const t = token.toLowerCase();
+  return SLOT_SET.has(t as FollowupSlot) ? (t as FollowupSlot) : null;
+}
+
+function buildFollowup(
+  slot: FollowupSlot | undefined,
+  modeRaw: string,
+  label: string,
+  prefillParts: string[],
+): Followup | null {
+  const modeKey = modeRaw.toLowerCase();
+
+  const navTarget = NAV_MAP[modeKey];
+  if (navTarget) {
+    return slot
+      ? { kind: "navigate", slot, target: navTarget, label }
+      : { kind: "navigate", target: navTarget, label };
+  }
+
+  const mode = MODE_MAP[modeKey];
+  if (!mode) return null;
+  const prefill = prefillParts.join(" | ").trim();
+  if (!prefill) return null;
+  return slot
+    ? { kind: "send", slot, mode, label, prefill }
+    : { kind: "send", mode, label, prefill };
+}
 
 export function extractFollowups(content: string): {
   content: string;
@@ -39,26 +98,42 @@ export function extractFollowups(content: string): {
 
   const block = match[1] ?? "";
   const followups: Followup[] = [];
+  let anySlot = false;
+
   for (const rawLine of block.split("\n")) {
     const line = rawLine.trim();
     if (!line) continue;
     const parts = line.split("|").map((p) => p.trim());
     if (parts.length < 2) continue;
-    const [modeRaw, label, ...prefillParts] = parts;
-    if (!modeRaw || !label) continue;
-    const modeKey = modeRaw.toLowerCase();
 
-    const navTarget = NAV_MAP[modeKey];
-    if (navTarget) {
-      followups.push({ kind: "navigate", target: navTarget, label });
-      continue;
+    // Detect new 4-field format (slot | mode | label | prefill) by checking
+    // whether the first token is a known slot name. Otherwise fall back to
+    // the legacy 3-field format (mode | label | prefill).
+    const maybeSlot = parseSlot(parts[0] ?? "");
+    let followup: Followup | null;
+    if (maybeSlot && parts.length >= 3) {
+      const [, modeRaw, label, ...prefillParts] = parts;
+      if (!modeRaw || !label) continue;
+      followup = buildFollowup(maybeSlot, modeRaw, label, prefillParts);
+      if (followup) anySlot = true;
+    } else {
+      const [modeRaw, label, ...prefillParts] = parts;
+      if (!modeRaw || !label) continue;
+      followup = buildFollowup(undefined, modeRaw, label, prefillParts);
     }
 
-    const mode = MODE_MAP[modeKey];
-    if (!mode) continue;
-    const prefill = prefillParts.join(" | ").trim();
-    if (!prefill) continue;
-    followups.push({ kind: "send", mode, label, prefill });
+    if (followup) followups.push(followup);
+  }
+
+  // Stable sort by slot order so Forward renders top-left, Confirm/Validate
+  // top-right, contextual chips on the bottom row. Skip when no slots were
+  // emitted (legacy format) — preserve the model's ordering.
+  if (anySlot) {
+    followups.sort((a, b) => {
+      const ao = a.slot ? SLOT_ORDER[a.slot] : 99;
+      const bo = b.slot ? SLOT_ORDER[b.slot] : 99;
+      return ao - bo;
+    });
   }
 
   const cleaned = content.slice(0, match.index).trimEnd();

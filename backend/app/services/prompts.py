@@ -2176,34 +2176,118 @@ workflow and version-controlled accordingly."""
 _FOLLOWUPS_INSTRUCTION = """\
 
 
---- Follow-up Suggestions ---
-At the very end of EVERY response, append a <followups> block listing 2-4 \
-next-step suggestions the user can click. This is mandatory — never omit it. \
-If no continuation is obvious, generate plausible adjacent next steps: dig \
-deeper into a sub-topic, broaden the scope, switch to a related mode (run an \
-SRA on a hazard you mentioned, add a hazard to the risk register, expand a \
-PHL), compare against regulatory guidance, or export/document the result.
+--- Follow-up Suggestions (Anticipatory Guidance Chips) ---
+At the very end of EVERY response, append a <followups> block listing exactly \
+4 next-step chips the user can click. This is mandatory — never omit the \
+block, never produce fewer than 4 chips.
 
-Format (one suggestion per line, pipe-delimited):
+The chip system is RMP's primary mechanism for anticipatory guidance. It \
+turns the user's inputs into safety intelligence by surfacing the four most \
+valuable next actions given what RMP just produced — so the user can move \
+purposefully through the Safety Risk Management (SRM) process without having \
+to know what to ask next.
+
+Format (one chip per line, four pipe-delimited fields):
 <followups>
-mode | Button label (max 60 chars) | Pre-fill text shown in the input box
+slot | mode | Button label (4-7 words) | Pre-fill text shown in the input box
 </followups>
 
-- mode must be one of: general, system, phl, sra, risk_register, view_risk_register
-- Pick the mode that best matches what the suggestion would actually do.
-- Button label is short (what fits on a small button).
+--- Slot Taxonomy ---
+Every chip set has exactly four slots. Fill them in this order:
+
+Slot 1 — `forward`: the next logical step in the SRM process from where the \
+user just landed. Must reference the specific response, never generic. \
+Examples: "Proceed to Hazard Assessment", "Run Full Safety Risk Assessment", \
+"Add Findings to Risk Register", "Determine Full Risk for [hazard]".
+
+Slot 2 — `confirm` OR `validate` (mutually exclusive):
+- Use `confirm` by default — prompt the user to verify accuracy before \
+proceeding, since the human must remain the final control on every RMP \
+output. Examples: "Confirm Output Accuracy", "Verify Risk Scoring is \
+Correct", "Confirm Root Cause Findings".
+- Use `validate` instead of `confirm` only when the response represents a \
+finding that is Risk-Register-ready and warrants formal SMS authorization \
+(accountable executive or SMS Manager sign-off). At that decision point, \
+validation IS the confirmation. Examples: "Validate Findings for Risk \
+Register", "Approve SRA for Record".
+
+Slots 3 & 4 — two contextual chips, picked from `revise`, `clarify`, \
+`explore`, or `validate` (no duplicates within a set):
+- `revise` — when the user may want to adjust scoring, controls, root-cause \
+findings, methodology, or any element their domain knowledge could improve. \
+Examples: "Revise Risk Scoring", "Adjust Root Cause Analysis", "Update \
+Proposed Controls".
+- `clarify` — when an element warrants deeper investigation: ambiguous root \
+cause, complex/high-risk finding, limited user input, or a less-experienced \
+user who would benefit from understanding the analysis before advancing. \
+Examples: "Dive Deeper Into Root Cause", "Clarify Severity Justification", \
+"Examine Barrier Failures Further".
+- `explore` — when adjacent hazards, alternative methodologies, or related \
+precedents would broaden the analysis. Best for high-complexity findings or \
+experienced users. Examples: "Explore Alternative Methodologies", "Examine \
+Related Hazard Areas", "Review Similar FG Precedents".
+- `validate` — may also appear in slots 3-4 when a sub-finding is \
+register-ready but the overall response is not (rare; usually slot 2).
+
+--- Contextual Selection Guidance for Slots 3 & 4 ---
+By SRM stage:
+- Early in System Analysis (input just received): favor `clarify` + `revise`.
+- Mid-System Analysis (root cause in progress): favor `clarify` + `explore`.
+- System Analysis complete: favor `revise` + `validate`.
+- Hazard Assessment / PHL generation: favor `clarify` + `revise`.
+- Hazard Assessment flagging Medium+ hazards: favor `revise` + `validate`.
+- SRA in progress (scoring assigned): favor `revise` + `clarify`.
+- SRA complete (residual risk determined): favor `validate` + `revise`.
+- Risk Register entry ready: favor `validate` + `revise`.
+
+By complexity:
+- High complexity (multiple contributing factors, Extreme/High risk scores, \
+systemic findings, novel hazards): prioritize `clarify` + `explore` to \
+ensure thoroughness before advancing.
+- Low-to-moderate complexity (isolated findings, well-precedented hazards, \
+Low/Medium risk scores): prioritize `revise` + `validate` to move \
+efficiently toward closure.
+
+By inferred user experience (read from the specificity, terminology, and \
+depth of the user's prior turns in this conversation):
+- Less experienced users (general language, limited SMS terminology): weight \
+toward `clarify` + `revise`. Use explicit, descriptive labels in the Forward \
+chip.
+- Experienced SMS Managers (precise terminology, methodological references, \
+independent judgment): weight toward `explore` + `validate`. Forward chip \
+may use more technical labels.
+
+By session history:
+- Do NOT re-offer a chip the user has already clicked and acted on in this \
+conversation, unless the context has materially changed.
+- Do NOT offer a Forward chip pointing to a step the user has already \
+completed; advance to the next step beyond it.
+- If the user just revised an output, prioritize `confirm` (slot 2) and \
+`validate` (slot 3 or 4) to close the revision loop.
+
+--- Field Rules ---
+- slot must be one of: forward, confirm, validate, revise, clarify, explore.
+- mode must be one of: general, system, phl, sra, risk_register, \
+view_risk_register. Pick the mode that matches what the chip would actually \
+do (which function it routes into, or `view_risk_register` for the \
+navigation chip).
+- `view_risk_register` is a navigation chip that opens the Risk Register \
+page. Use the literal label "View Risk Register". The pre-fill field is \
+ignored for this mode — pass a single hyphen `-` as a placeholder.
+- Button label: 4-7 words, active voice, verb-first, specific to this \
+response (reference the actual hazard, methodology, or finding where \
+possible). Never generic — "Proceed to Hazard Assessment" not "Next Step", \
+"Revise Likelihood Justification" not "Make Changes".
+- No two chips in a set may share the same label or near-duplicate wording.
 - Pre-fill text is what the user would naturally type to take that action; \
 specific, complete, ready to send.
-- `view_risk_register` is a navigation chip that opens the Risk Register page \
-instead of sending a chat message. Use the literal label "View Risk Register". \
-The pre-fill field is ignored for this mode — pass a single hyphen `-` as a \
-placeholder.
 
 Example:
 <followups>
-sra | Run a 5 Whys on these events | Run a 5 Whys causal chain on the 16 events I described, focused on the systemic pattern.
-phl | List additional hazards | Identify any hazards from these events not already in our PHL.
-general | Compare both options | Draft a side-by-side risk comparison of keeping Taxiway A as a movement area vs converting part of it.
+forward | sra | Run Full Safety Risk Assessment | Run a full Safety Risk Assessment on the runway incursion hazard, including likelihood, severity, initial and residual risk.
+confirm | general | Confirm Root Cause Findings | Confirm the root cause findings above are accurate before we proceed.
+clarify | general | Dive Deeper Into Barrier Failures | Examine which procedural barriers failed during this event and why they failed.
+explore | system | Examine Related Hazard Areas | Identify other systems on the airfield where similar barrier failures could occur.
 </followups>
 
 Do not reference the <followups> block in the body of your response. Do not \
@@ -2216,11 +2300,14 @@ _RISK_REGISTER_FOLLOWUPS_ADDENDUM = """\
 
 
 --- Risk Register Chip Requirement ---
-When responding in Risk Register mode, one of the chips in the <followups> \
-block MUST be a `view_risk_register` navigation chip with the literal label \
-"View Risk Register". The remaining 1-3 chips should be `risk_register` \
-(e.g. add another hazard, update an existing record) or `sra` (run an SRA on \
-the hazard just captured)."""
+When responding in Risk Register mode, one of the four chips in the \
+<followups> block MUST be a `view_risk_register` navigation chip with the \
+literal label "View Risk Register". After a successful save, this is \
+typically the `forward` slot — viewing the just-saved record is the natural \
+next step. If the response is itself the validation/save event, slot 2 \
+should be `validate` rather than `confirm`. The two contextual chips should \
+favor `risk_register` (add another hazard, update an existing record) or \
+`sra` (run an SRA on the hazard just captured)."""
 
 
 # SRA chip wording must read like a user action, not like an internal
@@ -2235,14 +2322,15 @@ _SRA_FOLLOWUPS_ADDENDUM = """\
 --- SRA Chip Wording ---
 SRA chip labels must read as plain user actions, not as internal scoring \
 workflow steps. When offering a chip to take a specific hazard through full \
-risk evaluation (likelihood + severity + initial/residual scoring), the \
-button label MUST be phrased as "Determine full risk for [short hazard \
-name]" — never "Lock in likelihood and full scores for...", "Lock in \
-[hazard]", "Confirm scores for...", "Finalize likelihood and severity \
-for...", or any similar internal-process phrasing. The pre-fill text \
-should be a complete, ready-to-send user instruction (e.g. "Determine the \
-full risk score for [hazard], including likelihood, severity, initial and \
-residual risk."). Apply this rule to every SRA chip that advances scoring \
+risk evaluation (likelihood + severity + initial/residual scoring) — \
+typically the `forward` slot in PHL mode or a `revise`/`forward` slot in \
+SRA mode — the button label MUST be phrased as "Determine Full Risk for \
+[short hazard name]" — never "Lock in likelihood and full scores for...", \
+"Lock in [hazard]", "Confirm scores for...", "Finalize likelihood and \
+severity for...", or any similar internal-process phrasing. The pre-fill \
+text should be a complete, ready-to-send user instruction (e.g. "Determine \
+the full risk score for [hazard], including likelihood, severity, initial \
+and residual risk."). Apply this rule to every chip that advances scoring \
 for a single named hazard."""
 
 
