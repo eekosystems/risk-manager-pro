@@ -7,10 +7,32 @@ import { getDocumentById } from "@/api/documents";
 import { FUNCTIONS } from "@/constants/functions";
 import { useConversation, useEmailChatMessage, useSendMessage } from "@/hooks/use-chat";
 import { useUploadDocument } from "@/hooks/use-documents";
+import { useOrganizationContext } from "@/hooks/use-organization-context";
 import { useToast } from "@/hooks/use-toast";
 import { extractFollowups, type Followup } from "@/lib/followups";
 import { logger } from "@/lib/logger";
 import type { ChatMessage, FunctionType } from "@/types/api";
+
+// Same key the DocumentDropZone writes to. Chat reads it so the AI can be
+// "file-aware" — it sees recent uploads as authoritative filenames and can
+// resolve pronoun references like "the file I just uploaded".
+const UPLOADED_DOCS_STORAGE_PREFIX = "rmp.uploadedDocs.";
+const MAX_RECENT_UPLOAD_IDS = 20;
+
+function readRecentUploadIds(orgId: string | undefined): string[] {
+  if (!orgId) return [];
+  try {
+    const raw = window.localStorage.getItem(
+      `${UPLOADED_DOCS_STORAGE_PREFIX}${orgId}`,
+    );
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((v): v is string => typeof v === "string");
+  } catch {
+    return [];
+  }
+}
 
 import { ChatInput } from "./chat-input";
 import { EmailChatModal } from "./email-chat-modal";
@@ -121,6 +143,7 @@ export function ChatPage({
   const lockedFunctionRef = useRef<FunctionType | null>(null);
   const { addToast } = useToast();
   const emailChatMutation = useEmailChatMessage();
+  const { activeOrganization } = useOrganizationContext();
 
   const { data: conversation } = useConversation(conversationId);
   const sendMessageMutation = useSendMessage();
@@ -214,12 +237,23 @@ export function ChatPage({
       const locked = lockedFunctionRef.current;
       lockedFunctionRef.current = null;
 
+      // Merge this turn's just-attached uploads with any prior uploads from the
+      // left-panel drop zone (persisted to localStorage per org). Most recent
+      // first; cap so we don't bloat the request.
+      const priorUploadIds = readRecentUploadIds(activeOrganization?.id);
+      const merged: string[] = [];
+      for (const id of [...uploadedIds, ...priorUploadIds]) {
+        if (!merged.includes(id)) merged.push(id);
+        if (merged.length >= MAX_RECENT_UPLOAD_IDS) break;
+      }
+
       sendMessageMutation.mutate(
         {
           message,
           conversation_id: conversationId,
           function_type: locked ?? activeFunction,
           routing_locked: locked !== null,
+          recent_upload_ids: merged.length > 0 ? merged : null,
         },
         {
           onSuccess: (data) => {
@@ -287,6 +321,7 @@ export function ChatPage({
       setConversationId,
       onFunctionRouted,
       addToast,
+      activeOrganization?.id,
     ],
   );
 

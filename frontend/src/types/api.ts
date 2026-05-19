@@ -93,6 +93,7 @@ export interface ChatRequest {
   conversation_id?: string | null;
   function_type: FunctionType;
   routing_locked?: boolean;
+  recent_upload_ids?: string[] | null;
 }
 
 export interface ChatResponse {

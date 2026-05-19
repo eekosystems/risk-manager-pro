@@ -21,6 +21,7 @@ class ChatRequest(BaseModel):
     conversation_id: uuid.UUID | None = None
     function_type: FunctionType = FunctionType.GENERAL
     routing_locked: bool = False
+    recent_upload_ids: list[uuid.UUID] | None = Field(default=None, max_length=20)
 
 
 class MessageResponse(BaseModel):

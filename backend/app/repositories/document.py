@@ -123,6 +123,52 @@ class DocumentRepository:
         await self._db.flush()
         return True
 
+    async def list_recent_documents(
+        self, organization_id: uuid.UUID, limit: int = 10
+    ) -> list[Document]:
+        """Return the org's most recently uploaded docs (any status) for chat awareness."""
+        stmt = (
+            select(Document)
+            .where(Document.organization_id == organization_id)
+            .order_by(Document.created_at.desc())
+            .limit(limit)
+        )
+        result = await self._db.execute(stmt)
+        return list(result.scalars().all())
+
+    async def list_indexed_filenames(
+        self, organization_id: uuid.UUID, limit: int = 500
+    ) -> list[str]:
+        """Return filenames of indexed docs for fuzzy-matching against chat queries."""
+        stmt = (
+            select(Document.filename)
+            .where(
+                Document.organization_id == organization_id,
+                Document.status == DocumentStatus.INDEXED,
+            )
+            .order_by(Document.created_at.desc())
+            .limit(limit)
+        )
+        result = await self._db.execute(stmt)
+        return list(result.scalars().all())
+
+    async def get_documents_by_ids(
+        self, document_ids: list[uuid.UUID], organization_id: uuid.UUID
+    ) -> list[Document]:
+        """Fetch documents for a set of IDs, tenant-scoped, preserving recency order."""
+        if not document_ids:
+            return []
+        stmt = (
+            select(Document)
+            .where(
+                Document.id.in_(document_ids),
+                Document.organization_id == organization_id,
+            )
+            .order_by(Document.created_at.desc())
+        )
+        result = await self._db.execute(stmt)
+        return list(result.scalars().all())
+
     async def count_by_source_type(self, organization_id: uuid.UUID) -> dict[str, dict[str, int]]:
         """Return per-source counts grouped by status, plus chunk totals.
 

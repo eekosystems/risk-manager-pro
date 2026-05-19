@@ -8,9 +8,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings as app_settings
 from app.models.conversation import Conversation, FunctionType
+from app.models.document import Document, DocumentStatus
 from app.models.message import MessageRole
 from app.models.user import User
 from app.repositories.conversation import ConversationRepository
+from app.repositories.document import DocumentRepository
 from app.schemas.chat import ChatRequest, ChatResponse, CitationSchema, MessageResponse
 from app.schemas.settings import PromptsPayload
 from app.services.openai_client import AzureOpenAIClient
@@ -67,6 +69,197 @@ _FILENAME_RE = re.compile(
 def _extract_referenced_filenames(query: str) -> list[str]:
     """Pull any document filenames the user typed into the query."""
     return _FILENAME_RE.findall(query)
+
+
+# Tokens that should not drive filename matching even though they're long enough.
+# We strip common chat verbs and filler so e.g. "tell me about the CSPP document"
+# narrows to ["cspp"] rather than spuriously matching files named "Document …".
+_QUERY_STOPWORDS: frozenset[str] = frozenset(
+    {
+        "the", "and", "but", "for", "you", "your", "our", "their", "this",
+        "that", "these", "those", "with", "from", "into", "have", "has",
+        "had", "are", "was", "were", "been", "being", "any", "all", "some",
+        "what", "when", "where", "which", "who", "whom", "why", "how",
+        "can", "could", "would", "should", "may", "might", "will", "shall",
+        "did", "does", "doing", "tell", "show", "give", "ask", "see", "read",
+        "find", "look", "looking", "about", "regarding", "concerning",
+        "file", "files", "document", "documents", "doc", "docs", "pdf",
+        "docx", "txt", "upload", "uploaded", "uploads", "uploading",
+        "most", "recent", "latest", "just", "now", "today", "yesterday",
+        "name", "names", "named", "called", "title", "titled",
+        "please", "thanks", "thank", "hello", "hey", "yes", "yeah",
+        "want", "need", "like", "know", "get", "got", "make", "made",
+        "use", "used", "using", "say", "said", "tell", "telling",
+        "between", "over", "under", "more", "less", "than", "then",
+        "out", "off", "yet", "still", "very", "much", "many", "few",
+    }
+)
+
+# Phrases that indicate the user is referencing a recent upload by pronoun
+# ("the file I just uploaded", "that doc", "the most recent one"). When any of
+# these match AND the query carries no explicit filename, the most-recently-
+# uploaded doc gets used as a source filter so retrieval pulls its content.
+_RECENT_UPLOAD_REF_RE = re.compile(
+    r"\b("
+    r"just\s+uploaded|"
+    r"recently\s+uploaded|"
+    r"most\s+recent|"
+    r"the\s+(?:file|doc|document|pdf|upload|attachment)|"
+    r"that\s+(?:file|doc|document|pdf|upload|attachment)|"
+    r"this\s+(?:file|doc|document|pdf|upload|attachment)|"
+    r"my\s+(?:file|doc|document|pdf|upload|attachment)|"
+    r"latest\s+(?:file|doc|document|pdf|upload)"
+    r")\b",
+    re.IGNORECASE,
+)
+
+# Splits filenames (and the user's query) into comparable tokens. Treats common
+# separators as boundaries so "CSPP_Seattle_Runway-2024.pdf" → cspp/seattle/runway/2024.
+_TOKEN_SPLIT_RE = re.compile(r"[\W_]+", re.UNICODE)
+
+
+def _normalize_token(token: str) -> str:
+    """Light stemming so plurals match singular filename tokens (e.g. CSPPs → CSPP)."""
+    if len(token) >= 5 and token.endswith("ies"):
+        return token[:-3] + "y"
+    if len(token) >= 5 and token.endswith("es") and not token.endswith("ses"):
+        return token[:-2]
+    if len(token) >= 4 and token.endswith("s") and not token.endswith("ss"):
+        return token[:-1]
+    return token
+
+
+def _tokenize(text: str) -> list[str]:
+    """Lowercase, split on non-word chars, drop short/stopword tokens, light-stem."""
+    raw = _TOKEN_SPLIT_RE.split(text.lower())
+    return [
+        _normalize_token(t)
+        for t in raw
+        if len(t) >= 3 and t not in _QUERY_STOPWORDS
+    ]
+
+
+def _filename_stem_tokens(filename: str) -> list[str]:
+    """Tokenize a filename ignoring its extension."""
+    stem = filename.rsplit(".", 1)[0] if "." in filename else filename
+    return _tokenize(stem)
+
+
+def _references_recent_upload(query: str) -> bool:
+    """True when the query reads as a pronoun reference to an uploaded doc."""
+    return bool(_RECENT_UPLOAD_REF_RE.search(query))
+
+
+def _match_candidate_filenames(
+    query: str, filenames: list[str], max_candidates: int = 12
+) -> list[str]:
+    """Return filenames whose tokens overlap with the user's query, ranked by overlap.
+
+    Empty result means the user did not name any indexed file (the model will
+    fall back to generic semantic search). A single result is a confident hit.
+    Multiple results means the model needs to disambiguate with the user.
+    """
+    query_tokens = set(_tokenize(query))
+    if not query_tokens or not filenames:
+        return []
+
+    scored: list[tuple[int, int, str]] = []  # (-overlap, -length_match, filename)
+    for fname in filenames:
+        fname_tokens = set(_filename_stem_tokens(fname))
+        if not fname_tokens:
+            continue
+        overlap = len(query_tokens & fname_tokens)
+        if overlap == 0:
+            continue
+        # Tie-break: prefer filenames whose token set is closer in size to the
+        # overlap (i.e. a 2-token file matched by 2 tokens beats a 10-token
+        # file matched by 2 tokens, which would be coincidental).
+        scored.append((-overlap, len(fname_tokens), fname))
+
+    scored.sort()
+    return [f for _, _, f in scored[:max_candidates]]
+
+
+def _format_doc_status(status: DocumentStatus) -> str:
+    """Human-readable status label for the inventory block."""
+    if status == DocumentStatus.INDEXED:
+        return "indexed"
+    if status == DocumentStatus.FAILED:
+        return "indexing failed"
+    return "still processing"
+
+
+def _build_recent_uploads_block(
+    docs: list[Document],
+    session_upload_ids: set[uuid.UUID] | None = None,
+) -> str | None:
+    """Render the org's most recently uploaded files (most recent first).
+
+    When `session_upload_ids` is provided, docs in that set are tagged as
+    uploaded by the current user in the active session so the model can
+    answer "the file I just uploaded" precisely.
+    """
+    if not docs:
+        return None
+    session_ids = session_upload_ids or set()
+    lines: list[str] = []
+    for doc in docs:
+        tag = _format_doc_status(doc.status)
+        if doc.id in session_ids:
+            tag += "; uploaded by you in this session"
+        lines.append(f"- {doc.filename} ({tag})")
+    return (
+        "Files most recently uploaded to this organization (most recent first; "
+        "this list IS the authoritative answer for recency and inventory "
+        "questions):\n" + "\n".join(lines)
+    )
+
+
+def _build_candidates_block(candidates: list[str], total_in_org: int) -> str | None:
+    """Render the candidate documents matched against the user's query."""
+    if not candidates:
+        return None
+    visible_limit = 8
+    visible = candidates[:visible_limit]
+    extra = max(0, len(candidates) - visible_limit)
+    lines = [f"- {name}" for name in visible]
+    if extra > 0:
+        lines.append(f"- …and {extra} more")
+    header = (
+        "Indexed documents in this organization whose filenames match the "
+        f"user's request ({len(candidates)} of {total_in_org} total):"
+    )
+    return header + "\n" + "\n".join(lines)
+
+
+_FILE_AWARENESS_INSTRUCTIONS = (
+    "File awareness rules:\n"
+    "- The lists above ARE the authoritative answer for what files exist in "
+    "this organization and what the user has recently uploaded. Treat them "
+    "as ground truth — do NOT hedge with phrases like \"based on the context "
+    "provided\", \"limited to what's shown\", or \"I don't have access to "
+    "your file repository\".\n"
+    "- When the user asks the name of a file, which file they uploaded, "
+    "which is most recent, or to list their files, answer with the bare "
+    "filename(s) only (e.g. \"Seattle CSPP 2024.pdf\"). Do NOT add chunk "
+    "numbers, \"[Source N]\" labels, section names, or any other RAG "
+    "retrieval terminology in prose. The UI renders source citation chips "
+    "separately — your job is to name the file plainly. This overrides the "
+    "general \"reference sources by number\" rule for file-identity "
+    "questions.\n"
+    "- \"Recently uploaded\" means the list under \"Files this user "
+    "recently uploaded\" above, ordered most recent first. Use that order — "
+    "do not re-infer recency from the order of retrieved chunks.\n"
+    "- If the user's request appears to target a single specific document "
+    "and the candidate list above contains more than one match, ask the user "
+    "which one they mean before answering. List the candidate filenames so "
+    "the user can pick. Do not guess.\n"
+    "- If the user's request is plural or comparative (e.g. \"compare\", "
+    "\"all of them\", \"our CSPPs\"), do not ask — synthesize across the "
+    "matching documents.\n"
+    "- If the candidate list is empty but the user names a file, say you "
+    "could not find a matching document in their library."
+)
 
 
 def _filter_by_threshold(results: list[SearchResult], threshold: float) -> list[SearchResult]:
@@ -225,6 +418,7 @@ class ChatService:
         self._rag = rag_service
         self._settings = settings_service or SettingsService(db)
         self._repo = ConversationRepository(db)
+        self._doc_repo = DocumentRepository(db)
 
     async def _resolve_conversation(
         self,
@@ -252,17 +446,27 @@ class ChatService:
         conversation_id: uuid.UUID,
         top_k: int,
         score_threshold: float,
+        implicit_source_filter: list[str] | None = None,
     ) -> tuple[list[SearchResult], str]:
-        """Run RAG search and return filtered results with a formatted context block."""
+        """Run RAG search and return filtered results with a formatted context block.
+
+        Source-filter precedence (first non-empty wins for the targeted search):
+          1. Explicit filenames typed by the user (`Foo.pdf`).
+          2. `implicit_source_filter` — resolved upstream from pronoun references
+             ("the file I just uploaded") or single-candidate filename matches.
+        If neither yields hits, falls back to an unfiltered hybrid search so the
+        model still has something to work with.
+        """
         search_results: list[SearchResult] = []
         referenced_filenames = _extract_referenced_filenames(query)
+        targeted_filter = referenced_filenames or (implicit_source_filter or [])
         try:
-            if referenced_filenames:
+            if targeted_filter:
                 search_results = await self._rag.hybrid_search(
                     query,
                     organization_id=organization_id,
                     top_k=max(top_k, 20),
-                    source_filter=referenced_filenames,
+                    source_filter=targeted_filter,
                 )
             if not search_results:
                 search_results = await self._rag.hybrid_search(
@@ -281,6 +485,83 @@ class ChatService:
         context_block = _build_context_block(search_results)
         return search_results, context_block
 
+    async def _resolve_document_context(
+        self,
+        request: ChatRequest,
+        organization_id: uuid.UUID,
+    ) -> tuple[list[Document], set[uuid.UUID], list[str], int, list[str]]:
+        """Gather the document signals the model needs to be file-aware.
+
+        Returns:
+            recent_docs: the org's most recently uploaded docs (any status,
+                most recent first). Always populated when the org has any
+                documents — independent of frontend localStorage state — so
+                "what's the most recent file" always has an authoritative
+                source.
+            session_upload_ids: IDs the frontend reported as uploaded in the
+                current session. Used to tag entries in `recent_docs` as
+                "uploaded by you" and to drive pronoun-based RAG filtering.
+            candidates: indexed filenames in the org whose tokens overlap with
+                the user's query (ranked, capped). Used both for the awareness
+                block and — when exactly one match — as an implicit RAG filter.
+            total_indexed: how many indexed docs exist in the org.
+            implicit_filter: filenames to pass to RAG as a source filter when
+                the user did not type an explicit filename.
+        """
+        try:
+            recent_docs = await self._doc_repo.list_recent_documents(
+                organization_id, limit=10
+            )
+        except Exception:
+            logger.error(
+                "recent_documents_fetch_failed",
+                organization_id=str(organization_id),
+                exc_info=True,
+            )
+            recent_docs = []
+
+        session_upload_ids: set[uuid.UUID] = set(request.recent_upload_ids or [])
+
+        try:
+            all_filenames = await self._doc_repo.list_indexed_filenames(
+                organization_id
+            )
+        except Exception:
+            logger.error(
+                "indexed_filenames_fetch_failed",
+                organization_id=str(organization_id),
+                exc_info=True,
+            )
+            all_filenames = []
+
+        candidates = _match_candidate_filenames(request.message, all_filenames)
+
+        implicit_filter: list[str] = []
+        if not _extract_referenced_filenames(request.message):
+            if _references_recent_upload(request.message):
+                # Prefer a session upload by THIS user; otherwise fall back to
+                # the org's most-recently-indexed doc.
+                session_indexed = [
+                    d.filename
+                    for d in recent_docs
+                    if d.id in session_upload_ids
+                    and d.status == DocumentStatus.INDEXED
+                ]
+                if session_indexed:
+                    implicit_filter = session_indexed[:1]
+                else:
+                    org_indexed = [
+                        d.filename
+                        for d in recent_docs
+                        if d.status == DocumentStatus.INDEXED
+                    ]
+                    if org_indexed:
+                        implicit_filter = org_indexed[:1]
+            elif len(candidates) == 1:
+                implicit_filter = candidates
+
+        return recent_docs, session_upload_ids, candidates, len(all_filenames), implicit_filter
+
     async def _prepare_messages(
         self,
         conversation_id: uuid.UUID,
@@ -288,6 +569,10 @@ class ChatService:
         function_type: FunctionType,
         prompts_config: PromptsPayload | None,
         context_block: str,
+        recent_docs: list[Document] | None = None,
+        session_upload_ids: set[uuid.UUID] | None = None,
+        candidates: list[str] | None = None,
+        total_indexed: int = 0,
     ) -> list[dict[str, str]]:
         """Build the full message list for the model: system prompt, history, and RAG context."""
         system_prompt = _resolve_prompt(function_type, prompts_config)
@@ -337,6 +622,22 @@ class ChatService:
                 ),
             },
         ]
+
+        awareness_sections: list[str] = []
+        recent_block = _build_recent_uploads_block(
+            recent_docs or [], session_upload_ids
+        )
+        if recent_block:
+            awareness_sections.append(recent_block)
+        candidates_block = _build_candidates_block(candidates or [], total_indexed)
+        if candidates_block:
+            awareness_sections.append(candidates_block)
+        if awareness_sections:
+            awareness_sections.append(_FILE_AWARENESS_INSTRUCTIONS)
+            messages.append(
+                {"role": "system", "content": "\n\n".join(awareness_sections)}
+            )
+
         for msg in history:
             messages.append({"role": msg.role.value, "content": msg.content})
 
@@ -510,12 +811,21 @@ class ChatService:
         except (ValueError, KeyError):
             prompts_config = None
 
+        (
+            recent_docs,
+            session_upload_ids,
+            candidates,
+            total_indexed,
+            implicit_filter,
+        ) = await self._resolve_document_context(request, organization_id)
+
         search_results, context_block = await self._build_rag_context(
             query=request.message,
             organization_id=organization_id,
             conversation_id=conversation.id,
             top_k=rag_config.top_k,
             score_threshold=rag_config.score_threshold,
+            implicit_source_filter=implicit_filter,
         )
 
         messages = await self._prepare_messages(
@@ -524,6 +834,10 @@ class ChatService:
             function_type=routed_function,
             prompts_config=prompts_config,
             context_block=context_block,
+            recent_docs=recent_docs,
+            session_upload_ids=session_upload_ids,
+            candidates=candidates,
+            total_indexed=total_indexed,
         )
 
         if routed_function == FunctionType.RISK_REGISTER:
@@ -619,12 +933,21 @@ class ChatService:
         except (ValueError, KeyError):
             prompts_config = None
 
+        (
+            recent_docs,
+            session_upload_ids,
+            candidates,
+            total_indexed,
+            implicit_filter,
+        ) = await self._resolve_document_context(request, organization_id)
+
         search_results, context_block = await self._build_rag_context(
             query=request.message,
             organization_id=organization_id,
             conversation_id=conversation.id,
             top_k=rag_config.top_k,
             score_threshold=rag_config.score_threshold,
+            implicit_source_filter=implicit_filter,
         )
 
         messages = await self._prepare_messages(
@@ -633,6 +956,10 @@ class ChatService:
             function_type=routed_function,
             prompts_config=prompts_config,
             context_block=context_block,
+            recent_docs=recent_docs,
+            session_upload_ids=session_upload_ids,
+            candidates=candidates,
+            total_indexed=total_indexed,
         )
 
         yield {
