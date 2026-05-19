@@ -75,7 +75,6 @@ const WELCOME_MESSAGES: Record<FunctionType, string> = {
     "To get started, I can help you with:\n\n" +
     "- Recording a new hazard with full classification (Technical, Human, Organizational, or Environmental)\n" +
     "- Assigning and documenting initial and residual risk scores against your organization-specific or FAA 5×5 risk matrix\n" +
-    "- Classifying the hazard entry as a Lagging, Leading, or Predictive indicator\n" +
     "- Linking existing controls and mitigation actions with assigned owners and due dates\n" +
     "- Flagging entries that require Accountable Executive review or a full Safety Risk Assessment (SRA)\n\n" +
     "All outputs are decision-support tools and require Safety Manager/SMS Manager " +
