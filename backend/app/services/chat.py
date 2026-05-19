@@ -89,7 +89,7 @@ _QUERY_STOPWORDS: frozenset[str] = frozenset(
         "name", "names", "named", "called", "title", "titled",
         "please", "thanks", "thank", "hello", "hey", "yes", "yeah",
         "want", "need", "like", "know", "get", "got", "make", "made",
-        "use", "used", "using", "say", "said", "tell", "telling",
+        "use", "used", "using", "say", "said", "telling",
         "between", "over", "under", "more", "less", "than", "then",
         "out", "off", "yet", "still", "very", "much", "many", "few",
     }
