@@ -576,6 +576,40 @@ _MANDATORY_ELEMENT_SIGNALS: dict[FunctionType, dict[str, tuple[str, ...]]] = {
 }
 
 
+# Regex-based checks specific to SRA outputs. Substring matching is not enough
+# for cell labels (we need patterns like "3B", "4c", or "Likelihood 3") so these
+# checks live alongside _MANDATORY_ELEMENT_SIGNALS rather than inside it.
+_MATRIX_CELL_RE = re.compile(r"\b[1-5][A-E]\b", re.IGNORECASE)
+_LIKELIHOOD_PROSE_RE = re.compile(r"likelihood\s*[:\-]?\s*[1-5]\b", re.IGNORECASE)
+_SEVERITY_PROSE_RE = re.compile(r"severity\s*[:\-]?\s*[a-e]\b", re.IGNORECASE)
+
+_VISUAL_MATRIX_CELL_SIGNALS: tuple[str, ...] = (
+    "matrix cell",
+    "matrix position",
+    "matrix grid",
+    "matrix coordinates",
+    "dashboard rendering",
+    "cell position",
+    "cell description",
+    "row ",
+    "column ",
+)
+
+
+def _has_matrix_cell_notation(content: str) -> bool:
+    """True when the SRA output renders FAA 5x5 alphanumeric notation.
+
+    Detects either a cell label ("3B", "4C", etc.) or scoring prose with the
+    expected numeric likelihood / alpha severity pattern. False here means the
+    model rendered qualitative descriptors only.
+    """
+    return bool(
+        _MATRIX_CELL_RE.search(content)
+        or _LIKELIHOOD_PROSE_RE.search(content)
+        or _SEVERITY_PROSE_RE.search(content)
+    )
+
+
 def _detect_missing_mandatory_elements(content: str, function_type: FunctionType) -> list[str]:
     """Return labels of mandatory output elements not detected in the response.
 
@@ -587,11 +621,17 @@ def _detect_missing_mandatory_elements(content: str, function_type: FunctionType
     if not required:
         return []
     lowered = content.lower()
-    return [
+    missing = [
         label
         for label, signals in required.items()
         if not any(signal in lowered for signal in signals)
     ]
+    if function_type == FunctionType.SRA:
+        if not _has_matrix_cell_notation(content):
+            missing.append("FAA 5x5 Matrix Cell Notation")
+        if not any(sig in lowered for sig in _VISUAL_MATRIX_CELL_SIGNALS):
+            missing.append("Visual Matrix Cell Description")
+    return missing
 
 
 def _build_quality_notice(missing: list[str]) -> str:
@@ -786,10 +826,18 @@ class ChatService:
             "Formatting rules:\n"
             "- Always put the Answer section first, then Reasoning.\n"
             "- Use markdown headers (###) for sections, NEVER numbered top-level sections.\n"
-            "- For risk levels, use bold colored labels: **High**, **Medium**, **Low**. "
-            "Do NOT put colors in parentheses like '(Red)' or '(Yellow)' — just use the label.\n"
-            "- Do NOT display numerical scores, percentages, or match tier labels "
-            "(High/Moderate/Low) next to sources anywhere in your response.\n"
+            "- For qualitative risk-level labels, use bold: **Low**, **Medium**, "
+            "**High**, **Extreme**. Do NOT put colors in parentheses like "
+            "'(Red)' or '(Yellow)' — just use the label.\n"
+            "- Source-retrieval metadata suppression (NARROW SCOPE): do NOT "
+            "display RAG retrieval scores, RRF scores, match-tier labels (e.g. "
+            "'High match', 'Moderate match'), or percentage relevance values "
+            "next to source citations. The UI renders source chips with their "
+            "own visual tier indicators. This suppression applies ONLY to "
+            "source-retrieval metadata. It does NOT apply to risk-matrix "
+            "scores (likelihood values 1-5, severity values A-E, matrix cell "
+            "labels like '3B', or numerical risk scores) — those follow the "
+            "system prompt and MUST be rendered.\n"
             "- If a source has low relevance or doesn't directly support your answer, "
             "say so rather than forcing a connection.\n"
             "- Do NOT display performance-indicator classifications (Leading, "
@@ -814,6 +862,20 @@ class ChatService:
             "- Regulatory citations tied to each root cause and corrective action "
             "(e.g. 14 CFR §139.337, AC 150/5200-33C, AC 150/5200-37A, ICAO Annex 19). "
             "Cite the specific regulatory authority, not just a generic reference.\n"
+            "- Risk-matrix notation for every risk determination. When the FAA 5x5 "
+            "matrix applies (default), render Likelihood as 1-5 (1-Improbable → "
+            "5-Frequent), Severity as A-E (A-Catastrophic → E-Negligible), and the "
+            "resulting cell label (e.g. '3B', '4C') explicitly. Qualitative "
+            "descriptors (Low/Medium/High/Extreme) may accompany the alphanumeric "
+            "notation but never replace it. The alphanumeric cell label is "
+            "mandatory and is NOT subject to the source-metadata suppression rule "
+            "above. This applies to initial risk, residual risk, and any other "
+            "risk score the output presents.\n"
+            "- Visual matrix-cell description for dashboard rendering on any SRA "
+            "output: state the cell's position on the matrix (e.g. 'row 3 "
+            "Remote, column B Hazardous') and the band it falls in (Low/Medium/"
+            "High/Extreme). This is what the dashboard renders visually — it "
+            "must appear in the output.\n"
             "- Source traceability with FG SRM precedent citations at 70% weighting "
             "where applicable, presented in prose (not as a separate sources list).\n"
             "- Predictive what-if projections for every analyzed hazard or trend, "
