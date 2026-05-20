@@ -576,9 +576,7 @@ _MANDATORY_ELEMENT_SIGNALS: dict[FunctionType, dict[str, tuple[str, ...]]] = {
 }
 
 
-def _detect_missing_mandatory_elements(
-    content: str, function_type: FunctionType
-) -> list[str]:
+def _detect_missing_mandatory_elements(content: str, function_type: FunctionType) -> list[str]:
     """Return labels of mandatory output elements not detected in the response.
 
     Returns an empty list for function types without mandatory-element rules
@@ -1077,9 +1075,7 @@ class ChatService:
                 max_tokens=model_config.max_output_tokens,
             )
 
-        missing_elements = _detect_missing_mandatory_elements(
-            assistant_content, routed_function
-        )
+        missing_elements = _detect_missing_mandatory_elements(assistant_content, routed_function)
         if missing_elements:
             assistant_content += _build_quality_notice(missing_elements)
             logger.warning(
@@ -1224,9 +1220,7 @@ class ChatService:
 
         assistant_content = "".join(buffered)
 
-        missing_elements = _detect_missing_mandatory_elements(
-            assistant_content, routed_function
-        )
+        missing_elements = _detect_missing_mandatory_elements(assistant_content, routed_function)
         if missing_elements:
             notice = _build_quality_notice(missing_elements)
             assistant_content += notice
