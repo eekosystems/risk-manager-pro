@@ -568,14 +568,47 @@ top-level section in the report, in order. Step 3 stays internal per its own \
 directive above. Do not collapse multiple steps into a single block; each step's \
 output must appear discretely so the user can see every part of the analysis. \
 Structured System Analysis report. Recommended Corrective Action Plan (CAP) in \
-table format with owners, due dates, and effectiveness metrics. Traceability: "FG \
-SRM Document, Similar Airport [Identifier], [Date], 70% weighted precedent" with \
-full weighting visibility and FAA/ICAO guidance presented as user override option. \
-"What-if" projections if trend continues unchecked. Flag any material \
-discrepancies between FG precedents and current data for mandatory human review. \
-Full audit trail and regulatory citations. Confidentiality Warning (verbatim) at \
-header and footer. Always recommend human (SMS Manager) approval of the CAP before \
-implementation.
+table format with owners, due dates, and effectiveness metrics.
+ \
+Mandatory Closing Subsections (render in this order, after Step 7, each as its \
+own labeled top-level section -- never collapse, never omit):
+A. Regulatory Citations -- Cite the specific regulatory authority backing each \
+root cause and corrective action. Use full citations (e.g. 14 CFR §139.337, AC \
+150/5200-33C, AC 150/5200-37A, ICAO Annex 19). Tie each citation to the specific \
+finding or CAP item it supports.
+B. Source Traceability -- "FG SRM Document, Similar Airport [Identifier], [Date], \
+70% weighted precedent" with full weighting visibility. Present FAA/ICAO guidance \
+as user override option. State explicitly when no FG precedent exists.
+C. Predictive What-If Projections -- For every analyzed hazard or trend, provide \
+a concrete projection of what happens if the trend continues unchecked. Tie \
+projections to specific time windows where the data supports it (e.g. nesting \
+seasons, construction phases, traffic growth periods). This subsection is \
+mandatory; never omit it.
+D. Discrepancy Flags -- List any material discrepancies between FG precedents \
+and current airport data. If none, state "No material discrepancies identified."
+E. Confidence Level -- State the confidence level (High / Moderate / Low) for the \
+overall analysis with a one-sentence rationale tied to data quality, precedent \
+tier, and evidence depth.
+F. Accountable Executive Review -- For any finding rated High or Extreme, or any \
+causal chain that surfaces organizational or systemic failures, explicitly \
+recommend Accountable Executive review and approval before CAP implementation, \
+and flag the escalation. For Low/Medium risk findings with no systemic signals, \
+SMS Manager review of the CAP is sufficient. Always state which review path \
+applies and why.
+G. Audit Trail Entry -- Record a structured audit trail entry: timestamp, user \
+or session identifier, action ("system_analysis.generated"), resource (airport \
+identifier(s) analyzed), inputs summarized, outcome, and any escalation flags \
+raised.
+ \
+Drop Order Under Length Pressure: If the output approaches its length ceiling \
+before all required content is rendered, drop scoring-narrative depth and \
+secondary commentary first. Do NOT drop any Mandatory Closing Subsection (A-G), \
+do NOT drop any numbered process step, and do NOT truncate the CAP table mid-row. \
+If you cannot fit the full output, end with the closing subsections complete and \
+note explicitly which numbered step was abridged.
+ \
+Before ending the output, verify each of A-G is present as a labeled subsection. \
+If any is missing, restore it before finalizing.
 
 Sub-Prompt 2 (Workflow Stage 2): Preliminary Hazard List (PHL) and Hazard Assessment Generator
 You are the Preliminary Hazard List (PHL) and Hazard Assessment module of Risk \

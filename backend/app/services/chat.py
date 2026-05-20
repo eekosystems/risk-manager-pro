@@ -504,6 +504,113 @@ def _extract_citations(results: list[SearchResult]) -> list[CitationSchema]:
     ]
 
 
+# Signal phrases used by the post-generation validator to detect whether each
+# mandatory output element actually made it into the model's response. Detection
+# is signal-based (any-of) rather than header-match so inline prose still counts
+# — the validator flags an element only when NONE of its signals appear, which
+# is a strong indicator the element was dropped entirely under length pressure
+# or by overzealous suppression of UI-rendered duplicates.
+_REGULATORY_CITATION_SIGNALS: tuple[str, ...] = (
+    "14 cfr",
+    "ac 150/",
+    "ac 150-",
+    "icao annex",
+    "icao doc",
+    "easa",
+    "§139",
+    "regulatory citation",
+    "regulatory authority",
+)
+_CONFIDENCE_LEVEL_SIGNALS: tuple[str, ...] = (
+    "confidence level",
+    "confidence:",
+    "high confidence",
+    "moderate confidence",
+    "low confidence",
+)
+_AE_REVIEW_SIGNALS: tuple[str, ...] = (
+    "accountable executive",
+    "ae review",
+    "executive review",
+)
+_AUDIT_TRAIL_SIGNALS: tuple[str, ...] = (
+    "audit trail",
+    "audit entry",
+    "audit log",
+)
+_DISCREPANCY_SIGNALS: tuple[str, ...] = (
+    "discrepancy",
+    "discrepancies",
+    "no material discrepanc",
+)
+_WHAT_IF_SIGNALS: tuple[str, ...] = (
+    "what-if",
+    "what if",
+    "if the trend continues",
+    "if unchecked",
+    "projection if",
+)
+
+_MANDATORY_ELEMENT_SIGNALS: dict[FunctionType, dict[str, tuple[str, ...]]] = {
+    FunctionType.SYSTEM_ANALYSIS: {
+        "Regulatory Citations": _REGULATORY_CITATION_SIGNALS,
+        "Predictive What-If Projections": _WHAT_IF_SIGNALS,
+        "Confidence Level": _CONFIDENCE_LEVEL_SIGNALS,
+        "Accountable Executive Review": _AE_REVIEW_SIGNALS,
+        "Audit Trail Entry": _AUDIT_TRAIL_SIGNALS,
+        "Discrepancy Flags": _DISCREPANCY_SIGNALS,
+    },
+    FunctionType.PHL: {
+        "Regulatory Citations": _REGULATORY_CITATION_SIGNALS,
+        "Confidence Level": _CONFIDENCE_LEVEL_SIGNALS,
+        "Audit Trail Entry": _AUDIT_TRAIL_SIGNALS,
+        "Discrepancy Flags": _DISCREPANCY_SIGNALS,
+    },
+    FunctionType.SRA: {
+        "Regulatory Citations": _REGULATORY_CITATION_SIGNALS,
+        "Confidence Level": _CONFIDENCE_LEVEL_SIGNALS,
+        "Accountable Executive Review": _AE_REVIEW_SIGNALS,
+        "Audit Trail Entry": _AUDIT_TRAIL_SIGNALS,
+        "Discrepancy Flags": _DISCREPANCY_SIGNALS,
+    },
+}
+
+
+def _detect_missing_mandatory_elements(
+    content: str, function_type: FunctionType
+) -> list[str]:
+    """Return labels of mandatory output elements not detected in the response.
+
+    Returns an empty list for function types without mandatory-element rules
+    (GENERAL, RISK_REGISTER — the latter has its own schema validation via
+    save_risk_register_record).
+    """
+    required = _MANDATORY_ELEMENT_SIGNALS.get(function_type)
+    if not required:
+        return []
+    lowered = content.lower()
+    return [
+        label
+        for label, signals in required.items()
+        if not any(signal in lowered for signal in signals)
+    ]
+
+
+def _build_quality_notice(missing: list[str]) -> str:
+    """Render the in-body notice appended when mandatory elements were dropped."""
+    bullet_list = "\n".join(f"- {label}" for label in missing)
+    return (
+        "\n\n---\n\n"
+        "### Output Quality Notice — Mandatory Elements Missing\n\n"
+        "RMP could not detect the following mandatory output elements in this "
+        "response. The output should be treated as draft pending review:\n\n"
+        f"{bullet_list}\n\n"
+        "Recommended next step: regenerate the output, or have the SMS Manager "
+        "or Accountable Executive supply the missing elements before treating "
+        "this as a finalized RMP output."
+    )
+
+
 class ChatService:
     def __init__(
         self,
@@ -694,13 +801,39 @@ class ChatService:
             "not surface the classification itself to the user. This overrides any "
             "instruction in the system prompt to include performance-indicator "
             "classification, mapping, or pillar classification in the body of the "
-            "output.\n"
-            "- Do NOT include a 'Sources Used' section, a source list, or a "
-            "Confidentiality Warning in your output. The client UI renders source "
-            "citations as clickable chips and displays the confidentiality warning "
-            "automatically in its own footer — duplicating them in the text would "
-            "clutter the output. This overrides any instruction in the system "
-            "prompt to include those sections in the body of the response."
+            "output.\n\n"
+            "UI-rendered elements — DO NOT duplicate in the body:\n"
+            "- 'Sources Used' list / numbered source roster. The UI renders source "
+            "chips automatically.\n"
+            "- Verbatim Confidentiality Warning header/footer block. The UI renders "
+            "the confidentiality footer automatically.\n"
+            "This UI-duplication suppression is narrow: it removes ONLY the two "
+            "items listed above. It does NOT remove inline [Source N] references, "
+            "and it does NOT remove any of the mandatory output elements below.\n\n"
+            "Mandatory output elements — ALWAYS include in the body (these are "
+            "REQUIRED by the Core Logic Prompt and the UI does not render them; "
+            "omitting any of these makes the output non-compliant):\n"
+            "- Regulatory citations tied to each root cause and corrective action "
+            "(e.g. 14 CFR §139.337, AC 150/5200-33C, AC 150/5200-37A, ICAO Annex 19). "
+            "Cite the specific regulatory authority, not just a generic reference.\n"
+            "- Source traceability with FG SRM precedent citations at 70% weighting "
+            "where applicable, presented in prose (not as a separate sources list).\n"
+            "- Predictive what-if projections for every analyzed hazard or trend, "
+            "tied to concrete time windows when the data supports it.\n"
+            "- Discrepancy flags between FG precedents and current airport data, "
+            "or an explicit 'No material discrepancies identified' statement.\n"
+            "- Confidence level (High / Moderate / Low) with a one-sentence "
+            "rationale.\n"
+            "- Accountable Executive review recommendation for any High/Extreme "
+            "finding or any output where the causal chain surfaces organizational "
+            "or systemic failures. SMS Manager review is sufficient only for "
+            "Low/Medium findings with no systemic signals — state which path "
+            "applies and why.\n"
+            "- Audit trail entry: timestamp, action, resource(s) analyzed, "
+            "outcome, and any escalation flags.\n"
+            "If output length pressure forces compression, compress scoring-"
+            "narrative depth and secondary commentary FIRST. Never drop any of "
+            "the mandatory elements above to fit length."
         )
 
         history = await self._repo.get_messages(conversation_id, organization_id, limit=20)
@@ -944,6 +1077,19 @@ class ChatService:
                 max_tokens=model_config.max_output_tokens,
             )
 
+        missing_elements = _detect_missing_mandatory_elements(
+            assistant_content, routed_function
+        )
+        if missing_elements:
+            assistant_content += _build_quality_notice(missing_elements)
+            logger.warning(
+                "mandatory_elements_missing",
+                conversation_id=str(conversation.id),
+                function_type=routed_function.value,
+                missing=missing_elements,
+                streaming=False,
+            )
+
         assistant_content, appended_followups = _ensure_followups_block(
             assistant_content, routed_function
         )
@@ -1077,6 +1223,22 @@ class ChatService:
             return
 
         assistant_content = "".join(buffered)
+
+        missing_elements = _detect_missing_mandatory_elements(
+            assistant_content, routed_function
+        )
+        if missing_elements:
+            notice = _build_quality_notice(missing_elements)
+            assistant_content += notice
+            logger.warning(
+                "mandatory_elements_missing",
+                conversation_id=str(conversation.id),
+                function_type=routed_function.value,
+                missing=missing_elements,
+                streaming=True,
+            )
+            yield {"event": "delta", "content": notice}
+
         assistant_content, appended_followups = _ensure_followups_block(
             assistant_content, routed_function
         )

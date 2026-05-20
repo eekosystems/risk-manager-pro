@@ -24,7 +24,7 @@ class RagSettingsPayload(BaseModel):
 class ModelPreferencesPayload(BaseModel):
     chat_model: str = Field("gpt-4o")
     temperature: float = Field(0.3, ge=0.0, le=2.0)
-    max_output_tokens: int = Field(4096, ge=256, le=16384)
+    max_output_tokens: int = Field(16384, ge=256, le=16384)
     top_p: float = Field(0.95, ge=0.0, le=1.0)
     frequency_penalty: float = Field(0.0, ge=0.0, le=2.0)
     presence_penalty: float = Field(0.0, ge=0.0, le=2.0)
