@@ -76,22 +76,125 @@ def _extract_referenced_filenames(query: str) -> list[str]:
 # narrows to ["cspp"] rather than spuriously matching files named "Document …".
 _QUERY_STOPWORDS: frozenset[str] = frozenset(
     {
-        "the", "and", "but", "for", "you", "your", "our", "their", "this",
-        "that", "these", "those", "with", "from", "into", "have", "has",
-        "had", "are", "was", "were", "been", "being", "any", "all", "some",
-        "what", "when", "where", "which", "who", "whom", "why", "how",
-        "can", "could", "would", "should", "may", "might", "will", "shall",
-        "did", "does", "doing", "tell", "show", "give", "ask", "see", "read",
-        "find", "look", "looking", "about", "regarding", "concerning",
-        "file", "files", "document", "documents", "doc", "docs", "pdf",
-        "docx", "txt", "upload", "uploaded", "uploads", "uploading",
-        "most", "recent", "latest", "just", "now", "today", "yesterday",
-        "name", "names", "named", "called", "title", "titled",
-        "please", "thanks", "thank", "hello", "hey", "yes", "yeah",
-        "want", "need", "like", "know", "get", "got", "make", "made",
-        "use", "used", "using", "say", "said", "telling",
-        "between", "over", "under", "more", "less", "than", "then",
-        "out", "off", "yet", "still", "very", "much", "many", "few",
+        "the",
+        "and",
+        "but",
+        "for",
+        "you",
+        "your",
+        "our",
+        "their",
+        "this",
+        "that",
+        "these",
+        "those",
+        "with",
+        "from",
+        "into",
+        "have",
+        "has",
+        "had",
+        "are",
+        "was",
+        "were",
+        "been",
+        "being",
+        "any",
+        "all",
+        "some",
+        "what",
+        "when",
+        "where",
+        "which",
+        "who",
+        "whom",
+        "why",
+        "how",
+        "can",
+        "could",
+        "would",
+        "should",
+        "may",
+        "might",
+        "will",
+        "shall",
+        "did",
+        "does",
+        "doing",
+        "tell",
+        "show",
+        "give",
+        "ask",
+        "see",
+        "read",
+        "find",
+        "look",
+        "looking",
+        "about",
+        "regarding",
+        "concerning",
+        "file",
+        "files",
+        "document",
+        "documents",
+        "doc",
+        "docs",
+        "pdf",
+        "docx",
+        "txt",
+        "upload",
+        "uploaded",
+        "uploads",
+        "uploading",
+        "most",
+        "recent",
+        "latest",
+        "just",
+        "now",
+        "today",
+        "yesterday",
+        "name",
+        "names",
+        "named",
+        "called",
+        "title",
+        "titled",
+        "please",
+        "thanks",
+        "thank",
+        "hello",
+        "hey",
+        "yes",
+        "yeah",
+        "want",
+        "need",
+        "like",
+        "know",
+        "get",
+        "got",
+        "make",
+        "made",
+        "use",
+        "used",
+        "using",
+        "say",
+        "said",
+        "telling",
+        "between",
+        "over",
+        "under",
+        "more",
+        "less",
+        "than",
+        "then",
+        "out",
+        "off",
+        "yet",
+        "still",
+        "very",
+        "much",
+        "many",
+        "few",
     }
 )
 
@@ -132,11 +235,7 @@ def _normalize_token(token: str) -> str:
 def _tokenize(text: str) -> list[str]:
     """Lowercase, split on non-word chars, drop short/stopword tokens, light-stem."""
     raw = _TOKEN_SPLIT_RE.split(text.lower())
-    return [
-        _normalize_token(t)
-        for t in raw
-        if len(t) >= 3 and t not in _QUERY_STOPWORDS
-    ]
+    return [_normalize_token(t) for t in raw if len(t) >= 3 and t not in _QUERY_STOPWORDS]
 
 
 def _filename_stem_tokens(filename: str) -> list[str]:
@@ -236,26 +335,26 @@ _FILE_AWARENESS_INSTRUCTIONS = (
     "File awareness rules:\n"
     "- The lists above ARE the authoritative answer for what files exist in "
     "this organization and what the user has recently uploaded. Treat them "
-    "as ground truth — do NOT hedge with phrases like \"based on the context "
-    "provided\", \"limited to what's shown\", or \"I don't have access to "
-    "your file repository\".\n"
+    'as ground truth — do NOT hedge with phrases like "based on the context '
+    'provided", "limited to what\'s shown", or "I don\'t have access to '
+    'your file repository".\n'
     "- When the user asks the name of a file, which file they uploaded, "
     "which is most recent, or to list their files, answer with the bare "
-    "filename(s) only (e.g. \"Seattle CSPP 2024.pdf\"). Do NOT add chunk "
-    "numbers, \"[Source N]\" labels, section names, or any other RAG "
+    'filename(s) only (e.g. "Seattle CSPP 2024.pdf"). Do NOT add chunk '
+    'numbers, "[Source N]" labels, section names, or any other RAG '
     "retrieval terminology in prose. The UI renders source citation chips "
     "separately — your job is to name the file plainly. This overrides the "
-    "general \"reference sources by number\" rule for file-identity "
+    'general "reference sources by number" rule for file-identity '
     "questions.\n"
-    "- \"Recently uploaded\" means the list under \"Files this user "
-    "recently uploaded\" above, ordered most recent first. Use that order — "
+    '- "Recently uploaded" means the list under "Files this user '
+    'recently uploaded" above, ordered most recent first. Use that order — '
     "do not re-infer recency from the order of retrieved chunks.\n"
     "- If the user's request appears to target a single specific document "
     "and the candidate list above contains more than one match, ask the user "
     "which one they mean before answering. List the candidate filenames so "
     "the user can pick. Do not guess.\n"
-    "- If the user's request is plural or comparative (e.g. \"compare\", "
-    "\"all of them\", \"our CSPPs\"), do not ask — synthesize across the "
+    '- If the user\'s request is plural or comparative (e.g. "compare", '
+    '"all of them", "our CSPPs"), do not ask — synthesize across the '
     "matching documents.\n"
     "- If the candidate list is empty but the user names a file, say you "
     "could not find a matching document in their library."
@@ -509,9 +608,7 @@ class ChatService:
                 the user did not type an explicit filename.
         """
         try:
-            recent_docs = await self._doc_repo.list_recent_documents(
-                organization_id, limit=10
-            )
+            recent_docs = await self._doc_repo.list_recent_documents(organization_id, limit=10)
         except Exception:
             logger.error(
                 "recent_documents_fetch_failed",
@@ -523,9 +620,7 @@ class ChatService:
         session_upload_ids: set[uuid.UUID] = set(request.recent_upload_ids or [])
 
         try:
-            all_filenames = await self._doc_repo.list_indexed_filenames(
-                organization_id
-            )
+            all_filenames = await self._doc_repo.list_indexed_filenames(organization_id)
         except Exception:
             logger.error(
                 "indexed_filenames_fetch_failed",
@@ -544,16 +639,13 @@ class ChatService:
                 session_indexed = [
                     d.filename
                     for d in recent_docs
-                    if d.id in session_upload_ids
-                    and d.status == DocumentStatus.INDEXED
+                    if d.id in session_upload_ids and d.status == DocumentStatus.INDEXED
                 ]
                 if session_indexed:
                     implicit_filter = session_indexed[:1]
                 else:
                     org_indexed = [
-                        d.filename
-                        for d in recent_docs
-                        if d.status == DocumentStatus.INDEXED
+                        d.filename for d in recent_docs if d.status == DocumentStatus.INDEXED
                     ]
                     if org_indexed:
                         implicit_filter = org_indexed[:1]
@@ -624,9 +716,7 @@ class ChatService:
         ]
 
         awareness_sections: list[str] = []
-        recent_block = _build_recent_uploads_block(
-            recent_docs or [], session_upload_ids
-        )
+        recent_block = _build_recent_uploads_block(recent_docs or [], session_upload_ids)
         if recent_block:
             awareness_sections.append(recent_block)
         candidates_block = _build_candidates_block(candidates or [], total_indexed)
@@ -634,9 +724,7 @@ class ChatService:
             awareness_sections.append(candidates_block)
         if awareness_sections:
             awareness_sections.append(_FILE_AWARENESS_INSTRUCTIONS)
-            messages.append(
-                {"role": "system", "content": "\n\n".join(awareness_sections)}
-            )
+            messages.append({"role": "system", "content": "\n\n".join(awareness_sections)})
 
         for msg in history:
             messages.append({"role": msg.role.value, "content": msg.content})
