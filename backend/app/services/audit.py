@@ -204,6 +204,7 @@ async def _write_audit_blob(
                 data=json.dumps(audit_data).encode("utf-8"),
                 content_type="application/json",
                 container=settings.azure_storage_audit_container,
+                overwrite=False,
             )
         finally:
             if owns_storage:

@@ -35,7 +35,12 @@ class BlobStorageService:
         return self._client
 
     async def upload(
-        self, blob_path: str, data: bytes, content_type: str, container: str | None = None
+        self,
+        blob_path: str,
+        data: bytes,
+        content_type: str,
+        container: str | None = None,
+        overwrite: bool = True,
     ) -> str:
         client = await self._get_client()
         container_name = container or settings.azure_storage_container_name
@@ -49,7 +54,7 @@ class BlobStorageService:
             logger.warning("container_create_failed", container=container_name, error=str(e))
 
         blob_client = container_client.get_blob_client(blob_path)
-        await blob_client.upload_blob(data, content_type=content_type, overwrite=True)
+        await blob_client.upload_blob(data, content_type=content_type, overwrite=overwrite)
         logger.info("blob_uploaded", path=blob_path, size=len(data))
         return blob_path
 

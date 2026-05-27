@@ -3,6 +3,16 @@ import { Configuration, LogLevel } from "@azure/msal-browser";
 import { env } from "./env";
 import { logger } from "../lib/logger";
 
+// RMP is single-tenant. A multi-tenant authority (/common, /organizations,
+// /consumers) would offer sign-in to identities from any Entra tenant; the
+// authority must be pinned to the configured tenant.
+const MULTI_TENANT_AUTHORITY = /\/(common|organizations|consumers)\/?$/i;
+if (MULTI_TENANT_AUTHORITY.test(env.azureAdAuthority)) {
+  throw new Error(
+    "VITE_AZURE_AD_AUTHORITY must be pinned to a specific Entra tenant, not a multi-tenant authority."
+  );
+}
+
 const isMsalConfigured =
   env.azureAdClientId !== "" && env.azureAdAuthority !== "";
 
@@ -16,10 +26,8 @@ export { isMsalConfigured };
 
 export const msalConfig: Configuration = {
   auth: {
-    clientId: env.azureAdClientId || "00000000-0000-0000-0000-000000000000",
-    authority:
-      env.azureAdAuthority ||
-      "https://login.microsoftonline.com/common",
+    clientId: env.azureAdClientId,
+    authority: env.azureAdAuthority,
     redirectUri: env.azureAdRedirectUri,
     postLogoutRedirectUri: env.azureAdRedirectUri,
   },

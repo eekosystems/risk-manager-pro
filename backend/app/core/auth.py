@@ -22,6 +22,7 @@ class TokenPayload(BaseModel):
     sub: str
     oid: str
     tid: str
+    iat: int = 0
     preferred_username: str | None = None
     name: str | None = None
     roles: list[str] = []
@@ -88,10 +89,28 @@ class EntraIDAuth:
                 ],
             )
 
+            # Pin the token to the configured Entra tenant. The issuer check
+            # above already encodes the tenant, but asserting tid explicitly is
+            # the auditable trust-boundary control and rejects any token whose
+            # tid does not match (defence in depth for the single-tenant model).
+            configured_tenant = settings.azure_ad_tenant_id
+            token_tenant = payload.get("tid", "")
+            if configured_tenant and token_tenant != configured_tenant:
+                logger.warning(
+                    "auth_failure",
+                    reason="tenant_not_allowed",
+                    token_tenant=token_tenant,
+                    client_ip=client_ip,
+                    user_agent=user_agent,
+                    correlation_id=correlation_id,
+                )
+                raise UnauthorizedError("Token issued by an untrusted tenant")
+
             return TokenPayload(
                 sub=payload["sub"],
                 oid=payload.get("oid", payload["sub"]),
-                tid=payload.get("tid", ""),
+                tid=token_tenant,
+                iat=int(payload.get("iat", 0)),
                 preferred_username=payload.get("preferred_username"),
                 name=payload.get("name"),
                 roles=payload.get("roles", []),

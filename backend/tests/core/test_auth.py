@@ -7,6 +7,7 @@ import jwt
 import pytest
 
 from app.core.auth import EntraIDAuth, TokenPayload
+from app.core.config import settings
 from app.core.exceptions import UnauthorizedError
 
 # RSA key pair for testing (generated with cryptography library — test only)
@@ -155,3 +156,52 @@ async def test_unknown_kid_raises_unauthorized() -> None:
 
         with pytest.raises(UnauthorizedError, match="signing key not found"):
             await auth.validate_token(token)
+
+
+@pytest.mark.asyncio
+async def test_token_from_untrusted_tenant_rejected() -> None:
+    auth = EntraIDAuth()
+
+    with patch.object(auth, "_fetch_jwks") as mock_fetch:
+        mock_fetch.return_value = None
+        auth._jwks = {TEST_KID: TEST_PUBLIC_KEY_JWK}
+
+        token = _make_token()
+
+        with (
+            patch.object(settings, "azure_ad_tenant_id", "trusted-tenant"),
+            patch("app.core.auth.jwt.decode") as mock_decode,
+        ):
+            mock_decode.return_value = {
+                "sub": "user-sub-123",
+                "oid": "oid-123",
+                "tid": "some-other-tenant",
+            }
+            with pytest.raises(UnauthorizedError, match="untrusted tenant"):
+                await auth.validate_token(token)
+
+
+@pytest.mark.asyncio
+async def test_token_from_trusted_tenant_accepted() -> None:
+    auth = EntraIDAuth()
+
+    with patch.object(auth, "_fetch_jwks") as mock_fetch:
+        mock_fetch.return_value = None
+        auth._jwks = {TEST_KID: TEST_PUBLIC_KEY_JWK}
+
+        token = _make_token()
+
+        with (
+            patch.object(settings, "azure_ad_tenant_id", "trusted-tenant"),
+            patch("app.core.auth.jwt.decode") as mock_decode,
+        ):
+            mock_decode.return_value = {
+                "sub": "user-sub-123",
+                "oid": "oid-123",
+                "tid": "trusted-tenant",
+                "iat": 1700000000,
+            }
+            result = await auth.validate_token(token)
+
+    assert result.tid == "trusted-tenant"
+    assert result.iat == 1700000000

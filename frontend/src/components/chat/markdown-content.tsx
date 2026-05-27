@@ -1,10 +1,29 @@
 import { ChevronRight } from "lucide-react";
 import { useMemo } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
+import rehypeSanitize from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
 
 import { stripFollowupsBlock, stripRrPayloadBlock } from "@/lib/followups";
 import type { Citation } from "@/types/api";
+
+/* ------------------------------------------------------------------ */
+/*  Sanitization: strip raw HTML / unsafe attributes from model output */
+/*  before it is rendered. Applied to every ReactMarkdown call site.   */
+/* ------------------------------------------------------------------ */
+const rehypePlugins = [rehypeSanitize];
+
+/** Allow only hash, root-relative, http(s) and mailto anchor targets. */
+function isSafeHref(href: string | undefined): href is string {
+  if (!href) return false;
+  if (href.startsWith("#") || href.startsWith("/")) return true;
+  try {
+    const { protocol } = new URL(href, window.location.origin);
+    return protocol === "http:" || protocol === "https:" || protocol === "mailto:";
+  } catch {
+    return false;
+  }
+}
 
 /* ------------------------------------------------------------------ */
 /*  Static components (no dependency on props)                        */
@@ -229,6 +248,9 @@ export function MarkdownContent({
             );
           }
         }
+        if (!isSafeHref(href)) {
+          return <span>{children}</span>;
+        }
         return (
           <a
             href={href}
@@ -248,7 +270,11 @@ export function MarkdownContent({
 
   if (!reasoning) {
     return (
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        rehypePlugins={rehypePlugins}
+        components={components}
+      >
         {processed}
       </ReactMarkdown>
     );
@@ -257,7 +283,11 @@ export function MarkdownContent({
   return (
     <>
       {before && (
-        <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+        <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        rehypePlugins={rehypePlugins}
+        components={components}
+      >
           {before}
         </ReactMarkdown>
       )}
@@ -270,13 +300,21 @@ export function MarkdownContent({
           Reasoning
         </summary>
         <div className="border-t border-gray-200 px-3 pb-2 pt-2">
-          <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+          <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        rehypePlugins={rehypePlugins}
+        components={components}
+      >
             {reasoning}
           </ReactMarkdown>
         </div>
       </details>
       {after && (
-        <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+        <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        rehypePlugins={rehypePlugins}
+        components={components}
+      >
           {after}
         </ReactMarkdown>
       )}

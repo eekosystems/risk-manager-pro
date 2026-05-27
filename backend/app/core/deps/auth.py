@@ -1,3 +1,4 @@
+import time
 import uuid
 from datetime import datetime, timedelta
 
@@ -109,15 +110,29 @@ async def _get_or_create_user(db: AsyncSession, token: TokenPayload, request: Re
     return user
 
 
-async def _check_session_timeout(db: AsyncSession, user: User, now: datetime) -> bool:
-    """Check if the session has expired and renew it if so.
+async def _enforce_session_timeout(
+    db: AsyncSession, user: User, token: TokenPayload, now: datetime
+) -> bool:
+    """Enforce the idle-session timeout (60 min of inactivity, CC6.1).
 
-    Returns True if the session was renewed (caller should return early),
-    False if no timeout occurred.
+    Returns True if the session was re-established from a genuine re-auth
+    (caller should treat the request as the start of a fresh session).
+    Raises UnauthorizedError if the session has been idle past the timeout and
+    the presented token is not itself fresh — i.e. no real re-authentication
+    happened, so a stale/replayed token must not be admitted.
     """
-    if user.last_activity is not None and (now - user.last_activity) > SESSION_TIMEOUT:
+    if user.last_activity is None or (now - user.last_activity) <= SESSION_TIMEOUT:
+        return False
+
+    # Idle past the timeout. Admit the request only if the bearer token was
+    # minted within the timeout window, which proves the caller just
+    # re-authenticated (interactive sign-in or MSAL silent refresh). The token's
+    # iat is the session clock; a token older than the window cannot revive an
+    # idle session.
+    token_age_seconds = time.time() - token.iat if token.iat else None
+    if token_age_seconds is not None and token_age_seconds <= SESSION_TIMEOUT.total_seconds():
         logger.info(
-            "session_renewed",
+            "session_reestablished",
             user_id=str(user.id),
             last_activity=user.last_activity.isoformat(),
         )
@@ -125,7 +140,13 @@ async def _check_session_timeout(db: AsyncSession, user: User, now: datetime) ->
         user.last_login = now
         await db.flush()
         return True
-    return False
+
+    logger.warning(
+        "session_expired",
+        user_id=str(user.id),
+        last_activity=user.last_activity.isoformat(),
+    )
+    raise UnauthorizedError("Session expired due to inactivity. Please sign in again.")
 
 
 async def _update_activity_timestamps(db: AsyncSession, user: User, now: datetime) -> None:
@@ -153,11 +174,10 @@ async def get_current_user(
 
     now = datetime.utcnow()
 
-    # Check session timeout — if last_activity is set and older than threshold,
-    # reset the session instead of permanently locking the user out.
-    # The user has already re-authenticated via Entra ID (token validated above),
-    # so we trust this is a legitimate new session.
-    if await _check_session_timeout(db, user, now):
+    # Enforce idle-session timeout. Rejects (401) when the session has been idle
+    # past the window and the token is not freshly minted; admits and resets the
+    # clock when the request carries a fresh re-auth token.
+    if await _enforce_session_timeout(db, user, token, now):
         return user
 
     await _update_activity_timestamps(db, user, now)
@@ -168,6 +188,14 @@ async def get_current_user(
 async def _get_or_create_org_for_tenant(
     db: AsyncSession, azure_tenant_id: str, request: Request | None = None
 ) -> Organization:
+    # Never silently provision an organization for an unrecognised tenant.
+    # validate_token already rejects foreign tenants, so in production this is a
+    # defence-in-depth assertion; in dev (no tenant configured) it is skipped.
+    configured_tenant = settings.azure_ad_tenant_id
+    if configured_tenant and azure_tenant_id != configured_tenant:
+        logger.warning("org_autocreate_blocked", token_tenant=azure_tenant_id)
+        raise ForbiddenError("Tenant is not provisioned for this application")
+
     if not azure_tenant_id:
         azure_tenant_id = str(uuid.uuid4())
 
