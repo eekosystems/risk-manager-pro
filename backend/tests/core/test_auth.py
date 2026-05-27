@@ -89,8 +89,13 @@ async def test_valid_jwt_returns_payload() -> None:
 
         token = _make_token()
 
-        # Bypass issuer/audience validation for unit test
-        with patch("app.core.auth.jwt.decode") as mock_decode:
+        # Bypass issuer/audience validation for unit test; pin the configured
+        # tenant to the token's tid so tenant validation passes regardless of
+        # the ambient AZURE_AD_TENANT_ID (set in CI, empty locally).
+        with (
+            patch.object(settings, "azure_ad_tenant_id", "tid-123"),
+            patch("app.core.auth.jwt.decode") as mock_decode,
+        ):
             mock_decode.return_value = {
                 "sub": "user-sub-123",
                 "oid": "oid-123",
