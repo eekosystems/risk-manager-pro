@@ -336,17 +336,6 @@ stages:
                   --role "Storage Blob Data Contributor" \
                   --scope "$STORAGE_ID" 2>/dev/null || echo "Storage role already assigned"
 
-                # Key Vault Secrets User so the app can resolve the DATABASE_URL
-                # secret reference (C-1)
-                KV_ID=$(az keyvault show \
-                  --name $(keyVaultName) \
-                  --resource-group $(resourceGroup) \
-                  --query "id" -o tsv)
-                az role assignment create \
-                  --assignee "$PRINCIPAL_ID" \
-                  --role "Key Vault Secrets User" \
-                  --scope "$KV_ID" 2>/dev/null || echo "Key Vault role already assigned"
-
                 # Ensure Search service is reachable (RBAC protects access)
                 az search service update \
                   --name $(searchServiceName) \
@@ -360,17 +349,14 @@ stages:
               scriptType: bash
               scriptLocation: inlineScript
               inlineScript: |
-                # C-1: bind DATABASE_URL to the Key Vault secret via the app's
-                # managed identity instead of pushing the connection string as a
-                # plaintext env var (readable through `az containerapp show`).
-                # The `database-url` Key Vault secret is provisioned out-of-band
-                # (Terraform azurerm_key_vault_secret.database_url, or the
-                # documented Cloud Shell command).
-                KV_SECRET_URI="https://$(keyVaultName).vault.azure.net/secrets/database-url"
+                # C-1: store the connection string as a Container App secret and
+                # reference it, so DATABASE_URL is not a plaintext env var
+                # readable via `az containerapp show`. Self-contained — sourced
+                # from the existing pipeline variable, no pre-created KV secret.
                 az containerapp secret set \
                   --name $(containerAppName) \
                   --resource-group $(resourceGroup) \
-                  --secrets "database-url=keyvaultref:$KV_SECRET_URI,identityref:system"
+                  --secrets "database-url=$DATABASE_URL"
 
                 az containerapp update \
                   --name $(containerAppName) \
@@ -388,6 +374,7 @@ stages:
                     APP_ENV=production \
                     LOG_LEVEL=INFO
             env:
+              DATABASE_URL: $(DATABASE_URL)
               AZURE_OPENAI_ENDPOINT: $(AZURE_OPENAI_ENDPOINT)
               AZURE_SEARCH_ENDPOINT: $(AZURE_SEARCH_ENDPOINT)
               AZURE_SEARCH_INDEX_NAME: $(AZURE_SEARCH_INDEX_NAME)
