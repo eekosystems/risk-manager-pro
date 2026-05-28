@@ -99,7 +99,7 @@ module "container_app" {
   subnet_id = module.network.container_app_subnet_id
 
   keyvault_uri               = module.keyvault.vault_uri
-  database_url               = module.database.connection_string
+  database_url_secret_id     = azurerm_key_vault_secret.database_url.id
   openai_endpoint            = module.ai_services.openai_endpoint
   search_endpoint            = module.ai_services.search_endpoint
   storage_account_name       = module.storage.storage_account_name
@@ -116,11 +116,35 @@ module "container_app" {
   applicationinsights_connection_string = module.monitoring.app_insights_connection_string
 }
 
+# Store the Postgres connection string in Key Vault so the Container App can
+# reference it as a secret instead of exposing it as a plaintext env var (C-1).
+# depends_on the keyvault module so the deployer's "Secrets Officer" grant has
+# been created before Terraform writes the secret.
+resource "azurerm_key_vault_secret" "database_url" {
+  name         = "database-url"
+  value        = module.database.connection_string
+  key_vault_id = module.keyvault.vault_id
+
+  depends_on = [module.keyvault]
+}
+
 # Grant Container App managed identity access to Key Vault
 resource "azurerm_role_assignment" "container_app_keyvault" {
   scope                = module.keyvault.vault_id
   role_definition_name = "Key Vault Secrets User"
   principal_id         = module.container_app.identity_principal_id
+}
+
+# Provision the Microsoft Entra authentication path on Postgres, pointing at the
+# Container App's managed identity (C-1). Password auth stays enabled for now;
+# disabling it requires switching the app to AAD token-based connections.
+resource "azurerm_postgresql_flexible_server_active_directory_administrator" "app" {
+  server_name         = module.database.server_name
+  resource_group_name = azurerm_resource_group.main.name
+  tenant_id           = var.azure_ad_tenant_id
+  object_id           = module.container_app.identity_principal_id
+  principal_name      = "rmp-api"
+  principal_type      = "ServicePrincipal"
 }
 
 # Grant Container App managed identity access to Azure OpenAI
@@ -144,12 +168,34 @@ resource "azurerm_role_assignment" "container_app_storage" {
   principal_id         = module.container_app.identity_principal_id
 }
 
-# Grant Container App managed identity access to Azure Communication Services
-# for sending QA/QC notification emails via EmailClient (no API keys required).
+# Least-privilege send-only access to Azure Communication Services for QA/QC
+# notification email (C-2). Replaces the previous control-plane "Contributor"
+# grant: a send-only role cannot regenerate keys, reconfigure, delete the
+# service, or create domains for phishing.
+resource "azurerm_role_definition" "acs_send_email" {
+  name        = "ACS Send Email (${local.name_prefix})"
+  scope       = module.communication.communication_service_id
+  description = "Send email through Azure Communication Services without management rights"
+
+  # EmailClient send over Entra/managed identity is gated by these control-plane
+  # actions (confirmed minimal working set); ACS exposes no send-only dataAction.
+  # This excludes listKeys/regenerateKey, delete, role assignment, and
+  # EmailServices domain creation that the prior "Contributor" grant allowed.
+  permissions {
+    actions = [
+      "Microsoft.Communication/CommunicationServices/Read",
+      "Microsoft.Communication/CommunicationServices/Write",
+    ]
+    data_actions = []
+  }
+
+  assignable_scopes = [module.communication.communication_service_id]
+}
+
 resource "azurerm_role_assignment" "container_app_communication" {
-  scope                = module.communication.communication_service_id
-  role_definition_name = "Contributor"
-  principal_id         = module.container_app.identity_principal_id
+  scope              = module.communication.communication_service_id
+  role_definition_id = azurerm_role_definition.acs_send_email.role_definition_resource_id
+  principal_id       = module.container_app.identity_principal_id
 }
 
 module "static_web_app" {

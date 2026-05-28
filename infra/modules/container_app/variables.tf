@@ -22,9 +22,9 @@ variable "keyvault_uri" {
   type = string
 }
 
-variable "database_url" {
-  type      = string
-  sensitive = true
+variable "database_url_secret_id" {
+  type        = string
+  description = "Key Vault secret ID holding the Postgres connection string. Referenced as a Container App secret instead of a plaintext env var (C-1)."
 }
 
 variable "openai_endpoint" {

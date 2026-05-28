@@ -1,5 +1,13 @@
 # Azure Pipelines — Risk Manager Pro CI/CD
 # Triggers disabled while waiting on free parallelism grant
+#
+# C-3 — credential hardening (requires a one-time Azure DevOps change, not YAML):
+#   1. Recreate the "azure-rmp-connection" service connection as an Azure Resource
+#      Manager connection using Workload Identity Federation (no client secret).
+#      Project settings → Service connections → New → Workload Identity federation.
+#   2. Remove DB_ADMIN_PASSWORD (and any DATABASE_URL) from the "RMP variable
+#      group"; store them in Key Vault ($(keyVaultName)) instead. The pipeline now
+#      reads db-admin-password from Key Vault per-run via the AzureKeyVault@2 task.
 
 trigger: none
 
@@ -27,6 +35,8 @@ variables:
     value: "search-rmp-rmp-start"
   - name: storageAccountName
     value: "strmprmpstartfg"
+  - name: keyVaultName
+    value: "kv-rmp-rmp-start-fg"
 
 stages:
   # ──────────────────────────────────────────────
@@ -41,6 +51,17 @@ stages:
         pool:
           vmImage: "ubuntu-latest"
         steps:
+          # C-3: fetch the DB admin password from Key Vault per-run instead of
+          # carrying it as a long-lived secret in the variable group. The secret
+          # is exposed to later steps as $(db-admin-password).
+          - task: AzureKeyVault@2
+            displayName: "Fetch secrets from Key Vault"
+            inputs:
+              azureSubscription: $(azureServiceConnection)
+              KeyVaultName: $(keyVaultName)
+              SecretsFilter: "db-admin-password"
+              RunAsPreJob: false
+
           - task: TerraformInstaller@1
             displayName: "Install Terraform"
             inputs:
@@ -68,7 +89,7 @@ stages:
                 -var-file=environments/dev.tfvars
                 -var="azure_ad_tenant_id=$(AZURE_AD_TENANT_ID)"
                 -var="azure_ad_client_id=$(AZURE_AD_CLIENT_ID)"
-                -var="db_admin_password=$(DB_ADMIN_PASSWORD)"
+                -var="db_admin_password=$(db-admin-password)"
               environmentServiceNameAzureRM: $(azureServiceConnection)
 
           - task: TerraformTaskV4@4
@@ -81,7 +102,7 @@ stages:
                 -var-file=environments/dev.tfvars
                 -var="azure_ad_tenant_id=$(AZURE_AD_TENANT_ID)"
                 -var="azure_ad_client_id=$(AZURE_AD_CLIENT_ID)"
-                -var="db_admin_password=$(DB_ADMIN_PASSWORD)"
+                -var="db_admin_password=$(db-admin-password)"
               environmentServiceNameAzureRM: $(azureServiceConnection)
 
   # ──────────────────────────────────────────────
@@ -315,6 +336,17 @@ stages:
                   --role "Storage Blob Data Contributor" \
                   --scope "$STORAGE_ID" 2>/dev/null || echo "Storage role already assigned"
 
+                # Key Vault Secrets User so the app can resolve the DATABASE_URL
+                # secret reference (C-1)
+                KV_ID=$(az keyvault show \
+                  --name $(keyVaultName) \
+                  --resource-group $(resourceGroup) \
+                  --query "id" -o tsv)
+                az role assignment create \
+                  --assignee "$PRINCIPAL_ID" \
+                  --role "Key Vault Secrets User" \
+                  --scope "$KV_ID" 2>/dev/null || echo "Key Vault role already assigned"
+
                 # Ensure Search service is reachable (RBAC protects access)
                 az search service update \
                   --name $(searchServiceName) \
@@ -328,12 +360,24 @@ stages:
               scriptType: bash
               scriptLocation: inlineScript
               inlineScript: |
+                # C-1: bind DATABASE_URL to the Key Vault secret via the app's
+                # managed identity instead of pushing the connection string as a
+                # plaintext env var (readable through `az containerapp show`).
+                # The `database-url` Key Vault secret is provisioned out-of-band
+                # (Terraform azurerm_key_vault_secret.database_url, or the
+                # documented Cloud Shell command).
+                KV_SECRET_URI="https://$(keyVaultName).vault.azure.net/secrets/database-url"
+                az containerapp secret set \
+                  --name $(containerAppName) \
+                  --resource-group $(resourceGroup) \
+                  --secrets "database-url=keyvaultref:$KV_SECRET_URI,identityref:system"
+
                 az containerapp update \
                   --name $(containerAppName) \
                   --resource-group $(resourceGroup) \
                   --image $(acrName).azurecr.io/$(backendImage):$(Build.BuildId) \
                   --set-env-vars \
-                    DATABASE_URL="$DATABASE_URL" \
+                    DATABASE_URL=secretref:database-url \
                     AZURE_OPENAI_ENDPOINT="$AZURE_OPENAI_ENDPOINT" \
                     AZURE_SEARCH_ENDPOINT="$AZURE_SEARCH_ENDPOINT" \
                     AZURE_SEARCH_INDEX_NAME="$AZURE_SEARCH_INDEX_NAME" \
@@ -344,7 +388,6 @@ stages:
                     APP_ENV=production \
                     LOG_LEVEL=INFO
             env:
-              DATABASE_URL: $(DATABASE_URL)
               AZURE_OPENAI_ENDPOINT: $(AZURE_OPENAI_ENDPOINT)
               AZURE_SEARCH_ENDPOINT: $(AZURE_SEARCH_ENDPOINT)
               AZURE_SEARCH_INDEX_NAME: $(AZURE_SEARCH_INDEX_NAME)

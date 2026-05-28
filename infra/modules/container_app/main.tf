@@ -27,6 +27,18 @@ resource "azurerm_container_app" "backend" {
     type = "SystemAssigned"
   }
 
+  # DATABASE_URL is sourced from Key Vault via the system-assigned identity
+  # rather than embedded as a plaintext env value (C-1). The MI is granted
+  # "Key Vault Secrets User" in the root module.
+  # Note: on a from-scratch apply the KV role assignment is created after this
+  # resource, so the very first create may require a second apply (or a
+  # pre-existing identity). The deployed environment already has the grant.
+  secret {
+    name                = "database-url"
+    key_vault_secret_id = var.database_url_secret_id
+    identity            = "System"
+  }
+
   template {
     min_replicas = 1
     max_replicas = 2
@@ -38,8 +50,8 @@ resource "azurerm_container_app" "backend" {
       memory = "1Gi"
 
       env {
-        name  = "DATABASE_URL"
-        value = var.database_url
+        name        = "DATABASE_URL"
+        secret_name = "database-url"
       }
       env {
         name  = "AZURE_OPENAI_ENDPOINT"
