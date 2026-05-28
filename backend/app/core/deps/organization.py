@@ -1,6 +1,7 @@
 import uuid
 from collections.abc import Awaitable, Callable
 
+import structlog
 from fastapi import Depends, Header
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,6 +13,8 @@ from app.core.exceptions import ForbiddenError, NotFoundError
 from app.models.organization import Organization, OrganizationStatus
 from app.models.organization_membership import MembershipRole, OrganizationMembership
 from app.models.user import User
+
+logger = structlog.get_logger(__name__)
 
 
 async def get_current_organization(
@@ -80,6 +83,13 @@ def require_org_role(*allowed_roles: MembershipRole) -> Callable[..., Awaitable[
 
         if not membership or membership.role not in allowed_roles:
             if not settings.enforce_rbac:
+                logger.warning(
+                    "rbac_bypass",
+                    user_id=str(current_user.id),
+                    org_id=str(organization.id),
+                    required=[r.value for r in allowed_roles],
+                    actual=membership.role.value if membership else None,
+                )
                 return current_user
             raise ForbiddenError(
                 f"Requires one of roles: {', '.join(r.value for r in allowed_roles)}"
