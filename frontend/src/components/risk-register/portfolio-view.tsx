@@ -70,7 +70,6 @@ export function PortfolioView() {
           <option value="low">Low</option>
           <option value="medium">Medium</option>
           <option value="high">High</option>
-          <option value="extreme">Extreme</option>
         </select>
         <span className="ml-auto self-center text-sm text-slate-500">
           {rows.length} records

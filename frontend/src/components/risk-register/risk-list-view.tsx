@@ -332,7 +332,6 @@ export function RiskListView({ onSelectRisk, onCreateNew }: RiskListViewProps) {
           className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-slate-800 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
         >
           <option value="">All Risk Levels</option>
-          <option value="extreme">Extreme</option>
           <option value="high">High</option>
           <option value="medium">Medium</option>
           <option value="low">Low</option>

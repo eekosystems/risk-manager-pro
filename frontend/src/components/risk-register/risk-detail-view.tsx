@@ -116,8 +116,7 @@ export function RiskDetailView({ riskId, onBack, onEdit }: RiskDetailViewProps) 
     );
   }
 
-  const requiresAEApproval =
-    risk.risk_level === "high" || risk.risk_level === "extreme";
+  const requiresAEApproval = risk.risk_level === "high";
 
   const riskLevelCfg =
     RISK_LEVEL_CONFIG[risk.risk_level as RiskLevel] ?? RISK_LEVEL_CONFIG.low;
@@ -163,7 +162,7 @@ export function RiskDetailView({ riskId, onBack, onEdit }: RiskDetailViewProps) 
             Request Accountable Executive approval
           </div>
           <p className="mb-3 text-[12px] text-amber-800">
-            High and Extreme records cannot be closed without AE sign-off. Submit
+            High records cannot be closed without AE sign-off. Submit
             this request and an approver with the Accountable Executive role will
             review.
           </p>

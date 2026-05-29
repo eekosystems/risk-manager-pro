@@ -66,7 +66,7 @@ const WELCOME_MESSAGES: Record<FunctionType, string> = {
     "- Calculating initial and residual risk scores with before/after comparison\n" +
     "- Evaluating proposed controls using the hierarchy of controls (Eliminate → Substitute → Engineer → Administrative → PPE)\n" +
     "- Determining ALARP status and whether Accountable Executive acceptance is required\n" +
-    "- Flagging High/Extreme risks for mandatory human review and escalation\n\n" +
+    "- Flagging High risks for mandatory human review and escalation\n\n" +
     "All outputs are decision-support tools and require Safety Manager/SMS Manager " +
     "or Accountable Executive review and approval before implementation.",
   system:

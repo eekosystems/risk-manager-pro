@@ -55,7 +55,7 @@ class SharePointRisk:
     hazard: str
     severity: int  # 1..5
     likelihood: str  # "A".."E"
-    risk_level: str  # "low" | "medium" | "high" | "extreme"
+    risk_level: str  # "low" | "medium" | "high"
     source_file: str
     source_url: str | None
     # Document-level metadata stamped onto every row from the same source file.
@@ -138,7 +138,7 @@ _RISK_LEVEL_ALIASES: dict[str, str] = {
     "low": "low", "green": "low",
     "medium": "medium", "med": "medium", "moderate": "medium", "yellow": "medium",
     "high": "high", "orange": "high",
-    "extreme": "extreme", "red": "extreme", "critical": "extreme",
+    "extreme": "high", "red": "high", "critical": "high",
 }  # fmt: skip
 
 # FG 5x5 — mirrors app.models.risk.RISK_MATRIX (duplicated to avoid a
@@ -326,7 +326,7 @@ Return ONLY this JSON shape (no prose):
       "hazard": "<verbatim hazard text as it appears in the document>",
       "severity": "<Catastrophic | Hazardous | Major | Minor | Minimal>",
       "likelihood": "<Frequent | Probable | Remote | Extremely Remote | Extremely Improbable>",
-      "risk_level": "<low | medium | high | extreme — include ONLY if explicitly stated in the source, otherwise omit>"
+      "risk_level": "<low | medium | high — include ONLY if explicitly stated in the source, otherwise omit. Map any higher rating the source uses (e.g. Extreme/Red/Critical) to high>"
     }}
   ]
 }}

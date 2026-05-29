@@ -6,7 +6,7 @@ The invariants enforced here:
   PendingSyncChange of type CREATE — the target org must explicitly accept
   before the twin record actually materializes.
 - Updates to a dual record enqueue an UPDATE PendingSyncChange. No auto-apply.
-- High/Extreme closures require an approved ClosureApproval row.
+- High closures require an approved ClosureApproval row.
 - ACP intelligence requires two explicit FG consultant decisions (accept
   into ACP, then decide: new record / link / monitor).
 """
@@ -76,7 +76,7 @@ class RRSyncError(AppError):
 
 
 class ClosureGateError(AppError):
-    """Raised when a High/Extreme record is closed without an approved AE sign-off."""
+    """Raised when a High record is closed without an approved AE sign-off."""
 
     def __init__(self, message: str) -> None:
         super().__init__(code="CLOSURE_REQUIRES_AE", message=message, status_code=403)
@@ -568,8 +568,8 @@ class RRSyncService:
         entry = (await self._db.execute(stmt)).scalar_one_or_none()
         if entry is None:
             raise NotFoundError("RiskEntry", str(risk_entry_id))
-        if entry.risk_level not in (RiskLevel.HIGH, RiskLevel.EXTREME):
-            raise RRSyncError("Closure approval is only required for High/Extreme records.")
+        if entry.risk_level != RiskLevel.HIGH:
+            raise RRSyncError("Closure approval is only required for High records.")
         approval = ClosureApproval(
             risk_entry_id=risk_entry_id,
             requested_by=requested_by,
@@ -621,12 +621,12 @@ class RRSyncService:
         return approval
 
     async def assert_closure_allowed(self, risk_entry_id: uuid.UUID) -> None:
-        """Raise ClosureGateError if a High/Extreme record has no APPROVED approval."""
+        """Raise ClosureGateError if a High record has no APPROVED approval."""
         stmt = select(RiskEntry).where(RiskEntry.id == risk_entry_id)
         entry = (await self._db.execute(stmt)).scalar_one_or_none()
         if entry is None:
             raise NotFoundError("RiskEntry", str(risk_entry_id))
-        if entry.risk_level not in (RiskLevel.HIGH, RiskLevel.EXTREME):
+        if entry.risk_level != RiskLevel.HIGH:
             return
         approval_stmt = select(ClosureApproval).where(
             ClosureApproval.risk_entry_id == risk_entry_id,
@@ -635,7 +635,7 @@ class RRSyncService:
         approved = (await self._db.execute(approval_stmt)).scalar_one_or_none()
         if approved is None:
             raise ClosureGateError(
-                "High/Extreme records require Accountable Executive approval before "
+                "High records require Accountable Executive approval before "
                 "they can be closed. Request a closure approval first."
             )
 

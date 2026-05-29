@@ -44,7 +44,6 @@ class RiskLevel(enum.StrEnum):
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
-    EXTREME = "extreme"
 
 
 class OperationalDomain(enum.StrEnum):

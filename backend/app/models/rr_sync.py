@@ -7,7 +7,7 @@ Per Sub-Prompt 4:
   explicitly accept or reject. Nothing auto-applies.
 - The FG RR maintains an Airport Context Profile per airport, enriched by
   internal FG corpus + external safety intelligence (ASRS, NOTAMs, etc.).
-- High/Extreme records require Accountable Executive approval before close.
+- High records require Accountable Executive approval before close.
 """
 
 from __future__ import annotations
@@ -212,9 +212,9 @@ class ACPIntelligenceItem(Base):
 
 
 class ClosureApproval(Base):
-    """Accountable Executive sign-off log for High/Extreme record closures.
+    """Accountable Executive sign-off log for High record closures.
 
-    High/Extreme records cannot be moved to Closed status without a row here
+    High records cannot be moved to Closed status without a row here
     with status=APPROVED. The service layer enforces this gate.
     """
 

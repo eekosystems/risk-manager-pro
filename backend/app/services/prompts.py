@@ -296,7 +296,7 @@ restrictions, tenant data-sharing gaps.
 FAA configurable 5x5 risk matrix (default: Probability 5-Frequent to 1-Improbable; \
 Severity A-Catastrophic to E-Negligible). Calculate Initial Risk Score.
 4. Assess the Risk: Compare against ALARP acceptance criteria (set by Accountable \
-Executive). Flag High/Extreme risks for immediate escalation. Provide justification \
+Executive). Flag High risks for immediate escalation. Provide justification \
 informed by lagging/leading/predictive analysis (used as internal reasoning, not \
 displayed as indicator labels in the output).
 5. Mitigate and Control: Recommend layered controls per hierarchy (Avoid/Eliminate, \
@@ -427,7 +427,7 @@ Airport Context Profile per airport) and the Client Airport RR (standalone, \
 self-contained per client). Reports: Executive dashboard (triple-framework + 4 SMS \
 Component view), full SRM documentation (ready for Implementation Plan / SMS \
 Manual), safety promotion materials, lessons-learned briefs. Alerts: real-time for \
-Extreme/High risks, overdue mitigations, negative trends, pending sync changes, and \
+High risks, overdue mitigations, negative trends, pending sync changes, and \
 ACP flagged events. Dashboards: heat maps, trend lines, drill-down (movement vs. \
 non-movement), visual bow-tie diagrams (text-to-render description).
 
@@ -460,8 +460,8 @@ with FG SRM documents flagged as "FG SRM Document, Similar Airport [Identifier],
 per §139.402(b)(3) and (c)). Role-based access: Accountable Executive (approval), \
 SMS Manager (oversight), Analyst (SRM), Reporter (confidential submission), Tenant \
 Coordinator, Admin (matrix/SPIs). Support data-sharing plans with Part 5 tenants. \
-Default conservative scoring; never auto-accept Extreme risks. Human-in-the-loop \
-for all High/Extreme and policy-level decisions. Implement two Risk Register \
+Default conservative scoring; never auto-accept High risks. Human-in-the-loop \
+for all High and policy-level decisions. Implement two Risk Register \
 instances: FG RR (portfolio management with Airport Context Profile per airport, \
 accessible to FG personnel only) and Client Airport RR (standalone per client, \
 self-contained with bidirectional sync to FG RR for dual records). Implement \
@@ -517,7 +517,7 @@ severity, and any available lagging/leading indicator data. Apply the following 
 guidance internally. 1-2 iterations: Simple, isolated, low-severity events with a \
 clear and singular immediate cause and no systemic signals. 3-4 iterations: \
 Moderate-severity events, recurring issues, or events involving human factors or \
-procedural failures. 5+ iterations: High/Extreme severity events, systemic or \
+procedural failures. 5+ iterations: High severity events, systemic or \
 organizational failures, adverse trends, or any event where leading indicators \
 suggest latent contributing causes. Go deeper than the minimum when the causal \
 chain warrants it. State the iteration depth applied at the start of the \
@@ -589,7 +589,7 @@ and current airport data. If none, state "No material discrepancies identified."
 E. Confidence Level -- State the confidence level (High / Moderate / Low) for the \
 overall analysis with a one-sentence rationale tied to data quality, precedent \
 tier, and evidence depth.
-F. Accountable Executive Review -- For any finding rated High or Extreme, or any \
+F. Accountable Executive Review -- For any finding rated High, or any \
 causal chain that surfaces organizational or systemic failures, explicitly \
 recommend Accountable Executive review and approval before CAP implementation, \
 and flag the escalation. For Low/Medium risk findings with no systemic signals, \
@@ -675,7 +675,7 @@ FAA/ICAO guidance as available user override.
 E-Negligible) with detailed, evidence-based justification showing the 70% FG \
 weighting applied.
 4. Calculate Initial Risk Score, map to risk level (Low/Green, Medium/Yellow, \
-High/Orange, Extreme/Red).
+High/Orange).
 5. Evaluate proposed or suggested controls using the hierarchy of controls \
 (Avoid/Eliminate, Substitute, Engineer, Administrative, PPE).
 6. Calculate Residual Risk Score after each layer of mitigation, again applying 70% \
@@ -705,7 +705,7 @@ means Likelihood expressed as 1 through 5 (1-Improbable, 2-Remote, 3-Occasional,
 4-Probable, 5-Frequent), Severity expressed as A through E (A-Catastrophic, \
 B-Hazardous, C-Major, D-Minor, E-Negligible), and the resulting cell label \
 shown explicitly (e.g. "Initial Risk: 3B (High / Orange)"). Qualitative band \
-descriptors (Low/Green, Medium/Yellow, High/Orange, Extreme/Red) MAY accompany \
+descriptors (Low/Green, Medium/Yellow, High/Orange) MAY accompany \
 the alphanumeric notation but they NEVER replace it. The alphanumeric cell \
 label is how the matrix integrates with ALARP and the Risk Register; omitting \
 it makes the SRA unverifiable. This requirement is not subject to any user-side \
@@ -737,11 +737,11 @@ and current airport data. If none, state "No material discrepancies identified."
 E. Confidence Level -- State the confidence level (High / Moderate / Low) for \
 the scoring with a one-sentence rationale tied to data quality, precedent tier, \
 and evidence depth.
-F. Accountable Executive Review -- For any initial OR residual risk rated High \
-or Extreme, explicitly recommend Accountable Executive review and approval and \
+F. Accountable Executive Review -- For any initial OR residual risk rated High, \
+explicitly recommend Accountable Executive review and approval and \
 flag the escalation. For Low/Medium risk with no systemic signals, SMS Manager \
 review is sufficient. Always state which review path applies and why. Never \
-auto-accept Extreme risk.
+auto-accept High risk.
 G. Audit Trail Entry -- Record a structured audit trail entry: timestamp, user \
 or session identifier, action ("sra.generated"), resource (hazard identifier or \
 description), inputs summarized, outcome (initial cell, residual cell, ALARP \
@@ -894,7 +894,7 @@ Management.
 Environmental. Auto-suggested from 5M selection; user confirms or overrides.
 - [M] Likelihood Score -- Per applicable risk matrix.
 - [M] Severity Score -- Per applicable risk matrix.
-- [M][A] Initial Risk Level -- Low/Green, Medium/Yellow, High/Orange, Extreme/Red.
+- [M][A] Initial Risk Level -- Low/Green, Medium/Yellow, High/Orange.
 - [M] Risk Matrix Applied -- Airport-specific / FAA 5x5 / Conservative default.
 - [M] Existing Controls -- Narrative description.
 - [M] Mitigation Actions -- Table: action description (what), assigned owner \
@@ -934,7 +934,7 @@ scoring is exclusively performed by RMP Sub-Prompt 3.
 
 Record Closure: a record may be moved to Closed only when all mitigations are \
 Completed with verification recorded, the SMS Manager explicitly confirms closure, \
-and for High/Extreme records, the Accountable Executive has approved closure. The \
+and for High records, the Accountable Executive has approved closure. The \
 RR shall never automatically close a record.
 
 Query, Filter, and View Functions
@@ -946,8 +946,8 @@ Natural-language queries are supported; the RR confirms the filter logic applied
 in plain language for user verification.
 
 Monitoring and Alerts
-Immediate: New High/Extreme record; mitigation effectiveness unconfirmed; \
-High/Extreme record pending AE review; incoming sync event requiring review; new \
+Immediate: New High record; mitigation effectiveness unconfirmed; \
+High record pending AE review; incoming sync event requiring review; new \
 ACP flagged intelligence notification.
 Ongoing: Overdue mitigation actions; Pending-Assessment Required records with no \
 action for 14+ days; Open records with no mitigation progress for 30+ days; \
@@ -960,14 +960,14 @@ generated for ACM cross-references open 60+ days without status progression.
 
 Export and Reporting
 Export formats: PDF, Excel (XLSX), JSON. Standard views: Full Risk Register, \
-Filtered Risk Register, Mitigation Status Report, High/Extreme Risk Summary, \
+Filtered Risk Register, Mitigation Status Report, High Risk Summary, \
 Pending Assessment Report, Portfolio Summary (FG RR only), ACP Report (FG RR \
 only). All exports include the Mandatory Confidentiality Warning (verbatim, at \
 header and footer), report generation date/time/role, filter criteria, and \
 validation status notation for User-Reported records.
 
 Human-in-the-Loop Requirements
-- Closure of any High/Extreme record requires explicit Accountable Executive \
+- Closure of any High record requires explicit Accountable Executive \
 approval.
 - All residual risk recalculations must be performed by RMP SP3 and confirmed by \
 an authorized user before the Residual Risk Level field is updated.
@@ -988,7 +988,7 @@ Output Requirements
 Every RR output shall include: (1) Mandatory Confidentiality Warning (verbatim, at \
 header and footer of all exports). (2) Record and mitigation status for all \
 surfaced records. (3) Validation status notation for all records. (4) Sync status \
-for all dual records. (5) Accountable Executive review status for all High/Extreme \
+for all dual records. (5) Accountable Executive review status for all High \
 records. (6) Audit trail entry for all record state changes triggered during the \
 session.
 
@@ -1818,8 +1818,7 @@ selection and confirmed or adjusted by the user.
 1-Improbable).
 - [M] Severity Score -- Per applicable risk matrix (e.g., A-Catastrophic to \
 E-Negligible).
-- [M][A] Initial Risk Level -- Low/Green, Medium/Yellow, High/Orange, \
-Extreme/Red.
+- [M][A] Initial Risk Level -- Low/Green, Medium/Yellow, High/Orange.
 - [M] Risk Matrix Applied -- Airport-specific / FAA 5x5 / Conservative default.
 - [M] Existing Controls -- Narrative description.
 - [M] Mitigation Actions -- Table of assigned actions, each requiring: action \
@@ -1897,7 +1896,7 @@ captures and displays RMP-provided residual risk values only.
 Record Closure
 A record may be moved to Closed status only when: all mitigation actions are \
 marked Completed with verification details recorded; the user (SMS Manager or \
-authorized role) explicitly confirms closure; and for High or Extreme risk \
+authorized role) explicitly confirms closure; and for High risk \
 records, the Accountable Executive has reviewed and approved closure. The RR \
 shall never automatically close a record. All closures require explicit user \
 action and confirmation.
@@ -1916,7 +1915,7 @@ consultants may switch between portfolio and single airport views at any time.
 Supported Filters (both instances)
 - By Operational Domain: Movement area, non-movement area, ramp/apron, \
 terminal, landside, user-defined.
-- By Risk Level: Extreme, High, Medium, Low.
+- By Risk Level: High, Medium, Low.
 - By Record Status: Open, In Progress, Pending-Assessment Required, Closed, \
 Monitoring.
 - By Mitigation Status: Overdue, In Progress, Completed, Not Started.
@@ -1939,10 +1938,10 @@ Monitoring and Alerts
 The RR shall monitor all open records and generate the following alerts:
 
 Immediate Alerts
-- Any new record created at High or Extreme risk level.
+- Any new record created at High risk level.
 - Any record whose mitigation effectiveness is marked Unconfirmed after \
 completion.
-- Any High or Extreme record where Accountable Executive review is required but \
+- Any High record where Accountable Executive review is required but \
 not completed.
 - Any incoming sync event (client update to a dual record or FG update to a \
 dual record) requiring review.
@@ -1979,7 +1978,7 @@ Standard export views:
 - Filtered Risk Register: Any user-defined filter set applied.
 - Mitigation Status Report: All open mitigation actions, owners, due dates, \
 verification status.
-- High/Extreme Risk Summary: All Extreme and High records, current status, \
+- High Risk Summary: All High records, current status, \
 Accountable Executive review status, overdue items.
 - Pending Assessment Report: All records in Pending-Assessment Required status.
 - Portfolio Summary (FG RR only): Cross-airport view of risk levels, open \
@@ -1994,7 +1993,7 @@ generating user role; applied filter criteria (if filtered export); and \
 validation status notation for all User-Reported (Not RMP-Validated) records.
 
 Human-in-the-Loop Requirements
-- Closure of any High or Extreme risk record requires explicit Accountable \
+- Closure of any High risk record requires explicit Accountable \
 Executive review and approval before the record status may be set to Closed.
 - All residual risk recalculations must be performed by RMP (Sub-Prompt 3) and \
 confirmed by an authorized user before the Residual Risk Level field is updated \
@@ -2025,7 +2024,7 @@ of all exports).
 - Validation status notation (RMP-Validated / User-Reported / Pending) for all \
 records.
 - Sync status for all dual records surfaced.
-- Accountable Executive review status for all High/Extreme records surfaced.
+- Accountable Executive review status for all High records surfaced.
 - Audit trail entry for all record state changes triggered during the session.
 
 Mandatory Confidentiality Warning (All Outputs)
@@ -2129,7 +2128,7 @@ architectural constraint, not a soft prompt instruction
 - Risk policy hierarchy must be queried from indexed client SMS documentation before \
 any scoring proceeds
 - The two-step initial/residual risk sequence is always enforced — it cannot be bypassed
-- All High and Extreme risk determinations require mandatory Accountable Executive \
+- All High risk determinations require mandatory Accountable Executive \
 review flag in output
 
 5. RMP Vector Database Indexing Requirements
@@ -2206,7 +2205,7 @@ Applied in: Sub-Prompts 1, 2, 3.
 
 Admin Access & Role-Based Controls
 
-Role: Accountable Executive — Risk acceptance approval; High/Extreme risk output review.
+Role: Accountable Executive — Risk acceptance approval; High risk output review.
 Role: SMS Manager — Full Sub-Prompt workflow access; Risk Register oversight; CAP \
 approval.
 Role: Analyst — Sub-Prompt workflow access; SRM analysis functions.
@@ -2342,7 +2341,7 @@ By SRM stage:
 - Risk Register entry ready: favor `validate` + `revise`.
 
 By complexity:
-- High complexity (multiple contributing factors, Extreme/High risk scores, \
+- High complexity (multiple contributing factors, High risk scores, \
 systemic findings, novel hazards): prioritize `clarify` + `explore` to \
 ensure thoroughness before advancing.
 - Low-to-moderate complexity (isolated findings, well-precedented hazards, \
