@@ -75,7 +75,12 @@ apiClient.interceptors.response.use(
       if (hasAccount && !isRedirectingToLogin) {
         isRedirectingToLogin = true;
         logger.warn("[api-client] 401 response — clearing session and redirecting to login");
-        sessionStorage.clear();
+        // L-6: clear only RMP app state, not the whole store. MSAL caches in
+        // sessionStorage; clear()-ing it destroys the token cache and forces a
+        // full redirect cycle even on a transient 401.
+        Object.keys(sessionStorage)
+          .filter((k) => k.startsWith("rmp_"))
+          .forEach((k) => sessionStorage.removeItem(k));
         window.location.href = "/login";
       }
     }

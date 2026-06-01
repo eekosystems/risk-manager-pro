@@ -6,7 +6,12 @@ resource "azurerm_storage_account" "main" {
   account_replication_type      = "GRS"
   min_tls_version               = "TLS1_2"
   public_network_access_enabled = false
-  tags                          = var.tags
+  # H-8: disable the shared-key auth path so the only way in is Entra/MI RBAC,
+  # which keeps the audit-logs immutability and network rules from being
+  # bypassed by anyone holding an account key.
+  shared_access_key_enabled       = false
+  default_to_oauth_authentication = true
+  tags                            = var.tags
 
   blob_properties {
     versioning_enabled = true

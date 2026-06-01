@@ -4,10 +4,13 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: rmp_dev
-      POSTGRES_PASSWORD: rmp_dev_password
+      # L-10: overridable via .env.local; the default is dev-only.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rmp_dev_password}
       POSTGRES_DB: riskmanagerpro
     ports:
-      - "5432:5432"
+      # L-10: bind to loopback only so the dev DB isn't exposed on every
+      # interface (shared box / Codespaces / hotel Wi-Fi).
+      - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:

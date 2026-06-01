@@ -156,7 +156,10 @@ export function RiskListView({ onSelectRisk, onCreateNew }: RiskListViewProps) {
   function handleSelectRisk(riskId: string) {
     if (riskId.startsWith("sp:")) {
       const url = spUrlById.get(riskId);
-      if (url) window.open(url, "_blank", "noopener,noreferrer");
+      // L-5: only open http(s) URLs — never a server-supplied javascript:/data: URI.
+      if (url && /^https?:\/\//i.test(url)) {
+        window.open(url, "_blank", "noopener,noreferrer");
+      }
       return;
     }
     onSelectRisk(riskId);

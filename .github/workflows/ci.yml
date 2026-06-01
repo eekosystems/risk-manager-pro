@@ -114,7 +114,9 @@ jobs:
 
       - name: Frontend dependency audit
         working-directory: frontend
-        run: npm ci && npm audit --audit-level=critical
+        # M-18: gate on High (was critical-only, which let the axios High advisories
+        # ship). --omit=dev keeps the gate focused on shipped runtime deps.
+        run: npm ci && npm audit --audit-level=high --omit=dev
 
   sast:
     name: SAST (Static Analysis)
@@ -231,3 +233,12 @@ jobs:
 
       - name: Terraform Format Check
         run: terraform fmt -check -recursive
+
+      # M-17: IaC security scan. Most of the H-7..H-12 infra findings would be
+      # caught here pre-merge. soft_fail reports without blocking initially; flip
+      # to soft_fail=false once the existing findings are triaged.
+      - name: tfsec IaC scan
+        uses: aquasecurity/tfsec-action@b466648d6e39e7c75324f25d83891162a721f2d6 # v1.0.3
+        with:
+          working_directory: infra
+          soft_fail: true

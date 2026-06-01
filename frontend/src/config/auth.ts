@@ -22,6 +22,18 @@ if (!isMsalConfigured) {
   );
 }
 
+// L-1: in the production bundle, fail fast if the baked-in redirect URI points at
+// a different origin than where the app is actually served (e.g. a bundle built
+// with a staging/localhost redirect). Entra's reply-URL allow-list is the real
+// control; this is a cheap defensive boot check.
+if (import.meta.env.PROD && isMsalConfigured && env.azureAdRedirectUri) {
+  if (new URL(env.azureAdRedirectUri).origin !== window.location.origin) {
+    throw new Error(
+      "Build misconfiguration: VITE_AZURE_AD_REDIRECT_URI origin does not match the window origin."
+    );
+  }
+}
+
 export { isMsalConfigured };
 
 export const msalConfig: Configuration = {
@@ -37,7 +49,10 @@ export const msalConfig: Configuration = {
   },
   system: {
     loggerOptions: {
-      logLevel: LogLevel.Verbose,
+      // H-15: Verbose forwards account UPNs, scopes, and token-cache events to
+      // the console. Keep it quiet in the production bundle.
+      logLevel: import.meta.env.PROD ? LogLevel.Error : LogLevel.Info,
+      piiLoggingEnabled: false,
       loggerCallback: (_level, message) => {
         logger.debug(message);
       },

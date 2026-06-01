@@ -261,8 +261,9 @@ stages:
             displayName: "Install dependencies"
 
           - script: |
-              echo "VITE_AZURE_AD_CLIENT_ID=$VITE_AZURE_AD_CLIENT_ID"
-              echo "VITE_AZURE_AD_AUTHORITY=$VITE_AZURE_AD_AUTHORITY"
+              # M-15: do not echo Azure AD identifiers to the build log. They are
+              # public client IDs today, but echoing config to stdout is the pattern
+              # that silently leaks a real secret the day one is piped through here.
               cd frontend
               npm run build
             displayName: "Build production bundle"
@@ -316,14 +317,16 @@ stages:
                   --role "Cognitive Services OpenAI User" \
                   --scope "$OPENAI_ID" 2>/dev/null || echo "OpenAI role already assigned"
 
-                # Search Index Data Reader on the Search service
+                # M-14: Search Index Data Contributor (read+write). The document
+                # processor writes to the index, so Reader is insufficient; this
+                # matches the Terraform grant and removes the RBAC drift.
                 SEARCH_ID=$(az search service show \
                   --name $(searchServiceName) \
                   --resource-group $(resourceGroup) \
                   --query "id" -o tsv)
                 az role assignment create \
                   --assignee "$PRINCIPAL_ID" \
-                  --role "Search Index Data Reader" \
+                  --role "Search Index Data Contributor" \
                   --scope "$SEARCH_ID" 2>/dev/null || echo "Search role already assigned"
 
                 # Storage Blob Data Contributor on the Storage account
@@ -336,11 +339,10 @@ stages:
                   --role "Storage Blob Data Contributor" \
                   --scope "$STORAGE_ID" 2>/dev/null || echo "Storage role already assigned"
 
-                # Ensure Search service is reachable (RBAC protects access)
-                az search service update \
-                  --name $(searchServiceName) \
-                  --resource-group $(resourceGroup) \
-                  --public-access enabled 2>/dev/null || echo "Search public access already enabled"
+                # M-11: do NOT force-open AI Search public network access. Terraform
+                # sets public_network_access_enabled = false; the backend reaches
+                # Search over the VNet service endpoint with Entra/MI RBAC. Re-opening
+                # it on every deploy put the index on the public internet.
 
           - task: AzureCLI@2
             displayName: "Update Container App image and env vars"

@@ -19,14 +19,17 @@ variable "project_name" {
 variable "azure_ad_tenant_id" {
   description = "Azure AD tenant ID for authentication"
   type        = string
-  sensitive   = true
-  default     = ""
+  # L-9: these are public identifiers (they appear in every issued JWT).
+  # Marking them sensitive only obscures plan output and hides legitimate diffs
+  # with no security benefit.
+  sensitive = false
+  default   = ""
 }
 
 variable "azure_ad_client_id" {
   description = "Azure AD application (client) ID"
   type        = string
-  sensitive   = true
+  sensitive   = false
   default     = ""
 }
 

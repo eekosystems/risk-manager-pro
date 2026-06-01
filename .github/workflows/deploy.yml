@@ -25,7 +25,10 @@ jobs:
   check-ci:
     name: Verify CI Passed
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    # H-18: a workflow_run trigger runs in the privileged default-branch context.
+    # Require the upstream run to have originated from this repo (not a fork PR)
+    # before granting it the Azure OIDC deploy permissions.
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_repository.full_name == github.repository) }}
     steps:
       - run: echo "CI passed, proceeding with deploy"
 
@@ -91,7 +94,9 @@ jobs:
           docker build -t "$IMAGE_TAG" .
 
       - name: Scan image for vulnerabilities
-        uses: aquasecurity/trivy-action@master
+        # H-17: pin to an immutable commit SHA, not the mutable @master ref, so a
+        # compromised release can't run arbitrary code with this job's OIDC creds.
+        uses: aquasecurity/trivy-action@18f2510ee396bbf400402947b394f2dd8c87dbb0 # v0.29.0
         with:
           image-ref: "${{ env.ACR_NAME }}.azurecr.io/rmp-api:${{ github.sha }}"
           format: "table"

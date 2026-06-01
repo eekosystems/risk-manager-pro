@@ -10,6 +10,12 @@ RUN mkdir -p app && touch app/__init__.py && \
 
 FROM python:3.12-slim
 
+# L-11: OCI metadata for image traceability. (Digest-pinning the base image is
+# the remaining half of L-11 and is handled with the M-16 Dockerfile work.)
+LABEL org.opencontainers.image.title="risk-manager-pro-api" \
+      org.opencontainers.image.vendor="Faith Group, LLC" \
+      org.opencontainers.image.description="Risk Manager Pro FastAPI backend"
+
 RUN groupadd -r appuser && useradd -r -g appuser -d /app -s /sbin/nologin appuser
 
 WORKDIR /app

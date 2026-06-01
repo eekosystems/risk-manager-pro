@@ -41,3 +41,12 @@ resource "azurerm_postgresql_flexible_server_configuration" "pgvector" {
   server_id = azurerm_postgresql_flexible_server.main.id
   value     = "vector"
 }
+
+# H-7: enforce TLS server-side. The connection string already carries
+# sslmode=require, so clients already negotiate TLS; this closes the gap where
+# plaintext TCP would otherwise be negotiable inside the VNet.
+resource "azurerm_postgresql_flexible_server_configuration" "require_ssl" {
+  name      = "require_secure_transport"
+  server_id = azurerm_postgresql_flexible_server.main.id
+  value     = "ON"
+}

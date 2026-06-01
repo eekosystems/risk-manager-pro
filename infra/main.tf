@@ -154,10 +154,13 @@ resource "azurerm_role_assignment" "container_app_openai" {
   principal_id         = module.container_app.identity_principal_id
 }
 
-# Grant Container App managed identity access to Azure AI Search
+# Grant Container App managed identity access to Azure AI Search.
+# M-14: the document processor writes to the index, so Reader is insufficient
+# and the pipeline was silently widening it at deploy time (RBAC drift).
+# Contributor is the correct least-privilege data-plane role for read+write.
 resource "azurerm_role_assignment" "container_app_search" {
   scope                = module.ai_services.search_id
-  role_definition_name = "Search Index Data Reader"
+  role_definition_name = "Search Index Data Contributor"
   principal_id         = module.container_app.identity_principal_id
 }
 
