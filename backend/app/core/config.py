@@ -120,10 +120,10 @@ class Settings(BaseSettings):
     last_login_throttle_seconds: int = 300  # 5 minutes
     last_activity_throttle_seconds: int = 300  # 5 minutes
 
-    # RBAC enforcement on risks/documents/chat endpoints. Disabled by default to
-    # allow a rollout window; production envs should set RMP_ENFORCE_RBAC=true
-    # after membership backfill has run.
-    enforce_rbac: bool = False
+    # RBAC enforcement on risks/documents/chat endpoints. Enforced by default;
+    # production refuses to boot with it disabled (see validator below). Set
+    # RMP_ENFORCE_RBAC=false only in non-prod during a membership-backfill window.
+    enforce_rbac: bool = True
 
     # Azure Monitor / Application Insights
     applicationinsights_connection_string: str = ""
@@ -148,6 +148,12 @@ class Settings(BaseSettings):
             url = url.replace("sslmode=verify-ca", "ssl=verify-ca")
             url = url.replace("sslmode=prefer", "ssl=prefer")
         self.database_url = url
+        return self
+
+    @model_validator(mode="after")
+    def _enforce_rbac_in_production(self) -> "Settings":
+        if self.app_env == "production" and not self.enforce_rbac:
+            raise ValueError("enforce_rbac must be true in production (set RMP_ENFORCE_RBAC=true)")
         return self
 
     @property
