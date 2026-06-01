@@ -75,9 +75,7 @@ variable "acs_sender_address" {
   description = "Default system sender email address (donotreply@<managed-domain>.azurecomm.net)"
 }
 
-variable "applicationinsights_connection_string" {
+variable "appinsights_connection_string_secret_id" {
   type        = string
-  description = "Application Insights connection string for OpenTelemetry export"
-  sensitive   = true
-  default     = ""
+  description = "Key Vault secret ID holding the Application Insights connection string. Referenced as a Container App secret instead of a plaintext env var (M-12)."
 }

@@ -68,6 +68,12 @@ variable "audit_immutability_locked" {
   default     = false
 }
 
+variable "postgres_sku" {
+  description = "Postgres flexible server SKU. B_Standard_B1ms for dev; GP_Standard_D2s_v3+ required for HA and geo-redundant backups (H-12)"
+  type        = string
+  default     = "B_Standard_B1ms"
+}
+
 variable "postgres_ha_enabled" {
   description = "Enable zone-redundant HA on Postgres flexible server (requires GP or MO tier)"
   type        = bool

@@ -11,6 +11,11 @@ from app.services.openai_client import AzureOpenAIClient
 
 logger = structlog.get_logger(__name__)
 
+# M-4: hard ceiling on retrieved chunks, enforced server-side regardless of the
+# per-org rag_config.top_k. Bounds both the Azure OpenAI/Search cost per call and
+# the prompt-injection surface a poisoned document corpus can present to the model.
+_MAX_TOP_K = 20
+
 
 class SearchResult(BaseModel):
     content: str
@@ -50,6 +55,11 @@ class RAGService:
             validated_id = uuid.UUID(str(organization_id))
         except ValueError as e:
             raise ValueError(f"Invalid organization_id for search filter: {e}") from e
+
+        effective_top_k = max(1, min(top_k, _MAX_TOP_K))
+        if effective_top_k != top_k:
+            logger.warning("rag_top_k_capped", requested=top_k, effective=effective_top_k)
+        top_k = effective_top_k
 
         embedding = await self._openai.embed(query)
         client = await self._get_search_client()

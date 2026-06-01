@@ -156,6 +156,19 @@ class Settings(BaseSettings):
             raise ValueError("enforce_rbac must be true in production (set RMP_ENFORCE_RBAC=true)")
         return self
 
+    @model_validator(mode="after")
+    def _validate_preference_token_secret(self) -> "Settings":
+        # H-6: the HMAC secret for QA/QC preference tokens defaults to "" and was
+        # only checked at first use, so a production deploy with the env var missed
+        # (or set to a short/guessable value) would boot cleanly and only fail when
+        # the first preference link was clicked. Refuse to boot instead.
+        if self.app_env == "production" and len(self.qaqc_preference_token_secret) < 32:
+            raise ValueError(
+                "qaqc_preference_token_secret must be at least 32 chars in production "
+                "(set RMP_QAQC_PREFERENCE_TOKEN_SECRET)"
+            )
+        return self
+
     @property
     def azure_ad_issuer(self) -> str:
         return f"https://login.microsoftonline.com/{self.azure_ad_tenant_id}/v2.0"

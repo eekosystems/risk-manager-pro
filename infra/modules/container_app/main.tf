@@ -39,6 +39,16 @@ resource "azurerm_container_app" "backend" {
     identity            = "System"
   }
 
+  # M-12: the App Insights connection string carries the instrumentation key.
+  # Source it from Key Vault via the managed identity rather than embedding it as
+  # a plaintext env value where any "list container apps" reader could harvest it
+  # and submit forged telemetry into Faith Group's APM stream.
+  secret {
+    name                = "appinsights-connection-string"
+    key_vault_secret_id = var.appinsights_connection_string_secret_id
+    identity            = "System"
+  }
+
   template {
     min_replicas = 1
     max_replicas = 2
@@ -98,8 +108,8 @@ resource "azurerm_container_app" "backend" {
         value = var.acs_sender_address
       }
       env {
-        name  = "APPLICATIONINSIGHTS_CONNECTION_STRING"
-        value = var.applicationinsights_connection_string
+        name        = "APPLICATIONINSIGHTS_CONNECTION_STRING"
+        secret_name = "appinsights-connection-string"
       }
       env {
         name  = "OTEL_SERVICE_NAME"

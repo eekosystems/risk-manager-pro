@@ -31,6 +31,7 @@ module "database" {
   subnet_id           = module.network.database_subnet_id
   private_dns_zone_id = module.network.postgres_private_dns_zone_id
 
+  sku_name                     = var.postgres_sku
   backup_retention_days        = var.postgres_backup_retention_days
   geo_redundant_backup_enabled = var.postgres_geo_redundant_backup
   ha_enabled                   = var.postgres_ha_enabled
@@ -113,7 +114,18 @@ module "container_app" {
   acs_endpoint       = module.communication.communication_service_endpoint
   acs_sender_address = module.communication.email_sender_address
 
-  applicationinsights_connection_string = module.monitoring.app_insights_connection_string
+  appinsights_connection_string_secret_id = azurerm_key_vault_secret.appinsights_connection_string.id
+}
+
+# Store the Application Insights connection string in Key Vault so the Container
+# App references it as a secret instead of exposing the instrumentation key as a
+# plaintext env var (M-12). Mirrors the database-url pattern from C-1.
+resource "azurerm_key_vault_secret" "appinsights_connection_string" {
+  name         = "appinsights-connection-string"
+  value        = module.monitoring.app_insights_connection_string
+  key_vault_id = module.keyvault.vault_id
+
+  depends_on = [module.keyvault]
 }
 
 # Store the Postgres connection string in Key Vault so the Container App can
