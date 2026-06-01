@@ -17,6 +17,8 @@ from app.core.deps import (
     require_analyst_or_above,
     require_any_member,
 )
+from app.core.exceptions import ValidationError
+from app.core.rate_limit import limiter
 from app.core.tasks import track_task
 from app.models.document import DocumentStatus, SourceType
 from app.models.organization import Organization
@@ -44,6 +46,7 @@ def _get_document_service(
 
 
 @router.post("/upload", response_model=DataResponse[DocumentResponse], status_code=201)
+@limiter.limit("10/minute")  # H-4: cap upload abuse / OpenAI-embedding cost
 async def upload_document(
     file: UploadFile,
     request: Request,
@@ -53,7 +56,17 @@ async def upload_document(
     service: DocumentService = Depends(_get_document_service),
     audit: AuditLogger = Depends(get_audit_logger),
 ) -> DataResponse[DocumentResponse]:
-    data = await file.read()
+    # H-4: stream the upload in 1 MB chunks and reject as soon as it exceeds the
+    # size limit, instead of materialising up to 250 MB in worker RAM before the
+    # check runs.
+    chunks: list[bytes] = []
+    total = 0
+    while chunk := await file.read(1024 * 1024):
+        total += len(chunk)
+        if total > settings.max_file_size_bytes:
+            raise ValidationError("File exceeds the maximum allowed size")
+        chunks.append(chunk)
+    data = b"".join(chunks)
     document = await service.upload(
         user=current_user,
         organization_id=organization.id,
@@ -194,7 +207,7 @@ async def reindex_document(
 
         raise NotFoundError("Document", str(document_id))
 
-    await indexer.delete_by_document(document_id)
+    await indexer.delete_by_document(document_id, organization_id=organization.id)
     await repo.update_status(document_id, DocumentStatus.UPLOADED, organization_id=organization.id)
     await db.commit()
 
@@ -243,7 +256,9 @@ class BulkDeleteResult(BaseModel):
     response_model=DataResponse[BulkDeleteResult],
     status_code=200,
 )
+@limiter.limit("10/minute")  # H-4: throttle bulk mutations
 async def bulk_delete_documents(
+    request: Request,
     payload: BulkDeleteRequest,
     current_user: User = Depends(require_analyst_or_above),
     organization: Organization = Depends(get_current_organization),
@@ -293,6 +308,7 @@ async def stats_by_source(
 
 
 @router.post("/process-all", response_model=DataResponse[ProcessAllResult])
+@limiter.limit("10/minute")  # H-4: throttle bulk reprocessing
 async def process_all_uploaded(
     request: Request,
     current_user: User = Depends(require_analyst_or_above),

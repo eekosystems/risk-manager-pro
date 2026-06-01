@@ -5,6 +5,7 @@ from collections.abc import AsyncIterator
 import structlog
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import StreamingResponse
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -17,10 +18,11 @@ from app.core.deps import (
     require_analyst_or_above,
     require_any_member,
 )
-from app.core.exceptions import AppError, NotFoundError
+from app.core.exceptions import AppError, ForbiddenError, NotFoundError
 from app.core.rate_limit import limiter
 from app.models.notification import NotificationType
 from app.models.organization import Organization
+from app.models.organization_membership import OrganizationMembership
 from app.models.user import User
 from app.schemas.chat import (
     ChatRequest,
@@ -75,7 +77,9 @@ async def send_message(
         triggered_by=current_user,
         notification_type=NotificationType.CHAT_RESPONSE,
         title=f"AI response in: {result.title or 'conversation'}",
-        body=result.message.content[:500],
+        # M-8: keep AI content out of the persisted notification body — other org
+        # members can read notifications regardless of role. Link, don't embed.
+        body=f"{current_user.display_name} generated an AI response. Open the conversation to view it.",
         resource_type="conversation",
         resource_id=str(result.conversation_id),
     )
@@ -139,8 +143,30 @@ async def email_chat_message(
     payload: EmailChatMessageRequest,
     current_user: User = Depends(require_analyst_or_above),
     organization: Organization = Depends(get_current_organization),
+    db: AsyncSession = Depends(get_db),
     audit: AuditLogger = Depends(get_audit_logger),
 ) -> dict[str, str]:
+    # M-1: only allow sending to a verified member of the caller's organization
+    # (or the caller themselves) so this can't be used as an open spam relay on
+    # Faith Group's ACS sender reputation.
+    member_emails = {
+        e.lower()
+        for e in (
+            await db.execute(
+                select(User.email)
+                .join(OrganizationMembership, OrganizationMembership.user_id == User.id)
+                .where(
+                    OrganizationMembership.organization_id == organization.id,
+                    OrganizationMembership.is_active.is_(True),
+                )
+            )
+        )
+        .scalars()
+        .all()
+    }
+    if payload.to.lower() not in member_emails and payload.to.lower() != current_user.email.lower():
+        raise ForbiddenError("Recipient must be a member of your organization or yourself")
+
     email_service = get_email_service()
     html = _build_chat_email_html(payload.content)
     sent = await email_service.send(

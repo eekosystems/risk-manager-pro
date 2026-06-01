@@ -104,8 +104,9 @@ export function RiskDetailView({ riskId, onBack, onEdit }: RiskDetailViewProps) 
       setShowClosureForm(false);
       setClosureNote("");
     },
-    onError: (err: Error) =>
-      addToast(`Closure request failed: ${err.message}`, "error"),
+    // M-7: generic message; raw backend detail must not reach the UI
+    onError: () =>
+      addToast("Closure request failed. Please try again or contact support.", "error"),
   });
 
   if (isLoading || !risk) {

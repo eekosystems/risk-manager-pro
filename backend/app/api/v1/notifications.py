@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.deps import get_current_organization, get_current_user
 from app.core.exceptions import NotFoundError
+from app.core.rate_limit import limiter
 from app.models.organization import Organization
 from app.models.user import User
 from app.models.user_notification_preference import UserNotificationPreference
@@ -111,7 +112,9 @@ async def _resolve_token(token: str) -> uuid.UUID:
     "/preferences/{token}",
     response_model=DataResponse[PreferenceResponse],
 )
+@limiter.limit("10/minute")  # H-5: throttle the unauthenticated token endpoint
 async def get_email_preference(
+    request: Request,
     token: str,
     db: AsyncSession = Depends(get_db),
 ) -> DataResponse[PreferenceResponse]:
@@ -131,7 +134,9 @@ async def get_email_preference(
     "/preferences/{token}",
     response_model=DataResponse[PreferenceResponse],
 )
+@limiter.limit("10/minute")  # H-5: throttle the unauthenticated token endpoint
 async def update_email_preference(
+    request: Request,
     token: str,
     payload: UpdatePreferenceRequest,
     db: AsyncSession = Depends(get_db),

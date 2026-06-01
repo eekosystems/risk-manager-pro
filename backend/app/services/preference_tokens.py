@@ -8,7 +8,7 @@ import uuid
 
 from app.core.config import settings
 
-_TOKEN_TTL_SECONDS = 60 * 60 * 24 * 90  # 90 days
+_TOKEN_TTL_SECONDS = 60 * 60 * 24 * 7  # 7 days (H-5: was 90; shorten the abuse window)
 
 
 def _secret_bytes() -> bytes:

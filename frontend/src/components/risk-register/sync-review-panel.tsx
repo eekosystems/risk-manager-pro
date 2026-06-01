@@ -86,7 +86,8 @@ function SyncChangeCard({ item }: { item: PendingSyncChange }) {
       addToast("Change accepted", "success");
       invalidate();
     },
-    onError: (err: Error) => addToast(`Accept failed: ${err.message}`, "error"),
+    // M-7: don't render raw backend error text (may contain SQL/SharePoint internals)
+    onError: () => addToast("Accept failed. Please try again or contact support.", "error"),
   });
 
   const rejectMut = useMutation({
@@ -95,7 +96,8 @@ function SyncChangeCard({ item }: { item: PendingSyncChange }) {
       addToast("Change rejected", "success");
       invalidate();
     },
-    onError: (err: Error) => addToast(`Reject failed: ${err.message}`, "error"),
+    // M-7: generic message; raw backend detail must not reach the UI
+    onError: () => addToast("Reject failed. Please try again or contact support.", "error"),
   });
 
   return (

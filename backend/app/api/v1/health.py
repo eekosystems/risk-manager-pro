@@ -1,3 +1,4 @@
+import time
 from datetime import UTC, datetime
 
 import structlog
@@ -34,12 +35,25 @@ async def health_check() -> HealthResponse:
     return HealthResponse(status="healthy", version=settings.app_version)
 
 
+# L-4: the readiness probe makes real outbound calls to Search, OpenAI, and
+# Storage. It stays rate-limit-exempt so platform probes always pass, but the
+# result is cached briefly so anonymous mass requests can't run up paid-service
+# cost — the expensive checks run at most once per TTL window regardless of load.
+_READY_CACHE_TTL_SECONDS = 15.0
+_ready_cache: tuple[float, ReadyResponse] | None = None
+
+
 @router.get("/health/ready", response_model=ReadyResponse)
 @limiter.exempt  # type: ignore[untyped-decorator]
 async def readiness_check(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> ReadyResponse:
+    global _ready_cache
+    now = time.monotonic()
+    if _ready_cache is not None and now - _ready_cache[0] < _READY_CACHE_TTL_SECONDS:
+        return _ready_cache[1]
+
     checks: dict[str, str] = {}
 
     # Database connectivity
@@ -69,12 +83,14 @@ async def readiness_check(
     else:
         status = "unhealthy"
 
-    return ReadyResponse(
+    result = ReadyResponse(
         status=status,
         checks=checks,
         checked_at=datetime.now(UTC).isoformat(),
         background_task_failures=get_task_failure_counts(),
     )
+    _ready_cache = (now, result)
+    return result
 
 
 async def _check_search() -> str:

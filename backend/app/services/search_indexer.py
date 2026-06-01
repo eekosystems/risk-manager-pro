@@ -68,12 +68,19 @@ class SearchIndexer:
         )
         return indexed
 
-    async def delete_by_document(self, document_id: uuid.UUID) -> int:
+    async def delete_by_document(
+        self, document_id: uuid.UUID, organization_id: uuid.UUID | None = None
+    ) -> int:
         """Delete all indexed chunks for a document. Returns count of deleted chunks."""
         client = await self._get_client()
+        # L-3: when the caller passes the tenant, scope the delete to it so a
+        # mismatched document_id can never reach another org's chunks.
+        filter_expr = f"document_id eq '{document_id}'"
+        if organization_id is not None:
+            filter_expr += f" and tenant_id eq '{organization_id}'"
         search_results = await client.search(
             search_text="*",
-            filter=f"document_id eq '{document_id}'",
+            filter=filter_expr,
             select=["chunk_id"],
         )
         to_delete: list[dict[str, str]] = []

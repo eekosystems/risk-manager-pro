@@ -380,11 +380,20 @@ class SharePointCrawler:
         token = await self._get_token()
 
         url = f"{GRAPH_BASE_URL}/drives/{file.drive_id}/items/{file.drive_item_id}/content"
+        # L-2: Graph 302-redirects to a pre-signed SAS URL that needs no auth. Do
+        # not follow it with the bearer token attached — a compromised redirect
+        # target could otherwise capture the Graph access token. Follow the SAS
+        # hop separately, without the Authorization header.
         response = await client.get(
             url,
             headers={"Authorization": f"Bearer {token}"},
-            follow_redirects=True,
+            follow_redirects=False,
         )
+        if response.is_redirect:
+            location = response.headers.get("location")
+            if not location:
+                raise RuntimeError(f"Failed to download {file.name}: redirect without location")
+            response = await client.get(location, follow_redirects=True)
         if response.status_code >= 400:
             raise RuntimeError(f"Failed to download {file.name} (HTTP {response.status_code})")
 

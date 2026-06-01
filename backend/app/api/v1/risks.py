@@ -70,7 +70,9 @@ async def create_risk_entry(
         triggered_by=current_user,
         notification_type=NotificationType.RISK_CREATED,
         title=f"New risk: {payload.title[:100]}",
-        body=f"Hazard: {payload.hazard[:200]} | Severity: {payload.severity}, Likelihood: {payload.likelihood}",
+        # M-8: don't persist hazard content in the notification body — it's
+        # readable by any org member. Link to the record instead.
+        body=f"{current_user.display_name} created a new risk. Open the record for details.",
         resource_type="risk_entry",
         resource_id=str(entry.id),
     )

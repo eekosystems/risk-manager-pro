@@ -63,6 +63,12 @@ class RAGService:
         sanitized_org_id = str(validated_id).replace("'", "''")
         filter_parts = [f"tenant_id eq '{sanitized_org_id}'"]
         if source_filter:
+            # M-2: defense in depth on top of the single-quote escape — reject
+            # control characters and absurdly long values that can't be a real
+            # source/filename, so a raw user string can't be smuggled in here.
+            for name in source_filter:
+                if len(name) > 256 or any(ord(c) < 32 for c in name):
+                    raise ValueError("source_filter contains an invalid source name")
             sources_clause = " or ".join(
                 f"source eq '{name.replace(chr(39), chr(39) + chr(39))}'" for name in source_filter
             )

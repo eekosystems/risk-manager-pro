@@ -74,16 +74,23 @@ class AuditQueryService:
                 "correlation_id",
             ]
         )
+
+        # M-6: neutralize spreadsheet formula injection. A cell starting with one
+        # of these characters is evaluated as a formula by Excel/Sheets on open;
+        # prefix such values with a single quote so they're treated as text.
+        def _csv_safe(value: str) -> str:
+            return "'" + value if value and value[0] in "=+-@\t\r" else value
+
         for entry in entries:
             writer.writerow(
                 [
                     entry.timestamp.isoformat(),
                     str(entry.user_id),
-                    entry.action,
-                    entry.resource_type,
-                    entry.resource_id or "",
+                    _csv_safe(entry.action),
+                    _csv_safe(entry.resource_type),
+                    _csv_safe(entry.resource_id or ""),
                     entry.outcome,
-                    entry.ip_address,
+                    _csv_safe(entry.ip_address),
                     str(entry.correlation_id),
                 ]
             )

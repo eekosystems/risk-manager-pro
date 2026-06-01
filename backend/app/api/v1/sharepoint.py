@@ -17,9 +17,13 @@ from app.core.deps import (
     get_audit_logger,
     get_current_organization,
     get_current_user,
+    require_analyst_or_above,
+    require_org_role,
 )
+from app.core.exceptions import ForbiddenError
 from app.core.tasks import track_task
 from app.models.document import SourceType
+from app.models.organization_membership import MembershipRole
 from app.repositories.document import DocumentRepository
 from app.schemas.common import DataResponse, MetaResponse
 from app.services.document_processor import DocumentProcessor
@@ -36,6 +40,21 @@ if TYPE_CHECKING:
 logger = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/sharepoint", tags=["sharepoint"])
+
+
+def _is_allowed_sync_path(folder_path: str) -> bool:
+    """H-2: constrain a caller-supplied sync path to the configured airport root.
+
+    Blocks traversal (``..``) and any path outside the airport-documents subtree,
+    so a valid user cannot point a sync at e.g. ``Confidential/Executive``.
+    """
+    root = settings.sharepoint_airport_root_folder.strip("/")
+    candidate = folder_path.strip("/")
+    if not candidate or ".." in candidate:
+        return False
+    if not root:
+        return True
+    return candidate == root or candidate.startswith(f"{root}/")
 
 
 class CrawlResult(BaseModel):
@@ -159,7 +178,8 @@ async def risk_outcome_summary(
 @router.get("/drives", response_model=DataResponse[DrivesResponse])
 async def list_drives(
     request: Request,
-    current_user: User = Depends(get_current_user),
+    # H-2: library enumeration is an analyst/admin tool, not viewer-facing.
+    current_user: User = Depends(require_analyst_or_above),
     organization: Organization = Depends(get_current_organization),
 ) -> DataResponse[DrivesResponse]:
     """List available document libraries in the configured SharePoint site."""
@@ -184,7 +204,8 @@ async def crawl_sharepoint(
     request: Request,
     drive_name: str | None = Query(None, description="Specific drive/library name to crawl"),
     source_type: SourceType = Query(SourceType.CLIENT, alias="source_type"),
-    current_user: User = Depends(get_current_user),
+    # H-2: crawling imports SharePoint content into the org's index — admin only.
+    current_user: User = Depends(require_org_role(MembershipRole.ORG_ADMIN)),
     organization: Organization = Depends(get_current_organization),
     db: AsyncSession = Depends(get_db),
     audit: AuditLogger = Depends(get_audit_logger),
@@ -241,12 +262,17 @@ async def sync_folder(
     request: Request,
     folder_path: str = Query(..., description="Folder path to re-sync from SharePoint"),
     source_type: SourceType = Query(SourceType.CLIENT, alias="source_type"),
-    current_user: User = Depends(get_current_user),
+    # H-2: re-syncing a caller-supplied folder imports content into the org's
+    # index — admin only, and the path must stay inside the configured airport root.
+    current_user: User = Depends(require_org_role(MembershipRole.ORG_ADMIN)),
     organization: Organization = Depends(get_current_organization),
     db: AsyncSession = Depends(get_db),
     audit: AuditLogger = Depends(get_audit_logger),
 ) -> DataResponse[SyncFolderResult]:
     """Discover files in a folder and queue background re-download + reprocess."""
+    if not _is_allowed_sync_path(folder_path):
+        raise ForbiddenError("folder_path is outside the permitted SharePoint root")
+
     crawler: SharePointCrawler = request.app.state.services.sharepoint_crawler
     registry = request.app.state.services
 
@@ -375,7 +401,9 @@ async def _sync_folder_background(
     for file, doc_id, blob_path in to_update:
         try:
             data = await crawler.download_file(file)
-            await registry.search_indexer.delete_by_document(doc_id)
+            await registry.search_indexer.delete_by_document(
+                doc_id, organization_id=organization_id
+            )
             await registry.storage_service.upload(blob_path, data, file.content_type)
             async with async_session_factory() as db:
                 repo = DocumentRepository(db)
