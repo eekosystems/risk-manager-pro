@@ -7,6 +7,7 @@ import pytest
 
 from app.models.document import Document, DocumentStatus, SourceType
 from app.services.document_processor import DocumentProcessor
+from app.services.parser_sandbox import extract_text_local
 
 
 @pytest.fixture
@@ -116,7 +117,7 @@ async def test_process_error_sets_failed_status(
 
 
 def test_extract_text_plain() -> None:
-    text = DocumentProcessor._extract_text(b"Hello, world!", "text/plain")
+    text = extract_text_local(b"Hello, world!", "text/plain")
     assert text == "Hello, world!"
 
 

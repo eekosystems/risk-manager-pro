@@ -17,9 +17,6 @@ import io
 import multiprocessing as mp
 import os
 from concurrent.futures import ProcessPoolExecutor
-from typing import TypeVar
-
-T = TypeVar("T")
 
 # Per-document caps for the sandboxed parse.
 _RLIMIT_AS_BYTES = 2 * 1024 * 1024 * 1024  # 2 GiB address space
@@ -81,9 +78,7 @@ def extract_text_local(data: bytes, content_type: str) -> str:
                 pages.append(text)
         return "\n\n".join(pages)
 
-    if content_type == (
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-    ):
+    if content_type == ("application/vnd.openxmlformats-officedocument.wordprocessingml.document"):
         from docx import Document as DocxDocument
 
         doc = DocxDocument(io.BytesIO(data))
