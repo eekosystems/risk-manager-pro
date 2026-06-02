@@ -37,6 +37,12 @@ variables:
     value: "strmprmpstartfg"
   - name: keyVaultName
     value: "kv-rmp-rmp-start-fg"
+  # Select the Terraform variable file by environment. This deployment targets
+  # the production Faith Group tenant, so the prod tfvars (WORM lock, GP/HA
+  # Postgres) must be the ones applied — previously dev.tfvars was hardcoded,
+  # so the committed prod fixes (H-9/H-12) never landed.
+  - name: tfVarFile
+    value: "environments/prod.tfvars"
 
 stages:
   # ──────────────────────────────────────────────
@@ -86,7 +92,7 @@ stages:
               command: "plan"
               workingDirectory: "$(System.DefaultWorkingDirectory)/infra"
               commandOptions: >-
-                -var-file=environments/dev.tfvars
+                -var-file=$(tfVarFile)
                 -var="azure_ad_tenant_id=$(AZURE_AD_TENANT_ID)"
                 -var="azure_ad_client_id=$(AZURE_AD_CLIENT_ID)"
                 -var="db_admin_password=$(db-admin-password)"
@@ -99,7 +105,7 @@ stages:
               command: "apply"
               workingDirectory: "$(System.DefaultWorkingDirectory)/infra"
               commandOptions: >-
-                -var-file=environments/dev.tfvars
+                -var-file=$(tfVarFile)
                 -var="azure_ad_tenant_id=$(AZURE_AD_TENANT_ID)"
                 -var="azure_ad_client_id=$(AZURE_AD_CLIENT_ID)"
                 -var="db_admin_password=$(db-admin-password)"

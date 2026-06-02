@@ -10,6 +10,15 @@ resource "azurerm_key_vault" "main" {
   soft_delete_retention_days = 90
   rbac_authorization_enabled = true
   tags                       = var.tags
+
+  # M-9: network firewall. Gated by variables so it ships non-breaking (default
+  # Allow) and production opts into Deny + an allow-list / private endpoint.
+  network_acls {
+    default_action             = var.network_default_action
+    bypass                     = "AzureServices"
+    virtual_network_subnet_ids = var.allowed_subnet_ids
+    ip_rules                   = var.allowed_ip_rules
+  }
 }
 
 # Grant the deployment identity access to manage secrets
