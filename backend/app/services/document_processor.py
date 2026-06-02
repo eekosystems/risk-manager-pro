@@ -1,6 +1,5 @@
 import asyncio
 import base64
-import io
 import uuid
 
 import structlog
@@ -15,6 +14,11 @@ from app.models.notification import NotificationType
 from app.repositories.document import DocumentRepository
 from app.services.notification import NotificationDispatcher
 from app.services.openai_client import AzureOpenAIClient
+from app.services.parser_sandbox import (
+    extract_text_local,
+    render_pdf_pages,
+    run_sandboxed,
+)
 from app.services.search_indexer import SearchIndexer
 from app.services.storage import BlobStorageService
 
@@ -33,61 +37,6 @@ class DocumentProcessor:
         self._openai = openai_client
         self._indexer = indexer
         self._repo = repo
-
-    @staticmethod
-    def _extract_text_pdf(data: bytes) -> str:
-        from pypdf import PdfReader
-
-        reader = PdfReader(io.BytesIO(data))
-        pages: list[str] = []
-        for page in reader.pages:
-            text = page.extract_text()
-            if text:
-                pages.append(text)
-        return "\n\n".join(pages)
-
-    @staticmethod
-    def _extract_text_docx(data: bytes) -> str:
-        from docx import Document as DocxDocument
-
-        doc = DocxDocument(io.BytesIO(data))
-        return "\n\n".join(p.text for p in doc.paragraphs if p.text.strip())
-
-    @staticmethod
-    def _extract_text_plain(data: bytes) -> str:
-        return data.decode("utf-8", errors="replace")
-
-    @staticmethod
-    def _extract_text_xlsx(data: bytes) -> str:
-        from openpyxl import load_workbook
-
-        wb = load_workbook(io.BytesIO(data), read_only=True, data_only=True)
-        rows: list[str] = []
-        for sheet in wb.worksheets:
-            rows.append(f"--- {sheet.title} ---")
-            for row in sheet.iter_rows(values_only=True):
-                cells = [str(c) if c is not None else "" for c in row]
-                if any(cells):
-                    rows.append("\t".join(cells))
-        wb.close()
-        return "\n".join(rows)
-
-    @staticmethod
-    def _extract_text_pptx(data: bytes) -> str:
-        from pptx import Presentation
-
-        prs = Presentation(io.BytesIO(data))
-        slides: list[str] = []
-        for i, slide in enumerate(prs.slides, 1):
-            parts = [f"--- Slide {i} ---"]
-            for shape in slide.shapes:
-                if shape.has_text_frame:
-                    for para in shape.text_frame.paragraphs:
-                        text = para.text.strip()
-                        if text:
-                            parts.append(text)
-            slides.append("\n".join(parts))
-        return "\n\n".join(slides)
 
     @staticmethod
     def _extract_text_ocr(data: bytes) -> str:
@@ -110,49 +59,11 @@ class DocumentProcessor:
         result = poller.result()
         return result.content or ""
 
-    @staticmethod
-    def _extract_text(data: bytes, content_type: str) -> str:
-        if content_type == "application/pdf":
-            text = DocumentProcessor._extract_text_pdf(data)
-            if not text.strip():
-                logger.info("pdf_no_text_layer_falling_back_to_ocr")
-                text = DocumentProcessor._extract_text_ocr(data)
-            return text
-        elif content_type == (
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        ):
-            return DocumentProcessor._extract_text_docx(data)
-        elif content_type in ("text/plain", "text/csv"):
-            return DocumentProcessor._extract_text_plain(data)
-        elif content_type == "application/msword":
-            # Old .doc format — attempt plain text extraction as fallback
-            return DocumentProcessor._extract_text_plain(data)
-        elif content_type == ("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"):
-            return DocumentProcessor._extract_text_xlsx(data)
-        elif content_type == (
-            "application/vnd.openxmlformats-officedocument.presentationml.presentation"
-        ):
-            return DocumentProcessor._extract_text_pptx(data)
-        else:
-            raise ValueError(f"Unsupported content type: {content_type}")
-
-    @staticmethod
-    def _render_pdf_pages(data: bytes) -> list[bytes]:
-        """Render each PDF page as a PNG image using PyMuPDF."""
-        import fitz  # pymupdf
-
-        doc = fitz.open(stream=data, filetype="pdf")
-        images: list[bytes] = []
-        for page in doc:
-            # Render at 150 DPI for good quality without huge size
-            pix = page.get_pixmap(dpi=150)
-            images.append(pix.tobytes("png"))
-        doc.close()
-        return images
-
     async def _describe_pdf_pages(self, data: bytes) -> str:
         """Render PDF pages to images and describe visual content via GPT-4o vision."""
-        page_images = await asyncio.to_thread(self._render_pdf_pages, data)
+        loop = asyncio.get_running_loop()
+        # L-8: render untrusted PDF bytes in a resource-capped subprocess.
+        page_images = await loop.run_in_executor(None, run_sandboxed, render_pdf_pages, data)
         if not page_images:
             return ""
 
@@ -194,7 +105,17 @@ class DocumentProcessor:
 
     @staticmethod
     async def _extract_text_in_thread(data: bytes, content_type: str) -> str:
-        return await asyncio.to_thread(DocumentProcessor._extract_text, data, content_type)
+        loop = asyncio.get_running_loop()
+        # L-8: parse untrusted bytes in a resource-capped subprocess.
+        text = await loop.run_in_executor(
+            None, run_sandboxed, extract_text_local, data, content_type
+        )
+        if content_type == "application/pdf" and not text.strip():
+            logger.info("pdf_no_text_layer_falling_back_to_ocr")
+            # OCR is a network call to Azure Document Intelligence — credentials,
+            # no untrusted local parsing — so it runs in-process, not sandboxed.
+            text = await asyncio.to_thread(DocumentProcessor._extract_text_ocr, data)
+        return text
 
     @staticmethod
     async def _chunk_text_in_thread(text: str) -> list[str]:

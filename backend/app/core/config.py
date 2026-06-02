@@ -169,6 +169,25 @@ class Settings(BaseSettings):
             )
         return self
 
+    @model_validator(mode="after")
+    def _validate_production_safety(self) -> "Settings":
+        # Hardening: refuse to boot a production instance with a configuration the
+        # security review flagged as silently weakening posture — an unset tenant
+        # (the single-tenant JWT assertion can't be enforced) or a wildcard CORS
+        # origin. Fail at startup rather than serving in a degraded state.
+        if self.app_env != "production":
+            return self
+        if not self.azure_ad_tenant_id:
+            raise ValueError(
+                "azure_ad_tenant_id must be set in production (set AZURE_AD_TENANT_ID)"
+            )
+        if "*" in self.cors_origins:
+            raise ValueError(
+                "cors_origins must not contain '*' in production "
+                "(set CORS_ORIGINS to explicit origins)"
+            )
+        return self
+
     @property
     def azure_ad_issuer(self) -> str:
         return f"https://login.microsoftonline.com/{self.azure_ad_tenant_id}/v2.0"
