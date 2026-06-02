@@ -1,6 +1,7 @@
 import asyncio
 import base64
 import uuid
+from typing import cast
 
 import structlog
 import tiktoken
@@ -61,9 +62,11 @@ class DocumentProcessor:
 
     async def _describe_pdf_pages(self, data: bytes) -> str:
         """Render PDF pages to images and describe visual content via GPT-4o vision."""
-        loop = asyncio.get_running_loop()
         # L-8: render untrusted PDF bytes in a resource-capped subprocess.
-        page_images = await loop.run_in_executor(None, run_sandboxed, render_pdf_pages, data)
+        page_images = cast(
+            "list[bytes]",
+            await asyncio.to_thread(run_sandboxed, render_pdf_pages, data),
+        )
         if not page_images:
             return ""
 
@@ -105,10 +108,10 @@ class DocumentProcessor:
 
     @staticmethod
     async def _extract_text_in_thread(data: bytes, content_type: str) -> str:
-        loop = asyncio.get_running_loop()
         # L-8: parse untrusted bytes in a resource-capped subprocess.
-        text = await loop.run_in_executor(
-            None, run_sandboxed, extract_text_local, data, content_type
+        text = cast(
+            "str",
+            await asyncio.to_thread(run_sandboxed, extract_text_local, data, content_type),
         )
         if content_type == "application/pdf" and not text.strip():
             logger.info("pdf_no_text_layer_falling_back_to_ocr")

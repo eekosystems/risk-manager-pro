@@ -17,6 +17,10 @@ import io
 import multiprocessing as mp
 import os
 from concurrent.futures import ProcessPoolExecutor
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 # Per-document caps for the sandboxed parse.
 _RLIMIT_AS_BYTES = 2 * 1024 * 1024 * 1024  # 2 GiB address space
@@ -46,7 +50,7 @@ def _apply_limits() -> None:
             continue
 
 
-def run_sandboxed(func, *args):
+def run_sandboxed[R](func: Callable[..., R], *args: object) -> R:
     """Run ``func(*args)`` in a fresh, resource-limited worker process.
 
     ``max_tasks_per_child=1`` guarantees a brand-new process per call so the
