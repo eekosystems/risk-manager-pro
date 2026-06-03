@@ -42,7 +42,7 @@ jobs:
       run:
         working-directory: infra
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 
       - name: Login to Azure
         uses: azure/login@1384c340ab2dda50fed2bee3041d1d87018aa5e8 # v2
@@ -75,7 +75,7 @@ jobs:
     needs: deploy-infra
     environment: production
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 
       - name: Login to Azure
         uses: azure/login@1384c340ab2dda50fed2bee3041d1d87018aa5e8 # v2
@@ -167,7 +167,7 @@ jobs:
     needs: deploy-infra
     environment: production
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
