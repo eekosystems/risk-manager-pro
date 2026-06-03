@@ -17,7 +17,7 @@ ARG VITE_API_SCOPE=""
 
 RUN npm run build
 
-FROM nginx:alpine@sha256:31db9045b34376493fd4fb695d8a8d03bbfffaf6297fcde82d0f925ce2dd329a
+FROM nginx:alpine@sha256:8b1e78743a03dbb2c95171cc58639fef29abc8816598e27fb910ed2e621e589a
 
 LABEL org.opencontainers.image.title="risk-manager-pro-web" \
       org.opencontainers.image.vendor="Faith Group, LLC" \
