@@ -99,7 +99,8 @@ Read [../../ENGINEERING_STANDARDS.md](../../ENGINEERING_STANDARDS.md) once in fu
 
 ## 6. Deploying
 
-You generally won't deploy by hand — GitHub Actions does it on merge to `main`. If you need to, read the
+You generally won't deploy by hand — the Azure DevOps pipeline handles build/test on merge to `main`
+(deploy is gated behind an opt-in flag). If you need to, read the
 [Deployment Runbook](../deployment/deployment-runbook.md). Deploys for this project run through **Azure
 Cloud Shell**, not a local terminal.
 

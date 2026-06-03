@@ -105,7 +105,8 @@ This prevents silent security downgrades from a misconfigured deploy.
 - All schema changes go through Alembic migrations.
 - CI gates every merge: lint, type check, unit tests, dependency audit (`pip-audit`/`npm audit`), SAST
   (`bandit`), and IaC scan (`tfsec`). Deploys are gated on a successful CI run and a production approval,
-  and the deploy auth uses GitHub OIDC (no long-lived cloud credentials).
+  and the pipeline authenticates to Azure via a Workload Identity Federation service connection (no
+  long-lived cloud credentials).
 
 ## 9. Security audit status
 
@@ -121,7 +122,7 @@ code-visible outcomes include:
 - Resource-capped sandbox for untrusted document parsing.
 - Reduced TTL + rate limiting on unauthenticated notification-preference tokens.
 - CSV formula-injection protection on audit export.
-- Pinned GitHub Actions and Dependabot; container and IaC scanning in CI.
+- Container image (Trivy) and IaC (tfsec) scanning, plus dependency auditing, in CI.
 - Digest-pinned, non-root container images; loopback-only local Postgres.
 
 > **Authoritative tracking:** the audit report and the per-finding remediation status are tracked

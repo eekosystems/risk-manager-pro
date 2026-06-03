@@ -1,17 +1,36 @@
 # Azure Pipelines — Risk Manager Pro CI/CD
-# Triggers disabled while waiting on free parallelism grant
+# Canonical CI/CD for this repository (Azure DevOps).
 #
-# C-3 — credential hardening (requires a one-time Azure DevOps change, not YAML):
-#   1. Recreate the "azure-rmp-connection" service connection as an Azure Resource
-#      Manager connection using Workload Identity Federation (no client secret).
+# CI (Backend + Frontend lint/test/build) runs automatically on every PR and on
+# pushes to main. The Deploy stage is gated behind the `deployEnabled` variable so
+# enabling the pipeline never auto-deploys to production — set deployEnabled=true
+# (a pipeline variable, or edit below) once the team is ready to release from DevOps.
+#
+# ── One-time Azure DevOps setup the team must complete (portal, not YAML) ──
+#   1. Pipelines → New pipeline → point at this azure-pipelines.yml.
+#   2. Grant free parallelism (Project settings → Parallel jobs → request the
+#      Microsoft-hosted free grant) or attach a self-hosted agent pool.
+#   3. Service connection "azure-rmp-connection": an Azure Resource Manager
+#      connection using Workload Identity Federation (no client secret).
 #      Project settings → Service connections → New → Workload Identity federation.
-#   2. Remove DB_ADMIN_PASSWORD (and any DATABASE_URL) from the "RMP variable
-#      group"; store them in Key Vault ($(keyVaultName)) instead. The pipeline now
-#      reads db-admin-password from Key Vault per-run via the AzureKeyVault@2 task.
+#   4. Variable group "RMP variable group": resource names + non-secret config
+#      (AZURE_AD_TENANT_ID, AZURE_AD_CLIENT_ID, AZURE_OPENAI_ENDPOINT,
+#      AZURE_SEARCH_ENDPOINT, AZURE_SEARCH_INDEX_NAME, AZURE_STORAGE_ACCOUNT_NAME,
+#      CORS_ORIGINS, API_BASE_URL, FRONTEND_URL, DATABASE_URL, SWA_DEPLOYMENT_TOKEN).
+#      Store DATABASE_URL / db-admin-password in Key Vault ($(keyVaultName)); the
+#      pipeline reads db-admin-password per-run via the AzureKeyVault@2 task.
+#   5. (Recommended) Create an Environment with required-approver checks and switch
+#      the Deploy jobs to deployment jobs targeting it for a manual release gate.
 
-trigger: none
+trigger:
+  branches:
+    include:
+      - main
 
-pr: none
+pr:
+  branches:
+    include:
+      - main
 
 variables:
   - group: "RMP variable group"
@@ -43,6 +62,10 @@ variables:
   # so the committed prod fixes (H-9/H-12) never landed.
   - name: tfVarFile
     value: "environments/prod.tfvars"
+  # Safety gate: CI always runs, but Deploy only runs when this is "true".
+  # Override as a pipeline variable when the team is ready to release from DevOps.
+  - name: deployEnabled
+    value: "false"
 
 stages:
   # ──────────────────────────────────────────────
@@ -292,7 +315,7 @@ stages:
     dependsOn:
       - Backend
       - Frontend
-    condition: and(succeeded('Backend'), succeeded('Frontend'), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    condition: and(succeeded('Backend'), succeeded('Frontend'), eq(variables['Build.SourceBranch'], 'refs/heads/main'), eq(variables['deployEnabled'], 'true'))
     jobs:
       - job: DeployBackend
         displayName: "Deploy Backend (Container App)"

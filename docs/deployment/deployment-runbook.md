@@ -1,79 +1,88 @@
 # Deployment Runbook
 
 This runbook covers how Risk Manager Pro is built, validated, and deployed to Azure. The
-**canonical CI/CD system is GitHub Actions**. The Azure DevOps pipeline (`azure-pipelines.yml`) is
-present but **disabled** (triggers set to `none`); treat GitHub Actions as the source of truth.
+**canonical CI/CD system is Azure DevOps Pipelines** (`azure-pipelines.yml`), running in Faith Group's
+Azure DevOps organization.
 
 For the underlying Azure resources, see [infrastructure.md](infrastructure.md).
 
-## 1. Pipelines overview
+## 1. Pipeline overview
 
 ```
-PR / push to main ──▶ ci.yml (lint, type-check, test, build, security scan, IaC validate)
-                          │  on success
-                          ▼
-                     deploy.yml ──▶ deploy-infra (Terraform apply)
-                          │            │
-                          │            ├─▶ build-and-deploy-backend (image build/scan/push, rollout, health-gated)
-                          │            └─▶ deploy-frontend (build + deploy to Static Web Apps)
-                     [production environment: requires approval]
+PR to main        ──▶ Backend CI + Frontend CI (lint, type-check, test, build)
+push to main      ──▶ Backend CI + Frontend CI ──▶ Deploy*  (*only when deployEnabled = true)
+                                                       │
+                                                       ├─▶ Deploy Backend (Container App image + env + migrations)
+                                                       └─▶ Deploy Frontend (Static Web App)
 ```
 
-## 2. CI — `.github/workflows/ci.yml`
+CI runs automatically on every PR and on pushes to `main`. The **Deploy stage is gated** behind the
+`deployEnabled` pipeline variable (default `false`) so simply enabling the pipeline never auto-deploys to
+production — the team flips it to `true` when ready to release from DevOps. The Infrastructure
+(Terraform) stage is disabled by default because the platform targets an existing resource group; enable
+it only to manage infra from the pipeline.
 
-Runs on every PR and push to `main`. Jobs (parallel where possible):
+## 2. One-time Azure DevOps setup
 
-| Job | What it does |
-|-----|--------------|
-| `backend-lint` | `ruff check`, `ruff format --check`, `mypy app/` |
-| `backend-test` | `pytest` with coverage against a Postgres-16 + pgvector service container |
-| `security-scan` | `pip-audit` (backend deps), `npm audit` (frontend, `--audit-level=high`) |
-| `sast` | `bandit` over `backend/app/` (config from `pyproject.toml`) |
-| `frontend-lint` | `npm run type-check`, `npm run lint` |
-| `frontend-test` | `npm test` (Vitest) |
-| `frontend-build` | `npm run build` |
-| `terraform-validate` | `terraform validate`, `fmt -check`, and `tfsec` (fails on CRITICAL) |
+These are portal/account actions (not YAML) that the team performs once in their DevOps project:
 
-All jobs must pass before `deploy.yml` is eligible to run.
+1. **Create the pipeline** — Pipelines → New pipeline → point at `azure-pipelines.yml` in this repo.
+2. **Parallelism** — request the free Microsoft-hosted parallel-jobs grant (Project settings → Parallel
+   jobs) or attach a self-hosted agent pool. Until granted, runs queue.
+3. **Service connection** `azure-rmp-connection` — an Azure Resource Manager connection using
+   **Workload Identity Federation** (no client secret). Project settings → Service connections.
+4. **Variable group** `RMP variable group` — resource names + non-secret config:
+   `AZURE_AD_TENANT_ID`, `AZURE_AD_CLIENT_ID`, `AZURE_OPENAI_ENDPOINT`, `AZURE_SEARCH_ENDPOINT`,
+   `AZURE_SEARCH_INDEX_NAME`, `AZURE_STORAGE_ACCOUNT_NAME`, `CORS_ORIGINS`, `API_BASE_URL`,
+   `FRONTEND_URL`, `DATABASE_URL`, `SWA_DEPLOYMENT_TOKEN`. Store `DATABASE_URL` /
+   `db-admin-password` in **Key Vault**; the pipeline reads `db-admin-password` per-run via the
+   `AzureKeyVault@2` task.
+5. **(Recommended) Release gate** — create a DevOps **Environment** with required-approver checks and
+   switch the Deploy jobs to deployment jobs targeting it, so production releases require human approval.
 
-## 3. Deploy — `.github/workflows/deploy.yml`
+## 3. CI stages (`azure-pipelines.yml`)
 
-Triggers on a **successful CI run on `main`**, or manually via `workflow_dispatch`. Azure auth uses
-**OIDC federation** (`id-token: write`) — no stored client secret.
+| Stage / job | What it does |
+|-------------|--------------|
+| **Backend → Lint & Type Check** | `ruff check`, `ruff format --check`, `mypy app/` |
+| **Backend → Unit Tests** | `pytest` with coverage against a Postgres-16 service container; publishes test + coverage results |
+| **Backend → Docker Build & Push** | On `main`: build the API image and push to ACR (`:BuildId` + `:latest`) |
+| **Frontend → Lint & Type Check** | `npm run lint`, `npm run type-check` |
+| **Frontend → Build** | `npm run build` with `VITE_*` injected from the variable group; publishes the `dist/` artifact |
 
-| Job | What it does |
-|-----|--------------|
-| `check-ci` | Gate: only proceed if CI passed **and** the run originated from this repo (blocks forked-PR runs from using production credentials). |
-| `deploy-infra` | `terraform init` (remote state) → `plan -var-file=environments/<TF_ENV>.tfvars` → `apply`. Tenant/client IDs and the DB password are injected from secrets. |
-| `build-and-deploy-backend` | Build the backend image, **Trivy** scan (fail on CRITICAL/HIGH), push to ACR tagged with the commit SHA, update the Container App with a new revision suffix, then **health-gate**: poll `/health` for ~90s and **roll back to the previous revision on failure**. |
-| `deploy-frontend` | `npm ci && npm run build` (with `VITE_*` injected from repo variables), then deploy `dist/` to Azure Static Web Apps. |
+Run the same gates locally before pushing:
 
-The `production` GitHub environment requires approval, so infra/app changes pause for a human gate.
+```bash
+cd backend && make lint && make type-check && pytest
+cd frontend && npm run type-check && npm run lint && npm test
+```
 
-### Required GitHub configuration
+## 4. Deploy stage
 
-- **Secrets:** Azure OIDC (`client-id`, `tenant-id`, `subscription-id`), `TF_VAR_db_admin_password`,
-  `SWA_DEPLOYMENT_TOKEN`, and the Entra `TF_VAR_azure_ad_*` values.
-- **Variables:** `ACR_NAME`, `CONTAINER_APP_NAME`, `RESOURCE_GROUP`, `TF_ENV` (default `prod`),
-  `API_BASE_URL`, `FRONTEND_URL`, `AZURE_AD_CLIENT_ID`, `AZURE_AD_AUTHORITY`, `API_SCOPE`.
+Runs only on `main` **and** when `deployEnabled = true`:
 
-## 4. Containers
+- **Deploy Backend (Container App)** — ensures the Container App identity's RBAC roles (OpenAI, Search,
+  Storage), sets the `database-url` secret, updates the Container App to the new image with its env vars,
+  and runs `alembic upgrade head`.
+- **Deploy Frontend (Static Web App)** — downloads the build artifact and deploys it via the SWA CLI.
+
+## 5. Containers
 
 - **Backend** (`backend/Dockerfile`): multi-stage on digest-pinned `python:3.12-slim`; runs as non-root
   `appuser`; entrypoint `start.sh` runs `alembic upgrade head` then Uvicorn on port 8000;
   `HEALTHCHECK` hits `/api/v1/health`.
 - **Frontend** (`frontend/Dockerfile`): build stage (`node:20-alpine`, `npm ci && npm run build`) →
-  runtime `nginx:alpine` as non-root on port 8080 with SPA fallback to `index.html`. (Static Web Apps
-  is the production host; the container image is available for container-based hosting.)
+  runtime `nginx:alpine` as non-root on port 8080 with SPA fallback to `index.html`. (Static Web Apps is
+  the production host; the container image is available for container-based hosting.)
 
-## 5. First-time provisioning with azd
+## 6. First-time provisioning with azd
 
 `azure.yaml` wires the **Azure Developer CLI (azd)** to Terraform and the two services (`api` →
 Container App, `web` → Static Web App). Provisioning hooks:
 
 - **preprovision** (`scripts/preprovision.*`) — generates a strong 32-char DB admin password if not set.
-- **postprovision** (`scripts/postprovision.*`) — creates/configures the Entra ID app registration,
-  the `access_as_user` OAuth scope and service principal, and stores client/tenant IDs in the azd
+- **postprovision** (`scripts/postprovision.*`) — creates/configures the Entra ID app registration, the
+  `access_as_user` OAuth scope and service principal, and stores client/tenant IDs in the azd
   environment; prompts for admin consent.
 
 ```bash
@@ -83,26 +92,25 @@ azd up                      # provision infra + deploy both services
 ```
 
 > **Deployment policy for this project:** routine deploys go through **Azure Cloud Shell**, not a local
-> Windows terminal. Run `az`/`azd`/Terraform commands from Cloud Shell (or let GitHub Actions perform
-> the deploy). Always check existing Azure resources before creating new ones.
+> Windows terminal. Run `az`/`azd`/Terraform commands from Cloud Shell (or let the DevOps pipeline
+> perform the deploy). Always check existing Azure resources before creating new ones.
 
-## 6. Database migrations on deploy
+## 7. Database migrations on deploy
 
-Migrations are **not** a separate pipeline step in GitHub Actions — the backend container runs
-`alembic upgrade head` on startup (`start.sh`). A new revision therefore applies pending migrations as
-it boots. Author migrations so they are safe to run against the live schema (additive first; avoid
-destructive changes in the same release as the code that depends on the old shape).
+The backend container runs `alembic upgrade head` on startup (`start.sh`), and the Deploy stage also runs
+it explicitly. A new revision therefore applies pending migrations as it boots. Author migrations so they
+are safe against the live schema (additive first; avoid destructive changes in the same release as the
+code that depends on the old shape).
 
-## 7. Rollback
+## 8. Rollback
 
-- **Backend:** automatic — the deploy job redirects traffic to the previous Container App revision and
-  deactivates the new one if the post-deploy health check fails. To roll back manually, shift 100% of
-  traffic back to the prior revision (revisions are suffixed with a timestamp for traceability).
+- **Backend:** Container App keeps prior revisions. To roll back, shift 100% of ingress traffic back to
+  the previous revision and deactivate the bad one (Azure portal or `az containerapp revision`).
 - **Frontend:** redeploy the previous build artifact / commit to Static Web Apps.
 - **Infrastructure:** revert the Terraform change and re-apply. Note the audit-log WORM lock is
   irreversible once enabled.
 
-## 8. Smoke checks after deploy
+## 9. Smoke checks after deploy
 
 1. `GET {API_BASE_URL}/health` → `200`, expected version.
 2. `GET {API_BASE_URL}/health/ready` → `healthy` (DB, Search, OpenAI, Storage all green).

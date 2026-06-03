@@ -70,8 +70,7 @@ risk-manager-pro/
 │   ├── scripts/           # seed, backfill_memberships, load_regulatory
 │   └── tests/
 ├── infra/                # Terraform IaC (root + 10 modules)
-├── .github/workflows/    # GitHub Actions: ci.yml, deploy.yml (canonical CI/CD)
-├── azure-pipelines.yml   # Azure DevOps pipeline (present but disabled)
+├── azure-pipelines.yml   # Azure DevOps Pipelines (canonical CI/CD)
 ├── azure.yaml            # Azure Developer CLI (azd) service/infra wiring
 ├── docker-compose.yml    # Local Postgres (pgvector) + Azurite
 ├── Makefile              # Dev shortcuts

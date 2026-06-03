@@ -44,7 +44,7 @@ logged for SOC 2 compliance.
 - **Data:** Azure Database for PostgreSQL (Flexible Server, pgvector), Azure AI Search (hybrid keyword + vector), Azure Blob Storage.
 - **AI:** Azure OpenAI (GPT-4o chat + vision, text-embedding-3-small).
 - **Platform:** Entra ID (auth), Key Vault + Managed Identity (secrets), Azure Communication Services (email), Azure Monitor + Application Insights (observability).
-- **IaC / CI-CD:** Terraform + GitHub Actions (canonical). Azure DevOps Pipelines present but disabled.
+- **IaC / CI-CD:** Terraform + Azure DevOps Pipelines (`azure-pipelines.yml`, canonical CI/CD).
 
 > **Status note:** This documentation reflects the codebase as of the handoff. The platform completed
 > a security audit (see [security-compliance.md](operations/security-compliance.md)); remediation is
