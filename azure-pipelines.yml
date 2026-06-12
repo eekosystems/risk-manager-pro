@@ -65,7 +65,7 @@ variables:
   # Safety gate: CI always runs, but Deploy only runs when this is "true".
   # Override as a pipeline variable when the team is ready to release from DevOps.
   - name: deployEnabled
-    value: "false"
+    value: "true"
 
 stages:
   # ──────────────────────────────────────────────
