@@ -138,9 +138,7 @@ class SettingsService:
         self, organization_id: uuid.UUID
     ) -> ModelPreferencesPayload:
         row = await self._repo.get(organization_id, "model")
-        config = (
-            ModelPreferencesPayload.model_validate(row.settings_json) if row else DEFAULT_MODEL
-        )
+        config = ModelPreferencesPayload.model_validate(row.settings_json) if row else DEFAULT_MODEL
         # Always request the model's maximum output budget regardless of any
         # previously stored (lower) value. 128000 is gpt-5.1's hard output ceiling.
         return config.model_copy(update={"max_output_tokens": 128000})

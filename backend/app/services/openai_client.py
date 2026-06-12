@@ -168,7 +168,7 @@ class AzureOpenAIClient:
         consumed by `chat_completion_stream`.
         """
         client = await self._get_client()
-        return await client.chat.completions.create(
+        return await client.chat.completions.create(  # type: ignore[return-value]
             model=settings.azure_openai_deployment_name,
             messages=messages,  # type: ignore[arg-type]
             temperature=temperature,
