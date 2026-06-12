@@ -26,13 +26,13 @@ resource "azurerm_cognitive_deployment" "gpt4o" {
 
   model {
     format  = "OpenAI"
-    name    = "gpt-4o"
-    version = "2024-11-20"
+    name    = "gpt-5.1"
+    version = "2025-11-13"
   }
 
   sku {
     name     = "Standard"
-    capacity = 20
+    capacity = 100
   }
 }
 
@@ -48,7 +48,7 @@ resource "azurerm_cognitive_deployment" "embedding" {
 
   sku {
     name     = "Standard"
-    capacity = 10
+    capacity = 100
   }
 }
 

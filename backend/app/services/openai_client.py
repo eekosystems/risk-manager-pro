@@ -46,7 +46,7 @@ class AzureOpenAIClient:
         self,
         messages: list[dict[str, str]],
         temperature: float = 0.3,
-        max_tokens: int = 16384,
+        max_tokens: int = 128000,
         json_mode: bool = False,
     ) -> str:
         client = await self._get_client()
@@ -101,7 +101,7 @@ class AzureOpenAIClient:
         messages: list[dict[str, Any]],
         tools: list[dict[str, Any]],
         temperature: float = 0.3,
-        max_tokens: int = 16384,
+        max_tokens: int = 128000,
         tool_choice: str | dict[str, Any] = "auto",
     ) -> dict[str, Any]:
         """Run a chat completion that may emit tool calls.
@@ -180,7 +180,7 @@ class AzureOpenAIClient:
         self,
         messages: list[dict[str, str]],
         temperature: float = 0.3,
-        max_tokens: int = 16384,
+        max_tokens: int = 128000,
     ) -> AsyncGenerator[str, None]:
         stream = await self._open_chat_stream(messages, temperature, max_tokens)
         async for chunk in stream:
