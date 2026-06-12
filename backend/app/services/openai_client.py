@@ -3,7 +3,8 @@ from typing import Any
 
 import structlog
 from azure.identity.aio import DefaultAzureCredential, get_bearer_token_provider
-from openai import APIStatusError, AsyncAzureOpenAI, RateLimitError
+from openai import APIStatusError, AsyncAzureOpenAI, AsyncStream, RateLimitError
+from openai.types.chat import ChatCompletionChunk
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from app.core.config import settings
@@ -45,7 +46,7 @@ class AzureOpenAIClient:
         self,
         messages: list[dict[str, str]],
         temperature: float = 0.3,
-        max_tokens: int = 2000,
+        max_tokens: int = 16384,
         json_mode: bool = False,
     ) -> str:
         client = await self._get_client()
@@ -100,7 +101,7 @@ class AzureOpenAIClient:
         messages: list[dict[str, Any]],
         tools: list[dict[str, Any]],
         temperature: float = 0.3,
-        max_tokens: int = 2000,
+        max_tokens: int = 16384,
         tool_choice: str | dict[str, Any] = "auto",
     ) -> dict[str, Any]:
         """Run a chat completion that may emit tool calls.
@@ -153,21 +154,36 @@ class AzureOpenAIClient:
             )
             raise
 
-    async def chat_completion_stream(
+    @_retry_on_rate_limit
+    async def _open_chat_stream(
         self,
         messages: list[dict[str, str]],
-        temperature: float = 0.3,
-        max_tokens: int = 2000,
-    ) -> AsyncGenerator[str, None]:
+        temperature: float,
+        max_tokens: int,
+    ) -> AsyncStream[ChatCompletionChunk]:
+        """Open a streaming chat completion, retrying on rate limits.
+
+        A 429 surfaces when the stream is *opened*, so the retry/backoff must
+        wrap this call — not the token iteration. The returned stream is then
+        consumed by `chat_completion_stream`.
+        """
         client = await self._get_client()
-        stream = await client.chat.completions.create(
+        return await client.chat.completions.create(
             model=settings.azure_openai_deployment_name,
             messages=messages,  # type: ignore[arg-type]
             temperature=temperature,
             max_completion_tokens=max_tokens,
             stream=True,
         )
-        async for chunk in stream:  # type: ignore[union-attr]
+
+    async def chat_completion_stream(
+        self,
+        messages: list[dict[str, str]],
+        temperature: float = 0.3,
+        max_tokens: int = 16384,
+    ) -> AsyncGenerator[str, None]:
+        stream = await self._open_chat_stream(messages, temperature, max_tokens)
+        async for chunk in stream:
             if chunk.choices and chunk.choices[0].delta.content:
                 yield chunk.choices[0].delta.content
 
