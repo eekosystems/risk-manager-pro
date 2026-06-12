@@ -7,10 +7,16 @@ import type {
   ConversationDetail,
   ConversationListItem,
   DataResponse,
+  FunctionType,
 } from "@/types/api";
 
 export type ChatStreamEvent =
-  | { event: "metadata"; conversation_id: string; title: string | null }
+  | {
+      event: "metadata";
+      conversation_id: string;
+      title: string | null;
+      routed_function_type: FunctionType;
+    }
   | { event: "delta"; content: string }
   | { event: "done"; message_id: string; citations: Citation[] | null }
   | { event: "error"; message: string };

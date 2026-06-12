@@ -112,12 +112,17 @@ async def send_message_stream(
 ) -> StreamingResponse:
     async def _sse() -> AsyncIterator[str]:
         conversation_id: str | None = None
+        title: str | None = None
+        completed = False
         try:
             async for event in service.process_message_stream(
                 payload, current_user, organization.id
             ):
                 if event.get("event") == "metadata":
                     conversation_id = event.get("conversation_id")
+                    title = event.get("title")
+                elif event.get("event") == "done":
+                    completed = True
                 yield f"data: {json.dumps(event)}\n\n"
         finally:
             if conversation_id:
@@ -127,6 +132,18 @@ async def send_message_stream(
                     resource_type="conversation",
                     resource_id=conversation_id,
                     organization_id=organization.id,
+                )
+            if completed and conversation_id:
+                _notification_dispatcher.dispatch(
+                    organization_id=organization.id,
+                    triggered_by=current_user,
+                    notification_type=NotificationType.CHAT_RESPONSE,
+                    title=f"AI response in: {title or 'conversation'}",
+                    # M-8: keep AI content out of the persisted notification body — other org
+                    # members can read notifications regardless of role. Link, don't embed.
+                    body=f"{current_user.display_name} generated an AI response. Open the conversation to view it.",
+                    resource_type="conversation",
+                    resource_id=conversation_id,
                 )
 
     return StreamingResponse(

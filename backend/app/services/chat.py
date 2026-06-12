@@ -1274,21 +1274,39 @@ class ChatService:
 
         buffered: list[str] = []
         try:
-            async for delta in self._openai.chat_completion_stream(
-                messages,
-                temperature=model_config.temperature,
-                max_tokens=model_config.max_output_tokens,
-            ):
-                buffered.append(delta)
-                yield {"event": "delta", "content": delta}
-        except Exception as exc:
+            if routed_function == FunctionType.RISK_REGISTER:
+                # The Risk Register function drives tool calls, which the token
+                # stream can't interleave — run the tool loop to completion and
+                # emit the final content as a single delta.
+                tool_content = await self._run_tool_loop(
+                    messages=messages,
+                    temperature=model_config.temperature,
+                    max_tokens=model_config.max_output_tokens,
+                    conversation_id=conversation.id,
+                    user_id=user.id,
+                    organization_id=organization_id,
+                )
+                buffered.append(tool_content)
+                yield {"event": "delta", "content": tool_content}
+            else:
+                async for delta in self._openai.chat_completion_stream(
+                    messages,
+                    temperature=model_config.temperature,
+                    max_tokens=model_config.max_output_tokens,
+                ):
+                    buffered.append(delta)
+                    yield {"event": "delta", "content": delta}
+        except Exception:
             logger.error(
                 "chat_stream_failed",
                 conversation_id=str(conversation.id),
                 user_id=str(user.id),
                 exc_info=True,
             )
-            yield {"event": "error", "message": str(exc)}
+            yield {
+                "event": "error",
+                "message": "The AI service failed to generate a response. Please try again.",
+            }
             return
 
         assistant_content = "".join(buffered)

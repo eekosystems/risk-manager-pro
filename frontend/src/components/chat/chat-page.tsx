@@ -1,11 +1,10 @@
-import axios from "axios";
 import { clsx } from "clsx";
 import { ArrowRight, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { getDocumentById } from "@/api/documents";
 import { FUNCTIONS } from "@/constants/functions";
-import { useConversation, useEmailChatMessage, useSendMessage } from "@/hooks/use-chat";
+import { useConversation, useEmailChatMessage, useStreamMessage } from "@/hooks/use-chat";
 import { useUploadDocument } from "@/hooks/use-documents";
 import { useOrganizationContext } from "@/hooks/use-organization-context";
 import { useToast } from "@/hooks/use-toast";
@@ -146,7 +145,7 @@ export function ChatPage({
   const { activeOrganization } = useOrganizationContext();
 
   const { data: conversation } = useConversation(conversationId);
-  const sendMessageMutation = useSendMessage();
+  const { send: sendStream, isStreaming } = useStreamMessage();
   const uploadDocumentMutation = useUploadDocument();
 
   useEffect(() => {
@@ -247,7 +246,19 @@ export function ChatPage({
         if (merged.length >= MAX_RECENT_UPLOAD_IDS) break;
       }
 
-      sendMessageMutation.mutate(
+      // Stream the response (SSE) instead of one blocking POST — long
+      // generations were hitting the 120s axios timeout. Deltas render into a
+      // placeholder bubble; conversationId/routing are applied only on "done"
+      // so the conversation refetch can't wipe the in-progress bubble.
+      const streamingId = `assistant-stream-${Date.now()}`;
+      let streamedContent = "";
+      let bubbleShown = false;
+      let streamMeta: {
+        conversationId: string;
+        routedFunction: FunctionType;
+      } | null = null;
+
+      await sendStream(
         {
           message,
           conversation_id: conversationId,
@@ -256,52 +267,72 @@ export function ChatPage({
           recent_upload_ids: merged.length > 0 ? merged : null,
         },
         {
-          onSuccess: (data) => {
+          onMetadata: (event) => {
+            streamMeta = {
+              conversationId: event.conversation_id,
+              routedFunction: event.routed_function_type,
+            };
+          },
+          onDelta: (content) => {
+            streamedContent += content;
+            if (!bubbleShown) {
+              bubbleShown = true;
+              setIsTyping(false);
+              setLocalMessages((prev) => [
+                ...prev,
+                {
+                  id: streamingId,
+                  role: "assistant",
+                  content: streamedContent,
+                  citations: null,
+                  created_at: new Date().toISOString(),
+                },
+              ]);
+            } else {
+              setLocalMessages((prev) =>
+                prev.map((m) =>
+                  m.id === streamingId ? { ...m, content: streamedContent } : m,
+                ),
+              );
+            }
+          },
+          onDone: (event) => {
             setIsTyping(false);
-            setConversationId(data.conversation_id);
+            setLocalMessages((prev) =>
+              prev.map((m) =>
+                m.id === streamingId
+                  ? { ...m, id: event.message_id, citations: event.citations }
+                  : m,
+              ),
+            );
+            const meta = streamMeta;
+            if (!meta) return;
+            setConversationId(meta.conversationId);
             // H-14: log at debug (off in the prod bundle) and never include a
             // preview of assistant content — it carries operational risk data
             // that must not persist in the browser console.
-            logger.debug("[chat] sendMessage success", {
-              conversation_id: data.conversation_id,
-              message_id: data.message.id,
-              content_length: data.message.content?.length ?? 0,
-              citations_count: data.message.citations?.length ?? 0,
-              routed_function_type: data.routed_function_type,
+            logger.debug("[chat] stream complete", {
+              conversation_id: meta.conversationId,
+              message_id: event.message_id,
+              content_length: streamedContent.length,
+              citations_count: event.citations?.length ?? 0,
+              routed_function_type: meta.routedFunction,
             });
-            setLocalMessages((prev) => [...prev, data.message]);
-            if (
-              data.routed_function_type &&
-              data.routed_function_type !== activeFunction
-            ) {
-              onFunctionRouted(data.routed_function_type);
-              const target = FUNCTIONS.find(
-                (f) => f.id === data.routed_function_type,
-              );
+            if (meta.routedFunction && meta.routedFunction !== activeFunction) {
+              onFunctionRouted(meta.routedFunction);
+              const target = FUNCTIONS.find((f) => f.id === meta.routedFunction);
               addToast(
-                `Switched to ${target?.name ?? data.routed_function_type}`,
+                `Switched to ${target?.name ?? meta.routedFunction}`,
                 "info",
               );
             }
           },
-          onError: (error) => {
+          onError: (errorMessage) => {
             setIsTyping(false);
-            if (axios.isAxiosError(error)) {
-              logger.error("[chat] sendMessage failed", {
-                status: error.response?.status,
-                statusText: error.response?.statusText,
-                data: error.response?.data,
-                code: error.code,
-                message: error.message,
-                url: error.config?.url,
-                timeout: error.config?.timeout,
-              });
-            } else {
-              logger.error("[chat] sendMessage failed", error);
-            }
+            logger.error("[chat] stream failed", { message: errorMessage });
             addToast("Failed to send message. Please try again.", "error");
             setLocalMessages((prev) => [
-              ...prev,
+              ...prev.filter((m) => m.id !== streamingId),
               {
                 id: `error-${Date.now()}`,
                 role: "assistant",
@@ -318,7 +349,7 @@ export function ChatPage({
     [
       conversationId,
       activeFunction,
-      sendMessageMutation,
+      sendStream,
       uploadDocumentMutation,
       setConversationId,
       onFunctionRouted,
@@ -430,7 +461,7 @@ export function ChatPage({
         <div className="relative z-10">
           <ChatInput
             onSend={handleSend}
-            disabled={sendMessageMutation.isPending}
+            disabled={isStreaming}
             seedValue={followupSeed ?? pendingInputSeed}
             onSeedConsumed={handleSeedConsumed}
             activeFunction={activeFunction}
