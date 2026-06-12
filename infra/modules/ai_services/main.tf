@@ -32,7 +32,7 @@ resource "azurerm_cognitive_deployment" "gpt4o" {
 
   sku {
     name     = "Standard"
-    capacity = 100
+    capacity = 1000
   }
 }
 
