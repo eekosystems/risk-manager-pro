@@ -140,7 +140,7 @@ export function ChatInput({
             ref={fileInputRef}
             type="file"
             multiple
-            accept=".pdf,.docx,.txt"
+            accept=".pdf,.docx,.xlsx,.txt"
             className="hidden"
             onChange={(e) => e.target.files && addFiles(e.target.files)}
           />

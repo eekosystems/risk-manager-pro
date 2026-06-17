@@ -1,8 +1,9 @@
-export const ALLOWED_EXTENSIONS = [".pdf", ".docx", ".txt"];
+export const ALLOWED_EXTENSIONS = [".pdf", ".docx", ".xlsx", ".txt"];
 
 export const ALLOWED_MIME_TYPES = new Set([
   "application/pdf",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   "text/plain",
 ]);
 
@@ -28,7 +29,7 @@ export function validateFiles(fileList: FileList): ValidationResult {
   for (const f of Array.from(fileList)) {
     const ext = f.name.toLowerCase().slice(f.name.lastIndexOf("."));
     if (!ALLOWED_EXTENSIONS.includes(ext) || !ALLOWED_MIME_TYPES.has(f.type)) {
-      errors.push(`"${f.name}" is not a supported file type. Allowed: PDF, DOCX, TXT`);
+      errors.push(`"${f.name}" is not a supported file type. Allowed: PDF, DOCX, XLSX, TXT`);
       continue;
     }
     if (f.size > MAX_FILE_SIZE_BYTES) {

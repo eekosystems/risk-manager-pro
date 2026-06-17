@@ -283,7 +283,7 @@ export function DocumentDropZone() {
       <input
         ref={fileInputRef}
         type="file"
-        accept=".pdf,.docx,.txt"
+        accept=".pdf,.docx,.xlsx,.txt"
         multiple
         className="hidden"
         onChange={handleFileChange}
@@ -361,7 +361,7 @@ export function DocumentDropZone() {
               ? "Drop files here"
               : "Drop files or click to upload"}
         </span>
-        <span className="text-[10px] text-gray-400">PDF, DOCX, TXT (max {MAX_FILE_SIZE_LABEL})</span>
+        <span className="text-[10px] text-gray-400">PDF, DOCX, XLSX, TXT (max {MAX_FILE_SIZE_LABEL})</span>
       </button>
 
       {uploadErrors.length > 0 && (
