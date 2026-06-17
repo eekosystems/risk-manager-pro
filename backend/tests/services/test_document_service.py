@@ -5,10 +5,11 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from app.core.config import settings
 from app.core.exceptions import NotFoundError, ValidationError
 from app.models.document import Document, DocumentStatus
 from app.models.user import User
-from app.services.document import ALLOWED_CONTENT_TYPES, MAX_FILE_SIZE, DocumentService
+from app.services.document import ALLOWED_CONTENT_TYPES, DocumentService
 from tests.conftest import ORGANIZATION_ID, make_test_user
 
 
@@ -37,8 +38,12 @@ async def test_upload_validates_content_type(document_service: DocumentService, 
 
 
 @pytest.mark.asyncio
-async def test_upload_validates_file_size(document_service: DocumentService, user: User) -> None:
-    oversized_data = b"x" * (MAX_FILE_SIZE + 1)
+async def test_upload_validates_file_size(
+    document_service: DocumentService, user: User, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Patch the ceiling small so the test doesn't have to allocate gigabytes.
+    monkeypatch.setattr(settings, "max_file_size_bytes", 1024)
+    oversized_data = b"x" * (settings.max_file_size_bytes + 1)
     with pytest.raises(ValidationError, match="exceeds maximum size"):
         await document_service.upload(
             user=user,

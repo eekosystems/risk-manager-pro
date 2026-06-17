@@ -21,7 +21,9 @@ export async function uploadDocument(
   const response = await apiClient.post<DataResponse<DocumentItem>>(
     `/documents/upload?source_type=${encodeURIComponent(sourceType)}`,
     formData,
-    { headers: { "Content-Type": "multipart/form-data" } },
+    // Large files (up to 2 GB) can take many minutes to upload, so disable the
+    // client timeout for this request — the default would abort the transfer.
+    { headers: { "Content-Type": "multipart/form-data" }, timeout: 0 },
   );
   return response.data.data;
 }

@@ -22,9 +22,12 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-# Per-document caps for the sandboxed parse.
-_RLIMIT_AS_BYTES = 2 * 1024 * 1024 * 1024  # 2 GiB address space
-_RLIMIT_CPU_SECONDS = 120
+# Per-document caps for the sandboxed parse. The address-space ceiling has to
+# leave headroom for large documents parsed from disk (multi-GB files); the
+# processor serialises large-file parses so only one of these runs at a time,
+# keeping it within the container's memory.
+_RLIMIT_AS_BYTES = 3 * 1024 * 1024 * 1024  # 3 GiB address space
+_RLIMIT_CPU_SECONDS = 300
 
 # Spawn (not fork) so the child does not inherit the parent's threads/locks.
 _MP_CONTEXT = mp.get_context("spawn")
@@ -111,6 +114,69 @@ def extract_text_local(data: bytes, content_type: str) -> str:
         from pptx import Presentation
 
         prs = Presentation(io.BytesIO(data))
+        slides: list[str] = []
+        for i, slide in enumerate(prs.slides, 1):
+            parts = [f"--- Slide {i} ---"]
+            for shape in slide.shapes:
+                if shape.has_text_frame:
+                    for para in shape.text_frame.paragraphs:
+                        text = para.text.strip()
+                        if text:
+                            parts.append(text)
+            slides.append("\n".join(parts))
+        return "\n\n".join(slides)
+
+    raise ValueError(f"Unsupported content type: {content_type}")
+
+
+def extract_text_local_from_path(path: str, content_type: str) -> str:
+    """Extract text by reading from a file on disk rather than an in-memory buffer.
+
+    Used for large uploads: the parser libraries read/seek within the file
+    lazily, so peak memory stays far below loading the whole multi-GB file into
+    a bytes object first. No network; the OCR fallback for text-less PDFs is not
+    attempted for large files (Document Intelligence has its own size limits)."""
+    if content_type == "application/pdf":
+        from pypdf import PdfReader
+
+        reader = PdfReader(path)
+        pages: list[str] = []
+        for page in reader.pages:
+            text = page.extract_text()
+            if text:
+                pages.append(text)
+        return "\n\n".join(pages)
+
+    if content_type == ("application/vnd.openxmlformats-officedocument.wordprocessingml.document"):
+        from docx import Document as DocxDocument
+
+        doc = DocxDocument(path)
+        return "\n\n".join(p.text for p in doc.paragraphs if p.text.strip())
+
+    if content_type in ("text/plain", "text/csv", "application/msword"):
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            return fh.read()
+
+    if content_type == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
+        from openpyxl import load_workbook
+
+        wb = load_workbook(path, read_only=True, data_only=True)
+        rows: list[str] = []
+        for sheet in wb.worksheets:
+            rows.append(f"--- {sheet.title} ---")
+            for row in sheet.iter_rows(values_only=True):
+                cells = [str(c) if c is not None else "" for c in row]
+                if any(cells):
+                    rows.append("\t".join(cells))
+        wb.close()
+        return "\n".join(rows)
+
+    if content_type == (
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    ):
+        from pptx import Presentation
+
+        prs = Presentation(path)
         slides: list[str] = []
         for i, slide in enumerate(prs.slides, 1):
             parts = [f"--- Slide {i} ---"]

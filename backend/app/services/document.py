@@ -1,6 +1,7 @@
 import hashlib
 import re
 import uuid
+from collections.abc import AsyncIterator
 
 import structlog
 from azure.core.exceptions import AzureError
@@ -14,8 +15,6 @@ from app.repositories.document import DocumentRepository
 from app.services.storage import BlobStorageService
 
 logger = structlog.get_logger(__name__)
-
-MAX_FILE_SIZE = 250 * 1024 * 1024  # 250 MB
 
 ALLOWED_CONTENT_TYPES = {
     "application/pdf",
@@ -120,6 +119,91 @@ class DocumentService:
         )
 
         return document
+
+    async def upload_streaming(
+        self,
+        *,
+        user: User,
+        organization_id: uuid.UUID,
+        filename: str,
+        content_type: str,
+        chunks: AsyncIterator[bytes],
+        source_type: SourceType = SourceType.CLIENT,
+    ) -> Document:
+        """Stream an upload straight to Blob without buffering the whole file.
+
+        Lets the multipart endpoint accept files up to max_file_size_bytes
+        (multi-GB) on a small container: bytes flow browser→API→Blob one chunk
+        at a time. The content hash is computed incrementally over the stream so
+        duplicate detection still works, and the magic-byte check runs against
+        the blob head once the bytes have landed. The size cap is enforced
+        mid-stream by the storage layer.
+        """
+        if content_type not in ALLOWED_CONTENT_TYPES:
+            raise ValidationError(f"Unsupported file type: {content_type}. Allowed: PDF, DOCX, TXT")
+
+        safe_filename = self._sanitize_filename(filename)
+        blob_path = f"{organization_id}/{uuid.uuid4()}/{safe_filename}"
+
+        hasher = hashlib.sha256()
+
+        async def _hashing(source: AsyncIterator[bytes]) -> AsyncIterator[bytes]:
+            async for chunk in source:
+                hasher.update(chunk)
+                yield chunk
+
+        try:
+            size = await self._storage.upload_stream(
+                blob_path,
+                _hashing(chunks),
+                content_type,
+                max_bytes=settings.max_file_size_bytes,
+            )
+        except ValidationError:
+            await self._safe_delete_blob(blob_path)
+            raise
+
+        # The client's declared content type is never trusted: validate the real
+        # bytes via the blob head before the Document row is created.
+        head = await self._storage.download_head(blob_path, 8)
+        try:
+            self._validate_file_content(head, content_type)
+        except ValidationError:
+            await self._safe_delete_blob(blob_path)
+            raise
+
+        content_hash = hasher.hexdigest()
+        existing = await self._repo.find_by_content_hash(organization_id, content_hash)
+        if existing is not None:
+            await self._safe_delete_blob(blob_path)
+            raise ConflictError(
+                f"Duplicate file: identical content already indexed as '{existing.filename}'."
+            )
+
+        document = await self._repo.create(
+            organization_id=organization_id,
+            uploaded_by=user.id,
+            filename=safe_filename,
+            blob_path=blob_path,
+            content_type=content_type,
+            size_bytes=size,
+            source_type=source_type,
+            content_hash=content_hash,
+        )
+
+        logger.info(
+            "document_uploaded_streaming",
+            document_id=str(document.id),
+            filename=safe_filename,
+            size_bytes=size,
+        )
+        return document
+
+    async def _safe_delete_blob(self, blob_path: str) -> None:
+        try:
+            await self._storage.delete(blob_path)
+        except AzureError:
+            logger.warning("orphan_blob_delete_failed", blob_path=blob_path, exc_info=True)
 
     async def list_documents(
         self, organization_id: uuid.UUID, skip: int = 0, limit: int = 50

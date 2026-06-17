@@ -1,5 +1,6 @@
 import asyncio
 import uuid
+from collections.abc import AsyncIterator
 
 import structlog
 from azure.core.exceptions import AzureError
@@ -17,7 +18,6 @@ from app.core.deps import (
     require_analyst_or_above,
     require_any_member,
 )
-from app.core.exceptions import ValidationError
 from app.core.rate_limit import limiter
 from app.core.tasks import track_task
 from app.models.document import DocumentStatus, SourceType
@@ -45,6 +45,14 @@ def _get_document_service(
     return DocumentService(db=db, storage=storage)
 
 
+async def _read_in_chunks(
+    file: UploadFile, chunk_size: int = 4 * 1024 * 1024
+) -> AsyncIterator[bytes]:
+    """Yield the upload's bytes in fixed-size chunks without buffering the whole file."""
+    while chunk := await file.read(chunk_size):
+        yield chunk
+
+
 @router.post("/upload", response_model=DataResponse[DocumentResponse], status_code=201)
 @limiter.limit("10/minute")  # H-4: cap upload abuse / OpenAI-embedding cost
 async def upload_document(
@@ -56,23 +64,15 @@ async def upload_document(
     service: DocumentService = Depends(_get_document_service),
     audit: AuditLogger = Depends(get_audit_logger),
 ) -> DataResponse[DocumentResponse]:
-    # H-4: stream the upload in 1 MB chunks and reject as soon as it exceeds the
-    # size limit, instead of materialising up to 250 MB in worker RAM before the
-    # check runs.
-    chunks: list[bytes] = []
-    total = 0
-    while chunk := await file.read(1024 * 1024):
-        total += len(chunk)
-        if total > settings.max_file_size_bytes:
-            raise ValidationError("File exceeds the maximum allowed size")
-        chunks.append(chunk)
-    data = b"".join(chunks)
-    document = await service.upload(
+    # Stream the upload straight to Blob in chunks so the API never holds the
+    # whole file in memory. This lets a small container accept files up to
+    # max_file_size_bytes (multi-GB); the size cap is enforced mid-stream.
+    document = await service.upload_streaming(
         user=current_user,
         organization_id=organization.id,
         filename=file.filename or "unnamed",
         content_type=file.content_type or "application/octet-stream",
-        data=data,
+        chunks=_read_in_chunks(file),
         source_type=source_type,
     )
     await audit.log(

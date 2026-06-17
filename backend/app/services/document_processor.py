@@ -1,5 +1,7 @@
 import asyncio
 import base64
+import os
+import tempfile
 import uuid
 from typing import cast
 
@@ -17,6 +19,7 @@ from app.services.notification import NotificationDispatcher
 from app.services.openai_client import AzureOpenAIClient
 from app.services.parser_sandbox import (
     extract_text_local,
+    extract_text_local_from_path,
     render_pdf_pages,
     run_sandboxed,
 )
@@ -24,6 +27,11 @@ from app.services.search_indexer import SearchIndexer
 from app.services.storage import BlobStorageService
 
 logger = structlog.get_logger(__name__)
+
+# Large-file parses can each use multiple GB of address space, so they are run
+# one at a time to stay within the container's memory even when several large
+# documents are queued at once.
+_large_parse_lock = asyncio.Semaphore(1)
 
 
 class DocumentProcessor:
@@ -121,37 +129,64 @@ class DocumentProcessor:
         return text
 
     @staticmethod
+    async def _extract_text_from_path(path: str, content_type: str) -> str:
+        # L-8: parse untrusted bytes in a resource-capped subprocess. Serialised
+        # via the lock so only one memory-heavy large-file parse runs at a time.
+        async with _large_parse_lock:
+            return cast(
+                "str",
+                await asyncio.to_thread(
+                    run_sandboxed, extract_text_local_from_path, path, content_type
+                ),
+            )
+
+    @staticmethod
     async def _chunk_text_in_thread(text: str) -> list[str]:
         return await asyncio.to_thread(DocumentProcessor._chunk_text, text)
 
     async def process(self, document_id: uuid.UUID) -> None:
         await self._repo.update_status(document_id, DocumentStatus.PROCESSING)
 
+        temp_path: str | None = None
         try:
             document = await self._repo.get_by_id_system(document_id)
             if not document:
                 logger.error("document_not_found", document_id=str(document_id))
                 return
 
-            data = await self._storage.download(document.blob_path)
-            text = await DocumentProcessor._extract_text_in_thread(data, document.content_type)
+            is_large = document.size_bytes > settings.large_file_threshold_bytes
 
-            # For PDFs, analyze pages with GPT-4o vision to capture images/diagrams
-            if document.content_type == "application/pdf":
-                try:
-                    image_descriptions = await self._describe_pdf_pages(data)
-                    if image_descriptions:
-                        text = text + "\n\n" + image_descriptions
-                        logger.info(
-                            "vision_descriptions_added",
+            if is_large:
+                # Stream the blob to a temp file and parse from disk so the API
+                # process never holds the whole multi-GB file in memory. The
+                # per-page vision pass is skipped: rendering every page to an
+                # image is unbounded memory and GPT-4o cost on huge documents.
+                fd, temp_path = tempfile.mkstemp()
+                os.close(fd)
+                await self._storage.download_to_path(document.blob_path, temp_path)
+                text = await DocumentProcessor._extract_text_from_path(
+                    temp_path, document.content_type
+                )
+            else:
+                data = await self._storage.download(document.blob_path)
+                text = await DocumentProcessor._extract_text_in_thread(data, document.content_type)
+
+                # For PDFs, analyze pages with GPT-4o vision to capture images/diagrams
+                if document.content_type == "application/pdf":
+                    try:
+                        image_descriptions = await self._describe_pdf_pages(data)
+                        if image_descriptions:
+                            text = text + "\n\n" + image_descriptions
+                            logger.info(
+                                "vision_descriptions_added",
+                                document_id=str(document_id),
+                            )
+                    except Exception:
+                        logger.warning(
+                            "vision_analysis_failed_continuing",
                             document_id=str(document_id),
+                            exc_info=True,
                         )
-                except Exception:
-                    logger.warning(
-                        "vision_analysis_failed_continuing",
-                        document_id=str(document_id),
-                        exc_info=True,
-                    )
 
             if not text.strip():
                 await self._repo.update_status(
@@ -160,6 +195,16 @@ class DocumentProcessor:
                 return
 
             chunks = await DocumentProcessor._chunk_text_in_thread(text)
+            if len(chunks) > settings.max_indexed_chunks:
+                # Cap the indexed chunks so a single huge document cannot flood
+                # the search index (or run up an unbounded embedding bill).
+                logger.warning(
+                    "chunk_cap_applied",
+                    document_id=str(document_id),
+                    total_chunks=len(chunks),
+                    cap=settings.max_indexed_chunks,
+                )
+                chunks = chunks[: settings.max_indexed_chunks]
             logger.info(
                 "document_chunked",
                 document_id=str(document_id),
@@ -215,3 +260,9 @@ class DocumentProcessor:
                 DocumentStatus.FAILED,
                 error_message="Document processing failed. See server logs for details.",
             )
+        finally:
+            if temp_path is not None:
+                try:
+                    os.unlink(temp_path)
+                except OSError:
+                    logger.warning("temp_file_cleanup_failed", path=temp_path, exc_info=True)

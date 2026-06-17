@@ -67,10 +67,18 @@ class Settings(BaseSettings):
     # Document processing
     chunk_size_tokens: int = 500
     chunk_overlap_tokens: int = 50
-    max_file_size_bytes: int = 250 * 1024 * 1024  # 250 MB
+    # 2 GB ceiling. The /upload endpoint streams the body straight to Blob in
+    # chunks (never buffering the whole file), so it accepts files this large
+    # on a small container; the cap is enforced mid-stream.
+    max_file_size_bytes: int = 2 * 1024 * 1024 * 1024  # 2 GB
     embedding_batch_size: int = 100
     search_index_batch_size: int = 100
     processing_concurrency: int = 5
+    # Large-file guards: above this size we stream-process from disk, skip
+    # per-page PDF vision (unbounded GPT-4o cost on huge scanned PDFs), and
+    # cap the number of indexed chunks so the search index can't be flooded.
+    large_file_threshold_bytes: int = 100 * 1024 * 1024  # 100 MB
+    max_indexed_chunks: int = 20_000
 
     # Killswitch for smart-routing of chat messages to the correct FunctionType.
     # Set to false on the Container App to disable routing without a rebuild

@@ -6,8 +6,8 @@ export const ALLOWED_MIME_TYPES = new Set([
   "text/plain",
 ]);
 
-export const MAX_FILE_SIZE_BYTES = 250 * 1024 * 1024; // 250 MB
-export const MAX_FILE_SIZE_LABEL = "250 MB";
+export const MAX_FILE_SIZE_BYTES = 2 * 1024 * 1024 * 1024; // 2 GB
+export const MAX_FILE_SIZE_LABEL = "2 GB";
 
 export interface ValidatedFile {
   id: string;

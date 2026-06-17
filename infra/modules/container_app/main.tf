@@ -54,10 +54,13 @@ resource "azurerm_container_app" "backend" {
     max_replicas = 2
 
     container {
-      name   = "api"
-      image  = "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"
-      cpu    = 0.5
-      memory = "1Gi"
+      name  = "api"
+      image = "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"
+      # Sized for large-file ingestion: streaming upload keeps peak memory low,
+      # but text extraction of multi-GB documents still needs headroom.
+      # Container Apps requires memory = 2 × cpu (Gi).
+      cpu    = 2.0
+      memory = "4Gi"
 
       env {
         name        = "DATABASE_URL"
