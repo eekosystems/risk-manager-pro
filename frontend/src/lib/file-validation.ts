@@ -17,6 +17,19 @@ export interface ValidatedFile {
   file: File;
 }
 
+/** Human-readable byte size. Files can now reach 2 GB, so KB alone is unusable. */
+export function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  const units = ["KB", "MB", "GB"];
+  let value = bytes / 1024;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+  return `${value.toFixed(1)} ${units[unitIndex]}`;
+}
+
 export interface ValidationResult {
   valid: ValidatedFile[];
   errors: string[];
@@ -39,7 +52,7 @@ export function validateFiles(fileList: FileList): ValidationResult {
     valid.push({
       id: `${Date.now()}-${Math.random()}`,
       name: f.name,
-      size: `${(f.size / 1024).toFixed(1)} KB`,
+      size: formatFileSize(f.size),
       file: f,
     });
   }

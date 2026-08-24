@@ -192,8 +192,18 @@ export function ChatPage({
           }
         }
 
+        // Indexing time scales with file size — extraction, chunking, embedding
+        // and index upload all grow with the document. A fixed 90s cap meant any
+        // large upload timed out and the message was sent against an unindexed
+        // file, producing an answer not grounded in it. Budget from the bytes
+        // actually being uploaded, with a ceiling so a stuck document can't lock
+        // the user out indefinitely.
         const POLL_INTERVAL_MS = 1500;
-        const POLL_TIMEOUT_MS = 90_000;
+        const totalBytes = files.reduce((sum, f) => sum + f.size, 0);
+        const POLL_TIMEOUT_MS = Math.min(
+          20 * 60_000,
+          120_000 + Math.ceil(totalBytes / (100 * 1024 * 1024)) * 90_000,
+        );
         const start = Date.now();
         const stillPending = new Set(uploadedIds);
         while (stillPending.size > 0 && Date.now() - start < POLL_TIMEOUT_MS) {
@@ -214,7 +224,7 @@ export function ChatPage({
         }
         if (stillPending.size > 0) {
           addToast(
-            "Indexing is taking longer than expected — sending your message now; the file may not be searchable yet.",
+            "Indexing has not finished. Sending your message now — the response will NOT be grounded in these files. Re-run once they show as indexed.",
             "warning",
           );
         }

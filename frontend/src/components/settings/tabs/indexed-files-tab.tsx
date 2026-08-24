@@ -28,6 +28,7 @@ import {
   reindexDocument,
   syncFolder,
 } from "@/api/documents";
+import { formatFileSize } from "@/lib/file-validation";
 import type { DocumentItem, DocumentStatus, SourceType } from "@/types/api";
 
 // All SharePoint syncs stamp documents with the "client" source type.
@@ -36,11 +37,7 @@ import type { DocumentItem, DocumentStatus, SourceType } from "@/types/api";
 // ICAO, etc.) are seeded server-side, not chosen at sync time.
 const DEFAULT_SOURCE_TYPE: SourceType = "client";
 
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
+const formatBytes = formatFileSize;
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-US", {
