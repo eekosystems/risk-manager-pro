@@ -1,6 +1,7 @@
-import { Search, Settings } from "lucide-react";
+import { Building2, Search, Settings } from "lucide-react";
 
 import { NotificationBell } from "@/components/notifications/notification-bell";
+import { useOrganizationContext } from "@/hooks/use-organization-context";
 import { useUserRole } from "@/hooks/use-user-role";
 
 import type { AppView } from "./app-layout";
@@ -47,6 +48,7 @@ export function HeaderBar({
 }: HeaderBarProps) {
   const header = VIEW_HEADERS[currentView];
   const { isAdmin } = useUserRole();
+  const { activeOrganization } = useOrganizationContext();
 
   return (
     <div className="flex items-center justify-between border-b border-gray-200 bg-white px-8 py-4">
@@ -60,6 +62,18 @@ export function HeaderBar({
       </div>
 
       <div className="flex items-center gap-3">
+        {/* The active organization scopes every AI answer to that tenant's
+            indexed documents. Surfacing it here makes a wrong selection
+            visible instead of silently changing what the AI can retrieve. */}
+        <div
+          className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2.5"
+          title="Answers are scoped to this organization's indexed documents"
+        >
+          <Building2 size={15} className="shrink-0 text-gray-400" />
+          <span className="max-w-[180px] truncate text-sm font-medium text-slate-700">
+            {activeOrganization?.name ?? "No organization selected"}
+          </span>
+        </div>
         <button
           type="button"
           onClick={onSearchClick}
