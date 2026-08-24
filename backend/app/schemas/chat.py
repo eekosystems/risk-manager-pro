@@ -1,7 +1,8 @@
 import uuid
 from datetime import datetime
+from typing import Any
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, model_validator
 
 from app.models.conversation import FunctionType
 
@@ -30,8 +31,35 @@ class MessageResponse(BaseModel):
     content: str
     citations: list[CitationSchema] | None = None
     created_at: datetime
+    # Structured hazard payload parsed out of the model's `<rr_payload>` block
+    # on PHL outputs. Null when the output produced none. Exposed so Risk
+    # Register ingestion and exports can consume it without re-parsing prose.
+    rr_payload: dict[str, Any] | list[Any] | None = None
 
     model_config = {"from_attributes": True}
+
+    @model_validator(mode="before")
+    @classmethod
+    def _lift_rr_payload(cls, data: Any) -> Any:
+        """Surface the stored payload when validating a Message ORM row.
+
+        `rr_payload` lives inside `metadata_json`, so plain attribute mapping
+        would silently drop it and every conversation fetch would report null.
+        """
+        metadata = getattr(data, "metadata_json", None)
+        if metadata is None or not isinstance(metadata, dict):
+            return data
+        payload = metadata.get("rr_payload")
+        if not isinstance(payload, dict | list):
+            return data
+        return {
+            "id": data.id,
+            "role": data.role,
+            "content": data.content,
+            "citations": data.citations,
+            "created_at": data.created_at,
+            "rr_payload": payload,
+        }
 
 
 class ChatResponse(BaseModel):
