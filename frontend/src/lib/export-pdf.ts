@@ -37,8 +37,12 @@ const SPACE = {
 const LIST_INDENT = 14;
 const MARKER_GAP = 5;
 
+// Verbatim per the Core Logic Prompt's MANDATORY CONFIDENTIALITY WARNING
+// section. Do not reword — the spec requires this exact text, and the previous
+// wording dropped "of this output" and "to the intended recipient". The spec
+// also requires it at both the header and the footer of every output.
 const CONFIDENTIALITY_TEXT =
-  "This output contains information intended only for the use of the individual or entity named above. If the reader is not the intended recipient or the employee or agent responsible for delivering it, any dissemination, publication or copying of this output is strictly prohibited.";
+  "This output contains information intended only for the use of the individual or entity named above. If the reader of this output is not the intended recipient or the employee or agent responsible for delivering it to the intended recipient, any dissemination, publication or copying of this output is strictly prohibited.";
 
 function parseInlines(text: string): Run[] {
   const runs: Run[] = [];
@@ -328,6 +332,31 @@ export function exportTextToPdf(
     doc.setTextColor(30);
   };
 
+  const drawConfidentialityHeader = () => {
+    const lineHeight = 8 * 1.3;
+    const wrapped = doc.splitTextToSize(CONFIDENTIALITY_TEXT, contentWidth);
+
+    doc.setFont(FONT, "bold");
+    doc.setFontSize(7.5);
+    doc.setTextColor(120);
+    doc.text("CONFIDENTIALITY WARNING", marginX, y);
+    y += lineHeight;
+
+    doc.setFont(FONT, "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(110);
+    for (const line of wrapped) {
+      doc.text(line, marginX, y);
+      y += lineHeight;
+    }
+
+    doc.setDrawColor(220);
+    doc.setLineWidth(0.5);
+    doc.line(marginX, y, pageWidth - marginX, y);
+    y += SPACE.afterTitle;
+    doc.setTextColor(30);
+  };
+
   const newPage = () => {
     drawFooter();
     doc.addPage();
@@ -392,6 +421,10 @@ export function exportTextToPdf(
   doc.line(marginX, y + 2, pageWidth - marginX, y + 2);
   y += SPACE.afterTitle;
   doc.setTextColor(30);
+
+  // The spec requires the confidentiality warning at the header as well as the
+  // footer. It previously rendered only as a repeated page footer.
+  drawConfidentialityHeader();
 
   const blocks = parseBlocks(content);
   let prevKind: Block["kind"] | null = null;
