@@ -7,6 +7,7 @@ type Block =
   | { kind: "p"; runs: Run[] }
   | { kind: "ul"; runs: Run[]; depth: number }
   | { kind: "ol"; runs: Run[]; depth: number; marker: string }
+  | { kind: "table"; header: Run[][]; rows: Run[][][] }
   | { kind: "hr" };
 
 const FONT = "helvetica";
@@ -16,9 +17,13 @@ const SIZE = {
   h2: 13,
   h3: 11.5,
   body: 10.5,
+  table: 9.5,
   meta: 9,
   title: 15,
 } as const;
+
+const TABLE_CELL_PAD = 4;
+const TABLE_MIN_COL_WIDTH = 36;
 
 const LINE_GAP = 1.35;
 
@@ -157,7 +162,46 @@ function classifyBlock(rawLine: string): Block | null {
   return { kind: "p", runs: parseInlines(line.trim()) };
 }
 
-function parseBlocks(md: string): Block[] {
+// A pipe-delimited row. Leading and trailing pipes are required so an ordinary
+// sentence containing "|" is never mistaken for a table.
+const TABLE_ROW_RE = /^\s*\|.*\|\s*$/;
+const TABLE_SEPARATOR_CELL_RE = /^:?-{2,}:?$/;
+
+function splitTableRow(line: string): string[] {
+  return line
+    .trim()
+    .replace(/^\|/, "")
+    .replace(/\|$/, "")
+    .split("|")
+    .map((cell) => cell.trim());
+}
+
+function isSeparatorRow(cells: string[]): boolean {
+  return cells.length > 0 && cells.every((cell) => TABLE_SEPARATOR_CELL_RE.test(cell));
+}
+
+// Before/after risk tables and per-hazard scoring tables were reaching the PDF
+// as one run of raw pipe characters — the rows were joined into a paragraph
+// like any other consecutive lines. Consecutive pipe rows now form a table
+// block; the GFM separator row marks the header when present.
+function buildTable(rawRows: string[][]): Block {
+  const [first, second] = rawRows;
+  const hasHeader = first !== undefined && second !== undefined && isSeparatorRow(second);
+  const header = hasHeader ? first : [];
+  const bodyRows = (hasHeader ? rawRows.slice(2) : rawRows).filter(
+    (row) => !isSeparatorRow(row),
+  );
+  const columnCount = Math.max(header.length, ...bodyRows.map((row) => row.length));
+  const toRuns = (row: string[]): Run[][] =>
+    Array.from({ length: columnCount }, (_, i) => parseInlines(row[i] ?? ""));
+  return {
+    kind: "table",
+    header: header.length > 0 ? toRuns(header) : [],
+    rows: bodyRows.map(toRuns),
+  };
+}
+
+export function parseBlocks(md: string): Block[] {
   const lines = md.replace(/\r\n/g, "\n").split("\n");
   const blocks: Block[] = [];
   let paragraph: string[] = [];
@@ -169,9 +213,21 @@ function parseBlocks(md: string): Block[] {
     }
   };
 
-  for (const line of lines) {
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i] ?? "";
     if (!line.trim()) {
       flushParagraph();
+      continue;
+    }
+    if (TABLE_ROW_RE.test(line)) {
+      flushParagraph();
+      const rawRows: string[][] = [];
+      while (i < lines.length && TABLE_ROW_RE.test(lines[i] ?? "")) {
+        rawRows.push(splitTableRow(lines[i] ?? ""));
+        i += 1;
+      }
+      i -= 1;
+      blocks.push(buildTable(rawRows));
       continue;
     }
     const classified = classifyBlock(line);
@@ -368,14 +424,91 @@ export function exportTextToPdf(
     if (y + needed > pageHeight - marginBottom) newPage();
   };
 
-  const drawLine = (line: Run[], startX: number, fontSize: number) => {
+  const drawLineAt = (line: Run[], startX: number, baseline: number, fontSize: number) => {
     let x = startX;
     for (const run of line) {
       applyRunFont(doc, run);
       doc.setFontSize(fontSize);
-      doc.text(run.text, x, y);
+      doc.text(run.text, x, baseline);
       x += doc.getTextWidth(run.text);
     }
+  };
+
+  const drawLine = (line: Run[], startX: number, fontSize: number) => {
+    drawLineAt(line, startX, y, fontSize);
+  };
+
+  const renderTable = (block: Extract<Block, { kind: "table" }>) => {
+    const fontSize = SIZE.table;
+    const lineHeight = fontSize * LINE_GAP;
+    const allRows = block.header.length > 0 ? [block.header, ...block.rows] : block.rows;
+    if (allRows.length === 0) return;
+    const columnCount = Math.max(...allRows.map((row) => row.length));
+
+    // Size columns to their widest single-line content, then scale the set to
+    // the page when it overflows, holding a floor so narrow columns stay legible.
+    doc.setFontSize(fontSize);
+    const natural = new Array<number>(columnCount).fill(0);
+    for (const row of allRows) {
+      row.forEach((cell, ci) => {
+        let width = 0;
+        for (const run of cell) {
+          applyRunFont(doc, run);
+          doc.setFontSize(fontSize);
+          width += doc.getTextWidth(run.text);
+        }
+        natural[ci] = Math.max(natural[ci] ?? 0, width + TABLE_CELL_PAD * 2);
+      });
+    }
+    const naturalTotal = natural.reduce((a, b) => a + b, 0);
+    let widths =
+      naturalTotal <= contentWidth
+        ? natural
+        : natural.map((w) => Math.max(TABLE_MIN_COL_WIDTH, (w / naturalTotal) * contentWidth));
+    const clampedTotal = widths.reduce((a, b) => a + b, 0);
+    if (clampedTotal > contentWidth) {
+      widths = widths.map((w) => (w / clampedTotal) * contentWidth);
+    }
+    const tableWidth = widths.reduce((a, b) => a + b, 0);
+
+    const drawRow = (row: Run[][], isHeader: boolean) => {
+      const wrapped = widths.map((w, ci) =>
+        wrapRuns(
+          doc,
+          (row[ci] ?? []).map((r) => ({ ...r, bold: isHeader || r.bold })),
+          w - TABLE_CELL_PAD * 2,
+        ).map(trimLineWhitespace),
+      );
+      const lineCount = Math.max(1, ...wrapped.map((lines) => lines.length));
+      const rowHeight = lineCount * lineHeight + TABLE_CELL_PAD * 2;
+
+      if (y + rowHeight > pageHeight - marginBottom) {
+        newPage();
+        if (!isHeader && block.header.length > 0) drawRow(block.header, true);
+      }
+
+      if (isHeader) {
+        doc.setFillColor(243, 243, 243);
+        doc.rect(marginX, y, tableWidth, rowHeight, "F");
+      }
+      doc.setDrawColor(200);
+      doc.setLineWidth(0.5);
+      let x = marginX;
+      widths.forEach((w, ci) => {
+        doc.rect(x, y, w, rowHeight);
+        let baseline = y + TABLE_CELL_PAD + fontSize;
+        for (const line of wrapped[ci] ?? []) {
+          drawLineAt(line, x + TABLE_CELL_PAD, baseline, fontSize);
+          baseline += lineHeight;
+        }
+        x += w;
+      });
+      y += rowHeight;
+    };
+
+    if (block.header.length > 0) drawRow(block.header, true);
+    for (const row of block.rows) drawRow(row, false);
+    doc.setTextColor(30);
   };
 
   const renderRuns = (
@@ -480,6 +613,9 @@ export function exportTextToPdf(
         bold: false,
       });
       y += SPACE.afterListItem;
+    } else if (block.kind === "table") {
+      renderTable(block);
+      y += SPACE.afterParagraph;
     } else {
       renderRuns(block.runs, SIZE.body, 0, null);
       y += SPACE.afterParagraph;

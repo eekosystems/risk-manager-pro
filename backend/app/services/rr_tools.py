@@ -150,12 +150,22 @@ RR_TOOLS: list[dict[str, Any]] = [
                     "severity": {
                         "type": "integer",
                         "enum": [s.value for s in Severity],
-                        "description": "Severity score 1-5 (1=Minimal, 5=Catastrophic).",
+                        "description": (
+                            "Severity as shown on the Risk Register matrix columns: "
+                            "1=Catastrophic, 2=Hazardous, 3=Major, 4=Minor, 5=Minimal. "
+                            "1 is the MOST severe. Pass the same number you used in the "
+                            "cell label (the '2' in C2)."
+                        ),
                     },
                     "likelihood": {
                         "type": "string",
                         "enum": [lv.value for lv in Likelihood],
-                        "description": "Likelihood score A-E (A=Frequent, E=Extremely Improbable).",
+                        "description": (
+                            "Likelihood as shown on the Risk Register matrix rows: "
+                            "A=Frequent, B=Probable, C=Remote, D=Extremely Remote, "
+                            "E=Extremely Improbable. Pass the same letter you used in "
+                            "the cell label (the 'C' in C2)."
+                        ),
                     },
                     "risk_matrix_applied": {
                         "type": "string",
@@ -337,6 +347,19 @@ async def _search_risk_registry(
     )
 
 
+def _display_severity_to_stored(value: object) -> int:
+    """Convert matrix-column severity (1=Catastrophic) to stored (5=Catastrophic).
+
+    The Risk Register chart labels its columns 1-Catastrophic … 5-Minimal, and
+    analysis outputs use that same number in the cell label. The database stores
+    the reverse. `6 - n` maps between them and is its own inverse.
+    """
+    severity: int = int(value)  # type: ignore[call-overload]
+    if not 1 <= severity <= 5:
+        raise ValueError(f"severity out of range: {severity}")
+    return 6 - severity
+
+
 async def _save_risk_register_record(
     *,
     args: dict[str, Any],
@@ -347,6 +370,24 @@ async def _save_risk_register_record(
 ) -> str:
     """Validate and persist a risk record via RiskService."""
     mitigations_payload = args.pop("mitigations", None) or []
+
+    # The model reports severity in matrix-column terms (1=Catastrophic … 5=Minimal),
+    # which is what the Risk Register chart displays and what the SRA cell label
+    # carries. Storage runs the other way (1=Minimal … 5=Catastrophic), so invert
+    # here — the one place the two conventions meet. Without this a Catastrophic
+    # hazard would be stored as Minimal and plotted in the opposite corner.
+    try:
+        args["severity"] = _display_severity_to_stored(args["severity"])
+    except (KeyError, TypeError, ValueError):
+        return json.dumps(
+            {
+                "ok": False,
+                "error": (
+                    "severity must be an integer 1-5 as shown on the risk matrix "
+                    "(1=Catastrophic … 5=Minimal). Ask the user to confirm it."
+                ),
+            }
+        )
 
     # Map LLM args to CreateRiskEntryRequest. Pydantic handles enum coercion
     # from string values; missing optional fields default in the schema.
@@ -424,13 +465,17 @@ async def _save_risk_register_record(
             "ok": True,
             "record_id": str(entry.id),
             "risk_level": entry.risk_level.value,
-            "severity": int(entry.severity),
+            # Echoed back in matrix-column terms so the model confirms the same
+            # cell label it reported, not the inverted stored value.
+            "severity": _display_severity_to_stored(int(entry.severity)),
             "likelihood": entry.likelihood,
+            "cell": f"{entry.likelihood}{_display_severity_to_stored(int(entry.severity))}",
             "mitigations": created_mitigations,
             "message": (
-                f"Record saved. Risk level: {entry.risk_level.value}. "
-                f"The 5x5 matrix on the Risk Register page will reflect this "
-                f"hazard on the next refresh."
+                f"Record saved as cell "
+                f"{entry.likelihood}{_display_severity_to_stored(int(entry.severity))} "
+                f"({entry.risk_level.value}). The 5x5 matrix on the Risk Register "
+                f"page will reflect this hazard on the next refresh."
             ),
         }
     )

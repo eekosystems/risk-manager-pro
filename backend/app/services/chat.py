@@ -403,6 +403,45 @@ _SOURCE_TYPE_LABELS: dict[str, str] = {
 }
 
 
+_NON_ALNUM_RE = re.compile(r"[^a-z0-9]+")
+
+
+def _normalize_filename(name: str) -> str:
+    """Collapse a filename to lower-case alphanumerics for identity comparison.
+
+    Upload sanitization rewrites separators (spaces become underscores), and
+    users retype names from memory with different punctuation, so byte equality
+    is the wrong test for "the same document". Stripping everything but letters
+    and digits makes `Airport Safety Tracking.pdf`, `Airport_Safety_Tracking.pdf`
+    and `AirportSafetyTracking.pdf` compare equal while keeping genuinely
+    different documents apart.
+    """
+    return _NON_ALNUM_RE.sub("", name.casefold())
+
+
+# Shortest normalized stem that may resolve a filename out of the query by
+# substring. Below this, common words ("report", "sra") collide with prose.
+_MIN_STEM_MATCH_CHARS = 8
+
+
+def _find_filenames_in_query(query: str, filenames: list[str]) -> list[str]:
+    """Return known filenames the user wrote out in the query, spaces and all.
+
+    `_FILENAME_RE` cannot capture a name containing spaces — it stops at the
+    last whitespace-free run, so "TW V RON CSPP Update - July 2026.pdf" yields
+    only "2026.pdf", which matches nothing. Comparing the normalized query
+    against each known document's normalized stem recovers the full name.
+    """
+    normalized_query = _normalize_filename(query)
+    found: list[str] = []
+    for filename in filenames:
+        stem = filename.rsplit(".", 1)[0] if "." in filename else filename
+        normalized_stem = _normalize_filename(stem)
+        if len(normalized_stem) >= _MIN_STEM_MATCH_CHARS and normalized_stem in normalized_query:
+            found.append(filename)
+    return found
+
+
 @dataclass(frozen=True)
 class RagGrounding:
     """Whether this turn's retrieval actually reached the documents it targeted.
@@ -414,34 +453,62 @@ class RagGrounding:
     through to an unfiltered search silently, and the model filled the gap with
     plausible generic content. A partial miss counts: retrieving one of two named
     documents still leaves the model free to invent the other.
+
+    `unindexed_sources` are requested documents that exist in the organization
+    but have not finished indexing (or failed). They can never be retrieved this
+    turn, so they are always missing; they are tracked separately so the notice
+    can say why rather than leaving the user to guess.
     """
 
     requested_sources: list[str] = field(default_factory=list)
     matched_sources: list[str] = field(default_factory=list)
     missing_sources: list[str] = field(default_factory=list)
+    unindexed_sources: list[str] = field(default_factory=list)
 
     @property
     def is_miss(self) -> bool:
         return bool(self.missing_sources)
 
 
-def _resolve_grounding(requested_sources: list[str], results: list[SearchResult]) -> RagGrounding:
-    """Compare what the turn targeted against what retrieval actually returned."""
-    if not requested_sources:
+def _resolve_grounding(
+    requested_sources: list[str],
+    results: list[SearchResult],
+    unindexed_sources: list[str] | None = None,
+) -> RagGrounding:
+    """Compare what the turn targeted against what retrieval actually returned.
+
+    Matching is by normalized filename, so a name the user typed with different
+    separators than the stored one still counts as retrieved. A document that
+    matches nothing returned is missing regardless of what the search fell back
+    to — the fallback is never allowed to redefine what was asked for.
+    """
+    unindexed = list(unindexed_sources or [])
+    requested = list(requested_sources) + [u for u in unindexed if u not in requested_sources]
+    if not requested:
         return RagGrounding()
-    returned = {r.source.casefold() for r in results}
-    matched = [name for name in requested_sources if name.casefold() in returned]
-    missing = [name for name in requested_sources if name.casefold() not in returned]
+    returned = {_normalize_filename(r.source) for r in results}
+    matched = [name for name in requested if _normalize_filename(name) in returned]
+    missing = [name for name in requested if _normalize_filename(name) not in returned]
     return RagGrounding(
-        requested_sources=list(requested_sources),
+        requested_sources=requested,
         matched_sources=matched,
         missing_sources=missing,
+        unindexed_sources=[u for u in unindexed if u in missing],
+    )
+
+
+def _describe_missing_sources(grounding: RagGrounding) -> str:
+    """Comma-joined missing names, annotating the ones that are not indexed yet."""
+    unindexed = set(grounding.unindexed_sources)
+    return ", ".join(
+        f"{name} (not yet indexed)" if name in unindexed else name
+        for name in grounding.missing_sources
     )
 
 
 def _build_grounding_directive(grounding: RagGrounding) -> str:
     """Instruction prepended to the context when targeted documents were missed."""
-    names = ", ".join(grounding.missing_sources)
+    names = _describe_missing_sources(grounding)
     return (
         "GROUNDING FAILURE — READ FIRST.\n"
         f"The user's request targeted these documents: {names}. Retrieval "
@@ -463,7 +530,13 @@ def _build_grounding_directive(grounding: RagGrounding) -> str:
 
 def _build_grounding_notice(grounding: RagGrounding) -> str:
     """Visible in-body notice appended when targeted documents were missed."""
-    bullet_list = "\n".join(f"- {name}" for name in grounding.missing_sources)
+    unindexed = set(grounding.unindexed_sources)
+    bullet_list = "\n".join(
+        f"- {name} — not yet indexed (still processing or indexing failed)"
+        if name in unindexed
+        else f"- {name}"
+        for name in grounding.missing_sources
+    )
     return (
         "\n\n---\n\n"
         "### Grounding Notice — Requested Documents Not Retrieved\n\n"
@@ -671,11 +744,31 @@ _MANDATORY_ELEMENT_SIGNALS: dict[FunctionType, dict[str, tuple[str, ...]]] = {
 
 
 # Regex-based checks specific to SRA outputs. Substring matching is not enough
-# for cell labels (we need patterns like "3B", "4c", or "Likelihood 3") so these
+# for cell labels (we need patterns like "C2" or "Likelihood: C") so these
 # checks live alongside _MANDATORY_ELEMENT_SIGNALS rather than inside it.
-_MATRIX_CELL_RE = re.compile(r"\b[1-5][A-E]\b", re.IGNORECASE)
-_LIKELIHOOD_PROSE_RE = re.compile(r"likelihood\s*[:\-]?\s*[1-5]\b", re.IGNORECASE)
-_SEVERITY_PROSE_RE = re.compile(r"severity\s*[:\-]?\s*[a-e]\b", re.IGNORECASE)
+# Cell labels are likelihood-letter then severity-number, matching the Risk
+# Register matrix: A1 is Frequent/Catastrophic, E5 is Extremely Improbable/Minimal.
+# The reversed order is deliberately NOT accepted: "1A" inverts the score, so an
+# output still written that way must be flagged rather than quietly pass.
+_MATRIX_CELL_RE = re.compile(r"\b[A-E][1-5]\b")
+# The keyword matches case-insensitively but the value does not: lowercase "a"
+# after "likelihood" is the English article, as in "the likelihood a vehicle
+# enters the RSA", and matching it reported scoring that was never rendered.
+_LIKELIHOOD_PROSE_RE = re.compile(r"(?i:likelihood)\s*[:\-]?\s*[A-E]\b")
+_SEVERITY_PROSE_RE = re.compile(r"(?i:severity)\s*[:\-]?\s*[1-5]\b")
+
+# Infrastructure designators share the cell-label shape — "Taxiway A1" and
+# "Gate B2" both read as valid matrix cells — so an SRA that names one while
+# rendering no scores at all would satisfy the check. A designator is always
+# introduced by its facility noun, so a candidate is rejected when one leads
+# into it (directly, or across a run like "Taxiways A1, B2").
+_DESIGNATOR_LEAD_IN_RE = re.compile(
+    r"(?:taxiway|twy|tw|runway|rwy|gate|stand|apron|ramp|connector|exit)s?\.?\s*"
+    r"(?:[A-E][1-5]\s*(?:,|/|&|and|or|-|–|through)\s*)*\Z",
+    re.IGNORECASE,
+)
+# Widest lead-in we look back over: the facility noun plus a short designator run.
+_DESIGNATOR_LOOKBACK_CHARS = 48
 
 _VISUAL_MATRIX_CELL_SIGNALS: tuple[str, ...] = (
     "matrix cell",
@@ -690,26 +783,37 @@ _VISUAL_MATRIX_CELL_SIGNALS: tuple[str, ...] = (
 )
 
 
+def _is_matrix_cell_label(content: str, match: re.Match[str]) -> bool:
+    """False when the candidate is an infrastructure designator, not a cell label."""
+    window_start = max(0, match.start() - _DESIGNATOR_LOOKBACK_CHARS)
+    return not _DESIGNATOR_LEAD_IN_RE.search(content[window_start : match.start()])
+
+
 def _has_matrix_cell_notation(content: str) -> bool:
     """True when the SRA output renders FAA 5x5 alphanumeric notation.
 
-    Detects either a cell label ("3B", "4C", etc.) or scoring prose with the
-    expected numeric likelihood / alpha severity pattern. False here means the
+    Detects either a cell label ("C2", "A1", etc.) or scoring prose with the
+    expected alpha likelihood / numeric severity pattern. False here means the
     model rendered qualitative descriptors only.
     """
-    return bool(
-        _MATRIX_CELL_RE.search(content)
-        or _LIKELIHOOD_PROSE_RE.search(content)
-        or _SEVERITY_PROSE_RE.search(content)
-    )
+    if any(_is_matrix_cell_label(content, m) for m in _MATRIX_CELL_RE.finditer(content)):
+        return True
+    return bool(_LIKELIHOOD_PROSE_RE.search(content) or _SEVERITY_PROSE_RE.search(content))
 
 
-def _detect_missing_mandatory_elements(content: str, function_type: FunctionType) -> list[str]:
+def _detect_missing_mandatory_elements(
+    content: str, function_type: FunctionType, has_sources: bool = False
+) -> list[str]:
     """Return labels of mandatory output elements not detected in the response.
 
     Returns an empty list for function types without mandatory-element rules
     (GENERAL, RISK_REGISTER — the latter has its own schema validation via
     save_risk_register_record).
+
+    `has_sources` says whether retrieval returned anything this turn. When it
+    did, the output must cite it inline — an analysis that read the CSPP but
+    references none of it is untraceable, and the source chips the UI renders
+    do not say which finding rests on which passage.
     """
     required = _MANDATORY_ELEMENT_SIGNALS.get(function_type)
     if not required:
@@ -725,7 +829,44 @@ def _detect_missing_mandatory_elements(content: str, function_type: FunctionType
             missing.append("FAA 5x5 Matrix Cell Notation")
         if not any(sig in lowered for sig in _VISUAL_MATRIX_CELL_SIGNALS):
             missing.append("Visual Matrix Cell Description")
+    if has_sources and "[source" not in lowered:
+        missing.append("Inline Source Citations")
     return missing
+
+
+# Function types that produce a formal RMP analysis, where FG SRM precedent
+# weighting is part of the output contract. Conversational turns (GENERAL) and
+# the Risk Register wizard are excluded — a precedent banner on "which airport?"
+# is noise.
+_ANALYSIS_FUNCTIONS: frozenset[FunctionType] = frozenset(
+    {FunctionType.PHL, FunctionType.SRA, FunctionType.SYSTEM_ANALYSIS}
+)
+
+# Verbatim from the Core Logic Prompt's No-Match Scenario. The spec places this
+# at the top of the output, before any analysis content; left to the model it
+# arrived paraphrased at the bottom under a "Discrepancy Flags" heading, in
+# every output reviewed. Rendered from code so neither placement nor wording
+# can drift.
+_FG_NO_MATCH_BANNER = (
+    "> **No FG SRM precedent identified for this airport/context. Output is "
+    "based on indexed FAA/ICAO/IATA/ASRS sources and model knowledge only.**"
+)
+
+# Faith Group's own SRM documents are indexed as `internal`; every other source
+# type is regulatory guidance or the client's material.
+_FG_PRECEDENT_SOURCE_TYPES: frozenset[str] = frozenset({"internal"})
+
+
+def _has_fg_precedent(results: list[SearchResult]) -> bool:
+    """True when at least one retrieved chunk came from an FG SRM document."""
+    return any(r.source_type in _FG_PRECEDENT_SOURCE_TYPES for r in results)
+
+
+def _fg_no_match_banner(function_type: FunctionType, results: list[SearchResult]) -> str:
+    """The banner to place at the top of the output, or an empty string."""
+    if function_type not in _ANALYSIS_FUNCTIONS or _has_fg_precedent(results):
+        return ""
+    return _FG_NO_MATCH_BANNER + "\n\n"
 
 
 def _build_quality_notice(missing: list[str]) -> str:
@@ -788,6 +929,26 @@ def _run_compliance_checks(
     return build_compliance_notice(issues)
 
 
+@dataclass(frozen=True)
+class DocumentContext:
+    """What this turn knows about the organization's documents.
+
+    `source_filter` is what retrieval is restricted to (indexed names only).
+    `requested_sources` is what the user asked for, which grounding is judged
+    against. `unindexed_sources` is the part of the request that exists but
+    cannot be retrieved yet. Keeping the three apart is what stops a fallback
+    document from being mistaken for the one that was requested.
+    """
+
+    recent_docs: list[Document]
+    session_upload_ids: set[uuid.UUID]
+    candidates: list[str]
+    total_indexed: int
+    source_filter: list[str]
+    requested_sources: list[str]
+    unindexed_sources: list[str]
+
+
 class ChatService:
     def __init__(
         self,
@@ -831,25 +992,44 @@ class ChatService:
         score_threshold: float,
         implicit_source_filter: list[str] | None = None,
         candidate_filenames: list[str] | None = None,
+        source_filter: list[str] | None = None,
+        requested_sources: list[str] | None = None,
+        unindexed_sources: list[str] | None = None,
     ) -> tuple[list[SearchResult], str, RagGrounding]:
         """Run RAG search and return results, a context block, and a grounding verdict.
 
-        Source-filter precedence (first non-empty wins for the targeted search):
-          1. Explicit filenames typed by the user (`Foo.pdf`).
-          2. `implicit_source_filter` — resolved upstream from pronoun references
-             ("the file I just uploaded") or single-candidate filename matches.
+        Two separate questions are answered here and must stay separate:
+        which documents to *filter* retrieval by, and which documents the user
+        *asked for*. Grounding is judged against the second, never the first.
+
+        Filter precedence for the targeted search:
+          1. `source_filter`, when the caller has already resolved it (the
+             normal path via `_resolve_document_context`).
+          2. Explicit filenames typed by the user (`Foo.pdf`).
+          3. `implicit_source_filter` — pronoun references ("the file I just
+             uploaded") or single-candidate filename matches.
 
         The search filter matches `source` exactly, so a typed name that differs
         at all from the stored (sanitized) filename returns nothing. When that
         happens we retry against `candidate_filenames` — the real indexed names
-        whose tokens overlap the query — before giving up. Only then do we fall
-        back to an unfiltered search, and that fallback is now reported via
-        `RagGrounding.is_miss` rather than passing silently: the caller warns the
-        model and the user that the requested documents were never retrieved.
+        whose tokens overlap the query — and finally fall back to an unfiltered
+        search. Neither fallback rewrites what was requested: if the retry lands
+        on a different document, the requested one is still reported missing.
+        Same-document-different-spelling is handled by normalized comparison in
+        `_resolve_grounding`, so a legitimate fuzzy hit still counts as a match.
+
+        `unindexed_sources` are requested documents that exist but cannot be
+        retrieved yet; they are always reported missing, with that reason.
         """
         search_results: list[SearchResult] = []
         referenced_filenames = _extract_referenced_filenames(query)
-        targeted_filter = referenced_filenames or (implicit_source_filter or [])
+        if source_filter is not None:
+            targeted_filter = list(source_filter)
+        else:
+            targeted_filter = referenced_filenames or (implicit_source_filter or [])
+        requested = (
+            list(requested_sources) if requested_sources is not None else list(targeted_filter)
+        )
         try:
             if targeted_filter:
                 search_results = await self._rag.hybrid_search(
@@ -872,8 +1052,6 @@ class ChatService:
                     top_k=max(top_k, 20),
                     source_filter=fuzzy_filter,
                 )
-                if search_results:
-                    targeted_filter = fuzzy_filter
             if not search_results:
                 search_results = await self._rag.hybrid_search(
                     query,
@@ -888,7 +1066,7 @@ class ChatService:
             )
 
         search_results = _filter_by_threshold(search_results, score_threshold)
-        grounding = _resolve_grounding(targeted_filter, search_results)
+        grounding = _resolve_grounding(requested, search_results, unindexed_sources)
         if grounding.is_miss:
             logger.warning(
                 "rag_grounding_miss",
@@ -906,24 +1084,25 @@ class ChatService:
         self,
         request: ChatRequest,
         organization_id: uuid.UUID,
-    ) -> tuple[list[Document], set[uuid.UUID], list[str], int, list[str]]:
+    ) -> DocumentContext:
         """Gather the document signals the model needs to be file-aware.
 
-        Returns:
-            recent_docs: the org's most recently uploaded docs (any status,
-                most recent first). Always populated when the org has any
-                documents — independent of frontend localStorage state — so
-                "what's the most recent file" always has an authoritative
-                source.
-            session_upload_ids: IDs the frontend reported as uploaded in the
-                current session. Used to tag entries in `recent_docs` as
-                "uploaded by you" and to drive pronoun-based RAG filtering.
-            candidates: indexed filenames in the org whose tokens overlap with
-                the user's query (ranked, capped). Used both for the awareness
-                block and — when exactly one match — as an implicit RAG filter.
-            total_indexed: how many indexed docs exist in the org.
-            implicit_filter: filenames to pass to RAG as a source filter when
-                the user did not type an explicit filename.
+        Resolves what the user asked for before deciding what to filter by, so
+        a document that cannot be retrieved is reported rather than replaced.
+        Every path that used to substitute a different document silently — a
+        session upload still processing, a typed name broken across spaces, a
+        pronoun reference with the latest upload not yet indexed — now lands in
+        `unindexed_sources` and surfaces as a grounding miss.
+
+        Request resolution, in precedence order (first hit wins):
+          1. Known filenames written out in the query, spaces included.
+          2. Filenames matched by `_FILENAME_RE`, reconciled against known
+             documents by normalized name; unknown ones are still tried
+             literally so a name we simply don't have on file can be searched.
+          3. A pronoun reference to a recent upload — the user's own latest
+             session upload if any, else the organization's latest upload.
+             Whatever its status.
+          4. Exactly one indexed filename whose tokens overlap the query.
         """
         try:
             recent_docs = await self._doc_repo.list_recent_documents(organization_id, limit=10)
@@ -948,29 +1127,62 @@ class ChatService:
             all_filenames = []
 
         candidates = _match_candidate_filenames(request.message, all_filenames)
+        indexed = set(all_filenames)
+        known_filenames = list(dict.fromkeys([d.filename for d in recent_docs] + all_filenames))
 
-        implicit_filter: list[str] = []
-        if not _extract_referenced_filenames(request.message):
-            if _references_recent_upload(request.message):
-                # Prefer a session upload by THIS user; otherwise fall back to
-                # the org's most-recently-indexed doc.
-                session_indexed = [
-                    d.filename
-                    for d in recent_docs
-                    if d.id in session_upload_ids and d.status == DocumentStatus.INDEXED
-                ]
-                if session_indexed:
-                    implicit_filter = session_indexed[:1]
-                else:
-                    org_indexed = [
-                        d.filename for d in recent_docs if d.status == DocumentStatus.INDEXED
-                    ]
-                    if org_indexed:
-                        implicit_filter = org_indexed[:1]
-            elif len(candidates) == 1:
-                implicit_filter = candidates
+        requested: list[str] = []
+        source_filter: list[str] = []
+        unindexed: list[str] = []
 
-        return recent_docs, session_upload_ids, candidates, len(all_filenames), implicit_filter
+        def request_known(filename: str) -> None:
+            if filename in requested:
+                return
+            requested.append(filename)
+            if filename in indexed:
+                source_filter.append(filename)
+            else:
+                unindexed.append(filename)
+
+        for filename in _find_filenames_in_query(request.message, known_filenames):
+            request_known(filename)
+
+        for typed in _extract_referenced_filenames(request.message):
+            normalized = _normalize_filename(typed)
+            # A fragment of a name already resolved in full ("2026.pdf" from
+            # "… July 2026.pdf") adds nothing and would be reported twice.
+            if any(normalized in _normalize_filename(name) for name in requested):
+                continue
+            match = next((f for f in known_filenames if _normalize_filename(f) == normalized), None)
+            if match is not None:
+                request_known(match)
+            elif typed not in requested:
+                requested.append(typed)
+                source_filter.append(typed)
+
+        if not requested and _references_recent_upload(request.message):
+            session_docs = [d for d in recent_docs if d.id in session_upload_ids]
+            for doc in (session_docs or recent_docs)[:1]:
+                request_known(doc.filename)
+
+        if not requested and len(candidates) == 1:
+            request_known(candidates[0])
+
+        if unindexed:
+            logger.info(
+                "requested_documents_not_indexed",
+                organization_id=str(organization_id),
+                unindexed=unindexed,
+            )
+
+        return DocumentContext(
+            recent_docs=recent_docs,
+            session_upload_ids=session_upload_ids,
+            candidates=candidates,
+            total_indexed=len(all_filenames),
+            source_filter=source_filter,
+            requested_sources=requested,
+            unindexed_sources=unindexed,
+        )
 
     async def _prepare_messages(
         self,
@@ -1008,8 +1220,8 @@ class ChatService:
             "next to source citations. The UI renders source chips with their "
             "own visual tier indicators. This suppression applies ONLY to "
             "source-retrieval metadata. It does NOT apply to risk-matrix "
-            "scores (likelihood values 1-5, severity values A-E, matrix cell "
-            "labels like '3B', or numerical risk scores) — those follow the "
+            "scores (likelihood letters A-E, severity numbers 1-5, matrix cell "
+            "labels like 'C2', or numerical risk scores) — those follow the "
             "system prompt and MUST be rendered.\n"
             "- If a source has low relevance or doesn't directly support your answer, "
             "say so rather than forcing a connection.\n"
@@ -1027,7 +1239,11 @@ class ChatService:
             "- Verbatim Confidentiality Warning block. The export renders the "
             "required warning verbatim at BOTH the header and the footer of "
             "every page, so emitting it in the body would duplicate it.\n"
-            "This UI-duplication suppression is narrow: it removes ONLY the two "
+            "- The verbatim 'No FG SRM precedent identified…' banner. When no "
+            "FG SRM document was retrieved this turn, the application places "
+            "that sentence at the very top of the output itself. Do not write "
+            "it yourself; do still state the precedent weighting in prose.\n"
+            "This UI-duplication suppression is narrow: it removes ONLY the "
             "items listed above. It does NOT remove inline [Source N] references, "
             "and it does NOT remove any of the mandatory output elements below.\n\n"
             "Mandatory output elements — ALWAYS include in the body (these are "
@@ -1037,21 +1253,38 @@ class ChatService:
             "(e.g. 14 CFR §139.337, AC 150/5200-33C, AC 150/5200-37A, ICAO Annex 19). "
             "Cite the specific regulatory authority, not just a generic reference.\n"
             "- Risk-matrix notation for every risk determination. When the FAA 5x5 "
-            "matrix applies (default), render Likelihood as 1-5 (1-Improbable → "
-            "5-Frequent), Severity as A-E (A-Catastrophic → E-Negligible), and the "
-            "resulting cell label (e.g. '3B', '4C') explicitly. Qualitative "
-            "descriptors (Low/Medium/High) may accompany the alphanumeric "
-            "notation but never replace it. The alphanumeric cell label is "
-            "mandatory and is NOT subject to the source-metadata suppression rule "
-            "above. This applies to initial risk, residual risk, and any other "
-            "risk score the output presents.\n"
+            "matrix applies (default), render Likelihood as a LETTER A-E "
+            "(A-Frequent, B-Probable, C-Remote, D-Extremely Remote, "
+            "E-Extremely Improbable) and Severity as a NUMBER 1-5 "
+            "(1-Catastrophic, 2-Hazardous, 3-Major, 4-Minor, 5-Minimal), and show "
+            "the cell label as LETTER-then-NUMBER (e.g. 'A1' = Frequent and "
+            "Catastrophic, 'C3' = Remote and Major). Never write the number first; "
+            "'1A' is invalid and inverts the meaning. This is the same notation "
+            "the Risk Register matrix uses, so a score reads identically in both. "
+            "Qualitative descriptors (Low/Medium/High) may accompany the cell "
+            "label but never replace it. The cell label is mandatory and is NOT "
+            "subject to the source-metadata suppression rule above. This applies "
+            "to initial risk, residual risk, and any other risk score the output "
+            "presents.\n"
             "- Visual matrix-cell description for dashboard rendering on any SRA "
-            "output: state the cell's position on the matrix (e.g. 'row 3 "
-            "Remote, column B Hazardous') and the band it falls in (Low/Medium/"
+            "output: state the cell's position on the matrix (e.g. 'row C "
+            "Remote, column 2 Hazardous') and the band it falls in (Low/Medium/"
             "High). This is what the dashboard renders visually — it "
             "must appear in the output.\n"
+            "- Inline [Source N] citations on every finding that rests on "
+            "retrieved material. The UI's source chips show WHICH documents were "
+            "retrieved, not which finding each one supports — that traceability "
+            "exists only if you cite inline. An analysis that draws on the "
+            "reference documents and cites none of them is non-compliant.\n"
             "- Source traceability with FG SRM precedent citations at 70% weighting "
             "where applicable, presented in prose (not as a separate sources list).\n"
+            "- Hierarchy of controls on every SRA hazard: all FIVE tiers — "
+            "Avoid/Eliminate, Substitute, Engineer, Administrative, PPE — each "
+            "under its own label, each either applied or explicitly ruled out "
+            "as 'Not applicable — <reason>'. Never merge two tiers under one "
+            "label, never omit a tier because it is a poor fit, and never "
+            "collapse the hierarchy into an unlabeled list of mitigations. "
+            "Substitute is the tier most often dropped; it must appear.\n"
             "- Predictive what-if projections for every analyzed hazard or trend, "
             "tied to concrete time windows when the data supports it.\n"
             "- Discrepancy flags between FG precedents and current airport data, "
@@ -1266,13 +1499,7 @@ class ChatService:
         except (ValueError, KeyError):
             prompts_config = None
 
-        (
-            recent_docs,
-            session_upload_ids,
-            candidates,
-            total_indexed,
-            implicit_filter,
-        ) = await self._resolve_document_context(request, organization_id)
+        docs = await self._resolve_document_context(request, organization_id)
 
         search_results, context_block, grounding = await self._build_rag_context(
             query=request.message,
@@ -1280,8 +1507,10 @@ class ChatService:
             conversation_id=conversation.id,
             top_k=rag_config.top_k,
             score_threshold=rag_config.score_threshold,
-            implicit_source_filter=implicit_filter,
-            candidate_filenames=candidates,
+            candidate_filenames=docs.candidates,
+            source_filter=docs.source_filter,
+            requested_sources=docs.requested_sources,
+            unindexed_sources=docs.unindexed_sources,
         )
 
         messages = await self._prepare_messages(
@@ -1290,10 +1519,10 @@ class ChatService:
             function_type=routed_function,
             prompts_config=prompts_config,
             context_block=context_block,
-            recent_docs=recent_docs,
-            session_upload_ids=session_upload_ids,
-            candidates=candidates,
-            total_indexed=total_indexed,
+            recent_docs=docs.recent_docs,
+            session_upload_ids=docs.session_upload_ids,
+            candidates=docs.candidates,
+            total_indexed=docs.total_indexed,
         )
 
         if routed_function == FunctionType.RISK_REGISTER:
@@ -1312,6 +1541,8 @@ class ChatService:
                 max_tokens=model_config.max_output_tokens,
             )
 
+        assistant_content = _fg_no_match_banner(routed_function, search_results) + assistant_content
+
         if grounding.is_miss:
             assistant_content += _build_grounding_notice(grounding)
 
@@ -1323,7 +1554,9 @@ class ChatService:
             assistant_content, routed_function, search_results, conversation.id
         )
 
-        missing_elements = _detect_missing_mandatory_elements(assistant_content, routed_function)
+        missing_elements = _detect_missing_mandatory_elements(
+            assistant_content, routed_function, has_sources=bool(search_results)
+        )
         if missing_elements:
             assistant_content += _build_quality_notice(missing_elements)
             logger.warning(
@@ -1406,13 +1639,7 @@ class ChatService:
         except (ValueError, KeyError):
             prompts_config = None
 
-        (
-            recent_docs,
-            session_upload_ids,
-            candidates,
-            total_indexed,
-            implicit_filter,
-        ) = await self._resolve_document_context(request, organization_id)
+        docs = await self._resolve_document_context(request, organization_id)
 
         search_results, context_block, grounding = await self._build_rag_context(
             query=request.message,
@@ -1420,8 +1647,10 @@ class ChatService:
             conversation_id=conversation.id,
             top_k=rag_config.top_k,
             score_threshold=rag_config.score_threshold,
-            implicit_source_filter=implicit_filter,
-            candidate_filenames=candidates,
+            candidate_filenames=docs.candidates,
+            source_filter=docs.source_filter,
+            requested_sources=docs.requested_sources,
+            unindexed_sources=docs.unindexed_sources,
         )
 
         messages = await self._prepare_messages(
@@ -1430,10 +1659,10 @@ class ChatService:
             function_type=routed_function,
             prompts_config=prompts_config,
             context_block=context_block,
-            recent_docs=recent_docs,
-            session_upload_ids=session_upload_ids,
-            candidates=candidates,
-            total_indexed=total_indexed,
+            recent_docs=docs.recent_docs,
+            session_upload_ids=docs.session_upload_ids,
+            candidates=docs.candidates,
+            total_indexed=docs.total_indexed,
         )
 
         yield {
@@ -1443,7 +1672,13 @@ class ChatService:
             "routed_function_type": routed_function.value,
         }
 
+        # The precedent banner belongs above the analysis, so it goes out
+        # before the first model token and is persisted as part of the message.
         buffered: list[str] = []
+        banner = _fg_no_match_banner(routed_function, search_results)
+        if banner:
+            buffered.append(banner)
+            yield {"event": "delta", "content": banner}
         try:
             if routed_function == FunctionType.RISK_REGISTER:
                 # The Risk Register function drives tool calls, which the token
@@ -1496,7 +1731,9 @@ class ChatService:
             assistant_content += compliance_notice
             yield {"event": "delta", "content": compliance_notice}
 
-        missing_elements = _detect_missing_mandatory_elements(assistant_content, routed_function)
+        missing_elements = _detect_missing_mandatory_elements(
+            assistant_content, routed_function, has_sources=bool(search_results)
+        )
         if missing_elements:
             notice = _build_quality_notice(missing_elements)
             assistant_content += notice

@@ -65,12 +65,15 @@ def extract_rr_payload(content: str) -> dict[str, object] | list[object] | None:
 
 # --- Hazard sections ----------------------------------------------------------
 
-# Outputs head each hazard as "H3 – Title", "Hazard 3 – Title", or
-# "Hazard H3 – Title" (all three forms appear across real outputs), optionally
-# behind markdown heading/bold markers.
+# Outputs head each hazard as "H3 – Title", "Hazard 3 – Title", "Hazard H3 –
+# Title", or with a project prefix welded on ("TWVH3 – Title", "PVD-H3 –
+# Title") — all of these appear across real outputs — optionally behind
+# markdown heading/bold markers. The prefix must be upper-case: under
+# IGNORECASE a lower-case run would let an ordinary heading such as "Length 3"
+# read as hazard 3.
 _HAZARD_HEADING_RE = re.compile(
     r"^[ \t]*(?:#{1,6}[ \t]*)?(?:\*\*)?[ \t]*"
-    r"(?:hazard[ \t]*H?|H)[ \t]*\.?[ \t]*(\d{1,2})\b",
+    r"(?:hazard[ \t]*H?|(?-i:[A-Z]{1,6}[-_]?H)|H)[ \t]*\.?[ \t]*(\d{1,2})\b",
     re.IGNORECASE | re.MULTILINE,
 )
 
@@ -82,8 +85,13 @@ _BARE_NUMBERED_HEADING_RE = re.compile(
     r"^[ \t]*(?:#{1,6}[ \t]*)?(?:\*\*)?[ \t]*(\d{1,2})[.)][ \t]+\S",
     re.MULTILINE,
 )
+# Cell labels are likelihood-letter then severity-number ("C2"). The reversed
+# order is accepted here on purpose: this decides only whether a numbered section
+# is about risk scoring, and an output still written the old way is scoring text
+# either way. Flagging the wrong order is _has_matrix_cell_notation's job.
 _SCORING_SIGNAL_RE = re.compile(
-    r"\b[1-5][A-E]\b|\blikelihood\b|\bseverity\b|\binitial risk\b|\bresidual risk\b",
+    r"\b[A-E][1-5]\b|\b[1-5][A-E]\b"
+    r"|\blikelihood\b|\bseverity\b|\binitial risk\b|\bresidual risk\b",
     re.IGNORECASE,
 )
 
@@ -135,11 +143,18 @@ def split_hazard_sections(content: str) -> list[HazardSection]:
 
 # --- Risk disposition (Sub-Prompt 3) -----------------------------------------
 
-# The spec requires one of three dispositions per hazard. ALARP wording is
-# commonly substituted for it and does not satisfy the requirement.
+# The spec requires one of three dispositions per hazard. Bare ALARP wording
+# ("ALARP: Yes") does not satisfy it, and neither does "acceptable" loose in
+# scoring prose ("residual risk is acceptable pending review"). The adjectival
+# forms the model emits as a labeled decision — "ALARP Status: Acceptable with
+# conditions", "Disposition: Not acceptable", "Unacceptable" — do carry the
+# decision and are accepted. Without them every hazard in an SRA written that
+# way reads as having no disposition at all.
 _DISPOSITION_RE = re.compile(
-    r"\baccept with conditions\b"
+    r"\baccept(?:able)? with conditions\b"
     r"|\baccept(?:ed)?\b(?![a-z])"
+    r"|\b(?:alarp(?: status)?|disposition|status)\s*[:\-–]\s*(?:not )?acceptable\b"
+    r"|\bunacceptable\b"
     r"|\breject(?:ed)?\b(?![a-z])"
     r"|\brequires? further mitigation\b",
     re.IGNORECASE,

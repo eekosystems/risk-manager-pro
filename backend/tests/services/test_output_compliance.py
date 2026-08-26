@@ -134,6 +134,35 @@ def test_bare_numbered_hazards_with_scoring_are_sectioned() -> None:
     assert [s.label for s in split_hazard_sections(content)] == ["H1", "H2"]
 
 
+def test_bare_numbered_hazards_scored_in_cell_notation_are_sectioned() -> None:
+    """Scores now read letter-then-number ("C2"); sectioning must follow."""
+    content = (
+        "Preliminary Hazard List\n"
+        "1. Mis-Marked Closures\nLikelihood C, Severity 2 – C2.\n"
+        "2. Aircraft/Vehicle Conflicts\nInitial risk B3.\n"
+    )
+
+    assert [s.label for s in split_hazard_sections(content)] == ["H1", "H2"]
+
+
+def test_project_prefixed_hazard_ids_are_sectioned() -> None:
+    """Real outputs weld a project code onto the id: "TWVH1 – …", "PVD-H2 – …"."""
+    content = "TWVH1 – Aircraft Entering Closed TW V\nbody\nTWVH2 – Vehicle Intrusion\nbody\n"
+
+    assert [s.label for s in split_hazard_sections(content)] == ["H1", "H2"]
+
+    content = "PVD-H1 – A\nbody\nPVD-H2 – B\nbody\n"
+
+    assert [s.label for s in split_hazard_sections(content)] == ["H1", "H2"]
+
+
+def test_an_ordinary_word_ending_in_h_is_not_a_hazard_id() -> None:
+    """Only an upper-case prefix counts, so "Length 3" is not hazard 3."""
+    content = "Length 3 of the taxiway\nbody\nLength 4 of the apron\nbody\n"
+
+    assert split_hazard_sections(content) == []
+
+
 def test_a_plain_numbered_list_is_not_mistaken_for_hazards() -> None:
     """Guards the bare-numbering fallback against ordinary prose lists."""
     content = (
@@ -170,6 +199,18 @@ def test_acceptable_does_not_count_as_an_accept_disposition() -> None:
     )
 
     assert find_hazards_missing_disposition(sections) == ["H1", "H2"]
+
+
+def test_labeled_acceptable_status_counts_as_a_disposition() -> None:
+    """Two of three reviewed SRAs wrote the decision as an ALARP Status value."""
+    sections = split_hazard_sections(
+        "H1 – A\nALARP Status: Acceptable with conditions – subject to review.\n"
+        "H2 – B\nALARP: Acceptable with conditions.\n"
+        "H3 – C\nDisposition: Not acceptable; further mitigation required.\n"
+        "H4 – D\nOutcome: Unacceptable at current controls.\n"
+    )
+
+    assert find_hazards_missing_disposition(sections) == []
 
 
 def test_reject_disposition_is_recognized() -> None:
