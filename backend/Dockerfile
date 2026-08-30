@@ -1,5 +1,5 @@
 # L-11: digest-pin the base image. Tag resolved 2026-06-02; refresh via Dependabot.
-FROM python:3.12-slim@sha256:866411c135b507754efdf2fda51484be4d3d7d5173ed53cd083106132e710904 AS builder
+FROM python:3.14-slim@sha256:c845af9399020c7e562969a13689e929074a10fd057acd1b1fad06a2fb068e97 AS builder
 
 WORKDIR /build
 
@@ -9,7 +9,7 @@ COPY pyproject.toml .
 RUN mkdir -p app && touch app/__init__.py && \
     pip install --no-cache-dir --prefix=/install .
 
-FROM python:3.12-slim@sha256:866411c135b507754efdf2fda51484be4d3d7d5173ed53cd083106132e710904
+FROM python:3.14-slim@sha256:c845af9399020c7e562969a13689e929074a10fd057acd1b1fad06a2fb068e97
 
 # L-11: OCI metadata for image traceability, paired with the digest-pinned base.
 LABEL org.opencontainers.image.title="risk-manager-pro-api" \
