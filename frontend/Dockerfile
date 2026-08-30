@@ -1,6 +1,6 @@
 # M-16: digest-pin the base images so a tag re-point can't silently change the
 # build. Tags resolved 2026-06-02; refresh via Dependabot.
-FROM node:20-alpine@sha256:afdf98210b07b586eb71fa22ba2e432e058e4cd1304d31ed60888755b8c865fb AS build
+FROM node:26-alpine@sha256:144769ec3f32e8ee36b3cfde91e82bee25d9367b20f31a151f3f7eea3a2a8541 AS build
 
 WORKDIR /app
 
