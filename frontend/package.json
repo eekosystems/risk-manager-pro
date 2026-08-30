@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@azure/msal-browser": "^3.27.0",
-    "@azure/msal-react": "^2.1.0",
+    "@azure/msal-react": "^5.4.2",
     "@tanstack/react-query": "^5.62.0",
     "axios": "^1.16.1",
     "clsx": "^2.1.1",
