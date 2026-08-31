@@ -64,6 +64,30 @@ export async function processAllDocuments(): Promise<ProcessAllResult> {
   return response.data.data;
 }
 
+export interface MoveDocumentsParams {
+  documentIds: string[];
+  folderId: string | null;
+}
+
+export interface MoveDocumentsResult {
+  moved: number;
+  folder_id: string | null;
+}
+
+/**
+ * File documents under an in-app folder, or unfile them when folderId is null.
+ * This never moves anything in SharePoint.
+ */
+export async function moveDocuments(
+  params: MoveDocumentsParams,
+): Promise<MoveDocumentsResult> {
+  const response = await apiClient.post<DataResponse<MoveDocumentsResult>>(
+    "/documents/move",
+    { document_ids: params.documentIds, folder_id: params.folderId },
+  );
+  return response.data.data;
+}
+
 // SharePoint
 
 export interface SharePointDrive {

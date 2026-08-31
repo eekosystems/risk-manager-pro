@@ -26,8 +26,10 @@ from app.models.user import User
 from app.repositories.document import DocumentRepository
 from app.schemas.common import DataResponse, MetaResponse, PaginatedMeta, PaginatedResponse
 from app.schemas.document import DocumentDetail, DocumentListItem, DocumentResponse
+from app.schemas.document_folder import MoveDocumentsRequest, MoveDocumentsResult
 from app.services.audit import AuditLogger
 from app.services.document import DocumentService
+from app.services.document_folder import DocumentFolderService
 from app.services.document_processor import DocumentProcessor
 from app.services.openai_client import AzureOpenAIClient
 from app.services.search_indexer import SearchIndexer
@@ -43,6 +45,10 @@ def _get_document_service(
     storage: BlobStorageService = Depends(get_storage_service),
 ) -> DocumentService:
     return DocumentService(db=db, storage=storage)
+
+
+def _get_folder_service(db: AsyncSession = Depends(get_db)) -> DocumentFolderService:
+    return DocumentFolderService(db=db)
 
 
 async def _read_in_chunks(
@@ -291,6 +297,38 @@ async def bulk_delete_documents(
 
     return DataResponse(
         data=BulkDeleteResult(deleted=deleted, skipped=skipped),
+        meta=MetaResponse(request_id=""),
+    )
+
+
+@router.post("/move", response_model=DataResponse[MoveDocumentsResult], status_code=200)
+@limiter.limit("30/minute")  # H-4: throttle bulk mutations
+async def move_documents(
+    request: Request,
+    payload: MoveDocumentsRequest,
+    current_user: User = Depends(require_analyst_or_above),
+    organization: Organization = Depends(get_current_organization),
+    service: DocumentFolderService = Depends(_get_folder_service),
+    audit: AuditLogger = Depends(get_audit_logger),
+) -> DataResponse[MoveDocumentsResult]:
+    """File documents under an in-app folder, or unfile them when folder_id is null.
+
+    This only rewrites Document.folder_id — nothing is moved in SharePoint, and
+    folder_path is left intact so the crawler still recognizes synced files.
+    """
+    moved = await service.move_documents(
+        payload.document_ids, payload.folder_id, organization.id
+    )
+    await audit.log(
+        action="document.moved",
+        user=current_user,
+        resource_type="document",
+        resource_id=str(payload.folder_id or ""),
+        organization_id=organization.id,
+        metadata={"moved": moved, "requested": len(payload.document_ids)},
+    )
+    return DataResponse(
+        data=MoveDocumentsResult(moved=moved, folder_id=payload.folder_id),
         meta=MetaResponse(request_id=""),
     )
 

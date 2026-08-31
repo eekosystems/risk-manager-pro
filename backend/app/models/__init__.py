@@ -1,6 +1,7 @@
 from app.models.audit import AuditEntry
 from app.models.conversation import Conversation
 from app.models.document import Document
+from app.models.document_folder import DocumentFolder
 from app.models.message import Message
 from app.models.notification import Notification
 from app.models.organization import Organization
@@ -27,6 +28,7 @@ __all__ = [
     "ClosureApproval",
     "Conversation",
     "Document",
+    "DocumentFolder",
     "Message",
     "Mitigation",
     "Notification",

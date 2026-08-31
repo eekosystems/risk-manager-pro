@@ -10,6 +10,7 @@ class DocumentResponse(BaseModel):
     id: uuid.UUID
     filename: str
     folder_path: str | None = None
+    folder_id: uuid.UUID | None = None
     content_type: str
     size_bytes: int
     status: DocumentStatus
@@ -24,6 +25,7 @@ class DocumentListItem(BaseModel):
     id: uuid.UUID
     filename: str
     folder_path: str | None = None
+    folder_id: uuid.UUID | None = None
     content_type: str
     size_bytes: int
     status: DocumentStatus
@@ -37,6 +39,7 @@ class DocumentDetail(BaseModel):
     id: uuid.UUID
     filename: str
     folder_path: str | None = None
+    folder_id: uuid.UUID | None = None
     content_type: str
     size_bytes: int
     status: DocumentStatus

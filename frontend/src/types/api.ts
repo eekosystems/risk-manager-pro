@@ -122,11 +122,21 @@ export interface ConversationDetail {
 export interface DocumentItem {
   id: string;
   filename: string;
+  /** Mirrors the source SharePoint hierarchy. Set by the crawler, never by a user. */
   folder_path: string | null;
+  /** In-app folder the user filed this document under, if any. */
+  folder_id: string | null;
   content_type: string;
   size_bytes: number;
   status: DocumentStatus;
   source_type: SourceType;
+  created_at: string;
+}
+
+export interface DocumentFolder {
+  id: string;
+  name: string;
+  parent_id: string | null;
   created_at: string;
 }
 
