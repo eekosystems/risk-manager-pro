@@ -67,6 +67,8 @@ export interface OrganizationMember {
   email: string;
   display_name: string;
   invitation_status: InvitationStatus;
+  /** Global flag, not a property of this membership. */
+  is_platform_admin: boolean;
   created_at: string;
 }
 

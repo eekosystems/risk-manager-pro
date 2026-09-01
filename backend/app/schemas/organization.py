@@ -80,6 +80,9 @@ class MemberResponse(BaseModel):
     email: str
     display_name: str
     invitation_status: str = "active"
+    # Global flag, not a property of this membership — surfaced here because
+    # this is where users are listed.
+    is_platform_admin: bool = False
     created_at: datetime
 
     model_config = {"from_attributes": True}

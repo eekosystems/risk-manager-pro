@@ -3,10 +3,13 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.deps import get_audit_logger, get_current_organization, get_current_user
-from app.core.deps.organization import require_org_role
+from app.core.deps import (
+    get_audit_logger,
+    get_current_organization,
+    get_current_user,
+    require_platform_admin,
+)
 from app.models.organization import Organization
-from app.models.organization_membership import MembershipRole
 from app.models.user import User
 from app.schemas.common import DataResponse, MetaResponse
 from app.schemas.settings import (
@@ -66,7 +69,7 @@ async def get_settings_by_category(
 @router.put(
     "/rag",
     response_model=DataResponse[SettingsResponse],
-    dependencies=[Depends(require_org_role(MembershipRole.ORG_ADMIN))],
+    dependencies=[Depends(require_platform_admin)],
 )
 async def update_rag_settings(
     payload: RagSettingsPayload,
@@ -90,7 +93,7 @@ async def update_rag_settings(
 @router.put(
     "/model",
     response_model=DataResponse[SettingsResponse],
-    dependencies=[Depends(require_org_role(MembershipRole.ORG_ADMIN))],
+    dependencies=[Depends(require_platform_admin)],
 )
 async def update_model_settings(
     payload: ModelPreferencesPayload,
@@ -114,7 +117,7 @@ async def update_model_settings(
 @router.put(
     "/prompts",
     response_model=DataResponse[SettingsResponse],
-    dependencies=[Depends(require_org_role(MembershipRole.ORG_ADMIN))],
+    dependencies=[Depends(require_platform_admin)],
 )
 async def update_prompts(
     payload: PromptsPayload,
@@ -138,7 +141,7 @@ async def update_prompts(
 @router.put(
     "/qaqc",
     response_model=DataResponse[SettingsResponse],
-    dependencies=[Depends(require_org_role(MembershipRole.ORG_ADMIN))],
+    dependencies=[Depends(require_platform_admin)],
 )
 async def update_qaqc_settings(
     payload: QaqcSettingsPayload,

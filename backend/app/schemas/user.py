@@ -36,3 +36,7 @@ class UserProfileResponse(BaseModel):
     organizations: list[UserOrgMembership] = []
 
     model_config = {"from_attributes": True}
+
+
+class SetPlatformAdminRequest(BaseModel):
+    is_platform_admin: bool

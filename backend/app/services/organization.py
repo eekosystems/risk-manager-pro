@@ -27,6 +27,7 @@ def _membership_to_response(membership: OrganizationMembership) -> MemberRespons
         invitation_status=(
             membership.user.invitation_status if membership.user else InvitationStatus.ACTIVE.value
         ),
+        is_platform_admin=bool(membership.user and membership.user.is_platform_admin),
         created_at=membership.created_at,
     )
 

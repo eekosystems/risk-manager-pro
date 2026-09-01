@@ -6,6 +6,7 @@ import {
   FolderTree,
   Loader2,
   Plus,
+  ShieldCheck,
   Trash2,
   UserPlus,
   X,
@@ -21,6 +22,8 @@ import {
   removeMember,
   setFolderScopes,
 } from "@/api/organizations";
+import { setPlatformAdmin } from "@/api/users";
+import { useUserRole } from "@/hooks/use-user-role";
 import type {
   MembershipRole,
   OrganizationMember,
@@ -394,6 +397,7 @@ function FolderScopeSection({ account }: { account: OrganizationSummary }) {
 
 function MembersSection({ account }: { account: OrganizationSummary }) {
   const queryClient = useQueryClient();
+  const { profile } = useUserRole();
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<MembershipRole>("analyst");
   const [removeConfirm, setRemoveConfirm] = useState<string | null>(null);
@@ -416,6 +420,12 @@ function MembersSection({ account }: { account: OrganizationSummary }) {
       setEmail("");
       invalidate();
     },
+  });
+
+  const platformAdminMutation = useMutation({
+    mutationFn: ({ userId, grant }: { userId: string; grant: boolean }) =>
+      setPlatformAdmin(userId, grant),
+    onSuccess: invalidate,
   });
 
   const removeMutation = useMutation({
@@ -443,7 +453,9 @@ function MembersSection({ account }: { account: OrganizationSummary }) {
       </h4>
       <p className="mb-3 text-[12px] text-slate-500">
         Adding a user sends them a Microsoft invitation. Account admins can add
-        their own colleagues; analysts and viewers cannot.
+        their own colleagues; analysts and viewers cannot. The shield grants
+        platform administration — full access to every account and the AI
+        configuration, so use it only for Faith Group staff.
       </p>
 
       <div className="mb-3 flex gap-2">
@@ -513,6 +525,32 @@ function MembersSection({ account }: { account: OrganizationSummary }) {
                   Invited
                 </span>
               )}
+              <button
+                onClick={() =>
+                  platformAdminMutation.mutate({
+                    userId: member.user_id,
+                    grant: !member.is_platform_admin,
+                  })
+                }
+                disabled={
+                  platformAdminMutation.isPending ||
+                  member.user_id === profile?.id
+                }
+                title={
+                  member.user_id === profile?.id
+                    ? "You cannot change your own platform access"
+                    : member.is_platform_admin
+                      ? "Platform administrator — click to revoke"
+                      : "Grant platform administrator"
+                }
+                className={`shrink-0 rounded-lg p-1 transition-colors disabled:opacity-30 ${
+                  member.is_platform_admin
+                    ? "bg-brand-50 text-brand-600"
+                    : "text-gray-300 hover:bg-brand-50 hover:text-brand-500"
+                }`}
+              >
+                <ShieldCheck size={13} />
+              </button>
               <button
                 onClick={() => handleRemove(member.user_id)}
                 disabled={removeMutation.isPending}
