@@ -99,6 +99,7 @@ def require_org_role(*allowed_roles: MembershipRole) -> Callable[..., Awaitable[
     return _check_org_role
 
 
+require_org_admin = require_org_role(MembershipRole.ORG_ADMIN)
 require_analyst_or_above = require_org_role(MembershipRole.ORG_ADMIN, MembershipRole.ANALYST)
 require_any_member = require_org_role(
     MembershipRole.ORG_ADMIN, MembershipRole.ANALYST, MembershipRole.VIEWER

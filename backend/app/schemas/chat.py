@@ -89,6 +89,33 @@ class ConversationDetail(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class TranscriptAuthor(BaseModel):
+    """Minimal identity of a transcript's owner.
+
+    Deliberately limited to the id and display name — an admin needs to know
+    whose conversation this is, not their full contact record.
+    """
+
+    id: uuid.UUID
+    display_name: str
+
+    model_config = {"from_attributes": True}
+
+
+class ConversationTranscript(BaseModel):
+    """Read-only view of another user's conversation, for org-admin review."""
+
+    id: uuid.UUID
+    title: str
+    function_type: FunctionType
+    created_at: datetime
+    updated_at: datetime
+    author: TranscriptAuthor
+    messages: list[MessageResponse]
+
+    model_config = {"from_attributes": True}
+
+
 class EmailChatMessageRequest(BaseModel):
     to: EmailStr
     subject: str = Field(..., min_length=1, max_length=200)

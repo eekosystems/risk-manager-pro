@@ -1782,6 +1782,9 @@ class ChatService:
     ) -> Conversation | None:
         return await self._repo.get_by_id(conversation_id, organization_id, user_id=user_id)
 
+    async def get_conversation_author(self, conversation: Conversation) -> User | None:
+        return await self._repo.get_author(conversation)
+
     async def list_conversations(
         self, user_id: uuid.UUID, organization_id: uuid.UUID, skip: int = 0, limit: int = 50
     ) -> list[Conversation]:

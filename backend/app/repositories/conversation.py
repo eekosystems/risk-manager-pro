@@ -8,6 +8,7 @@ from sqlalchemy.orm import selectinload
 from app.core.exceptions import NotFoundError
 from app.models.conversation import Conversation, ConversationStatus, FunctionType
 from app.models.message import Message, MessageRole
+from app.models.user import User
 
 
 def _strip_null_bytes(value: Any) -> Any:
@@ -57,6 +58,12 @@ class ConversationRepository:
         )
         if user_id is not None:
             stmt = stmt.where(Conversation.user_id == user_id)
+        result = await self._db.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def get_author(self, conversation: Conversation) -> User | None:
+        """Fetch the User who owns the given conversation."""
+        stmt = select(User).where(User.id == conversation.user_id)
         result = await self._db.execute(stmt)
         return result.scalar_one_or_none()
 

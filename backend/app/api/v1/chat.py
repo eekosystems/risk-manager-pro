@@ -17,6 +17,7 @@ from app.core.deps import (
     get_rag_service,
     require_analyst_or_above,
     require_any_member,
+    require_org_admin,
 )
 from app.core.exceptions import AppError, ForbiddenError, NotFoundError
 from app.core.rate_limit import limiter
@@ -29,7 +30,10 @@ from app.schemas.chat import (
     ChatResponse,
     ConversationDetail,
     ConversationListItem,
+    ConversationTranscript,
     EmailChatMessageRequest,
+    MessageResponse,
+    TranscriptAuthor,
 )
 from app.schemas.common import DataResponse, MetaResponse
 from app.services.audit import AuditLogger
@@ -258,6 +262,67 @@ async def get_conversation(
         raise NotFoundError("Conversation", str(conversation_id))
     detail = ConversationDetail.model_validate(conversation)
     return DataResponse(data=detail, meta=MetaResponse(request_id=str(conversation_id)))
+
+
+@router.get(
+    "/conversations/{conversation_id}/transcript",
+    response_model=DataResponse[ConversationTranscript],
+)
+async def get_conversation_transcript(
+    conversation_id: uuid.UUID,
+    current_user: User = Depends(require_org_admin),
+    organization: Organization = Depends(get_current_organization),
+    service: ChatService = Depends(_get_chat_service),
+    audit: AuditLogger = Depends(get_audit_logger),
+) -> DataResponse[ConversationTranscript]:
+    """Read any conversation in the organization, for org-admin supervisory review.
+
+    Reached from a conversation row in the audit log. Unlike the owner-facing
+    endpoint this skips the user filter, so the read is deliberately logged:
+    an admin opening someone else's chat is itself an access event the audit
+    trail has to show.
+    """
+    conversation = await service.get_conversation(conversation_id, organization.id)
+    if not conversation:
+        # Same response whether the conversation is missing or belongs to
+        # another tenant — never confirm the existence of another org's data.
+        await audit.log(
+            action="chat.conversation_viewed",
+            user=current_user,
+            resource_type="conversation",
+            resource_id=str(conversation_id),
+            outcome="failure",
+            organization_id=organization.id,
+        )
+        raise NotFoundError("Conversation", str(conversation_id))
+
+    author = await service.get_conversation_author(conversation)
+    if not author:
+        raise NotFoundError("Conversation", str(conversation_id))
+
+    await audit.log(
+        action="chat.conversation_viewed",
+        user=current_user,
+        resource_type="conversation",
+        resource_id=str(conversation_id),
+        organization_id=organization.id,
+        # Record whose conversation was read, by id only — never their name
+        # or email, which would put PII in the audit trail.
+        metadata={"subject_user_id": str(conversation.user_id)},
+    )
+
+    transcript = ConversationTranscript(
+        id=conversation.id,
+        title=conversation.title,
+        function_type=conversation.function_type,
+        created_at=conversation.created_at,
+        updated_at=conversation.updated_at,
+        author=TranscriptAuthor.model_validate(author),
+        messages=[MessageResponse.model_validate(m) for m in conversation.messages],
+    )
+    return DataResponse(
+        data=transcript, meta=MetaResponse(request_id=str(conversation_id))
+    )
 
 
 @router.delete("/conversations/{conversation_id}", status_code=204)

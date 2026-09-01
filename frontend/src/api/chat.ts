@@ -6,6 +6,7 @@ import type {
   Citation,
   ConversationDetail,
   ConversationListItem,
+  ConversationTranscript,
   DataResponse,
   FunctionType,
 } from "@/types/api";
@@ -44,6 +45,19 @@ export async function getConversation(
     await apiClient.get<DataResponse<ConversationDetail>>(
       `/chat/conversations/${conversationId}`,
     );
+  return response.data.data;
+}
+
+/**
+ * Read any conversation in the organization. Org admins only, and the server
+ * records the access in the audit log.
+ */
+export async function getConversationTranscript(
+  conversationId: string,
+): Promise<ConversationTranscript> {
+  const response = await apiClient.get<DataResponse<ConversationTranscript>>(
+    `/chat/conversations/${conversationId}/transcript`,
+  );
   return response.data.data;
 }
 

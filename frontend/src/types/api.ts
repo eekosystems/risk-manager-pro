@@ -119,6 +119,22 @@ export interface ConversationDetail {
   messages: ChatMessage[];
 }
 
+export interface TranscriptAuthor {
+  id: string;
+  display_name: string;
+}
+
+/** Another user's conversation, readable by org admins from the audit log. */
+export interface ConversationTranscript {
+  id: string;
+  title: string;
+  function_type: FunctionType;
+  created_at: string;
+  updated_at: string;
+  author: TranscriptAuthor;
+  messages: ChatMessage[];
+}
+
 export interface DocumentItem {
   id: string;
   filename: string;

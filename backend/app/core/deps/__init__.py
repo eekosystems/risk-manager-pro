@@ -10,6 +10,7 @@ from app.core.deps.organization import (
     get_current_organization,
     require_analyst_or_above,
     require_any_member,
+    require_org_admin,
     require_org_role,
     require_platform_admin,
 )
@@ -35,6 +36,7 @@ __all__ = [
     "get_token_payload",
     "require_analyst_or_above",
     "require_any_member",
+    "require_org_admin",
     "require_org_role",
     "require_platform_admin",
 ]

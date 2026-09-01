@@ -4,6 +4,7 @@ import {
   ChevronRight,
   Download,
   Loader2,
+  MessageSquare,
   Search,
   ShieldCheck,
 } from "lucide-react";
@@ -14,7 +15,13 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useAuditEntries, useAuditFilterOptions } from "@/hooks/use-audit";
 import { useToast } from "@/hooks/use-toast";
+import { useUserRole } from "@/hooks/use-user-role";
 
+import { ConversationTranscriptModal } from "./conversation-transcript-modal";
+
+// Keys must match the action strings the backend writes exactly. Several were
+// previously unprefixed ("message_sent" rather than "chat.message_sent"), so
+// those rows fell through to the raw slug.
 const ACTION_LABELS: Record<string, string> = {
   "risk.created": "Risk Created",
   "risk.updated": "Risk Updated",
@@ -22,19 +29,34 @@ const ACTION_LABELS: Record<string, string> = {
   "mitigation.created": "Mitigation Added",
   "mitigation.updated": "Mitigation Updated",
   "mitigation.deleted": "Mitigation Deleted",
-  "message_sent": "Message Sent",
-  "conversation_deleted": "Conversation Deleted",
+  "chat.message_sent": "Message Sent",
+  "chat.message_streamed": "Message Sent",
+  "chat.conversation_viewed": "Conversation Viewed",
+  "chat.conversation_deleted": "Conversation Deleted",
+  "chat.response.emailed": "Response Emailed",
   "document.uploaded": "Document Uploaded",
   "document.deleted": "Document Deleted",
+  "document.bulk_deleted": "Documents Deleted",
+  "document.reindexed": "Document Reindexed",
+  "document.process_all": "All Documents Processed",
+  "document.moved": "Document Filed",
+  "document_folder.created": "Folder Created",
+  "document_folder.renamed": "Folder Renamed",
+  "document_folder.moved": "Folder Moved",
+  "document_folder.deleted": "Folder Deleted",
   "organization.created": "Org Created",
   "organization.updated": "Org Updated",
-  "member_added": "Member Added",
-  "member_role_updated": "Role Updated",
-  "member_removed": "Member Removed",
-  "rag.updated": "RAG Settings Updated",
-  "model.updated": "Model Settings Updated",
-  "prompts.updated": "Prompts Updated",
+  "organization.member_added": "Member Added",
+  "organization.member_role_updated": "Role Updated",
+  "organization.member_removed": "Member Removed",
+  "settings.rag.updated": "RAG Settings Updated",
+  "settings.model.updated": "Model Settings Updated",
+  "settings.prompts.updated": "Prompts Updated",
+  "settings.qaqc.updated": "QA/QC Settings Updated",
+  "sharepoint.crawl": "SharePoint Sync",
+  "sharepoint.sync_folder": "Folder Synced",
   "user.auto_provisioned": "User Provisioned",
+  "workflow.deleted": "Workflow Deleted",
 };
 
 const OUTCOME_STYLES: Record<string, string> = {
@@ -53,7 +75,9 @@ export function AuditLogPage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [isExporting, setIsExporting] = useState(false);
+  const [openTranscriptId, setOpenTranscriptId] = useState<string | null>(null);
   const { addToast } = useToast();
+  const { isAdmin } = useUserRole();
 
   const params: GetAuditParams = {
     skip: page * PAGE_SIZE,
@@ -244,12 +268,38 @@ export function AuditLogPage() {
                 {entries.map((entry, i) => {
                   const outcomeCls =
                     OUTCOME_STYLES[entry.outcome] ?? OUTCOME_STYLES.success;
+                  // Only org admins can read another user's conversation, so
+                  // don't offer the affordance to anyone else.
+                  const canOpenTranscript =
+                    isAdmin &&
+                    entry.resource_type === "conversation" &&
+                    Boolean(entry.resource_id);
                   return (
                     <tr
                       key={entry.id}
+                      onClick={
+                        canOpenTranscript
+                          ? () => setOpenTranscriptId(entry.resource_id)
+                          : undefined
+                      }
+                      onKeyDown={
+                        canOpenTranscript
+                          ? (e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                setOpenTranscriptId(entry.resource_id);
+                              }
+                            }
+                          : undefined
+                      }
+                      tabIndex={canOpenTranscript ? 0 : undefined}
+                      role={canOpenTranscript ? "button" : undefined}
+                      aria-label={
+                        canOpenTranscript ? "Open conversation transcript" : undefined
+                      }
                       className={`transition-colors hover:bg-gray-50 ${
                         i < entries.length - 1 ? "border-b border-gray-100" : ""
-                      }`}
+                      } ${canOpenTranscript ? "cursor-pointer" : ""}`}
                     >
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-600">
                         {format(new Date(entry.timestamp), "MMM d, yyyy HH:mm:ss")}
@@ -264,6 +314,12 @@ export function AuditLogPage() {
                         {entry.resource_id && (
                           <span className="ml-1 text-[10px] text-slate-400" title={entry.resource_id}>
                             ({entry.resource_id.slice(0, 8)}...)
+                          </span>
+                        )}
+                        {canOpenTranscript && (
+                          <span className="ml-2 inline-flex items-center gap-0.5 text-[10px] font-semibold text-brand-600">
+                            <MessageSquare size={10} />
+                            View chat
                           </span>
                         )}
                       </td>
@@ -313,6 +369,13 @@ export function AuditLogPage() {
           </div>
         )}
       </div>
+
+      {openTranscriptId && (
+        <ConversationTranscriptModal
+          conversationId={openTranscriptId}
+          onClose={() => setOpenTranscriptId(null)}
+        />
+      )}
     </div>
   );
 }
