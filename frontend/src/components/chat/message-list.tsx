@@ -1,6 +1,6 @@
 import { clsx } from "clsx";
 import { format } from "date-fns";
-import { Check, Copy, Download, Mail } from "lucide-react";
+import { Check, Copy, Download, FileText, Mail } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { exportTextToPdf } from "@/lib/export-pdf";
@@ -174,6 +174,13 @@ export function MessageList({
                     label="Export PDF"
                     onClick={() => exportTextToPdf(cleanForExport(msg.content))}
                   />
+                  <ActionButton
+                    icon={<FileText size={12} />}
+                    label="Export Word"
+                    onClick={() => {
+                      void handleExportWord(cleanForExport(msg.content));
+                    }}
+                  />
                 </div>
               )}
               <MessageTimestamp
@@ -218,6 +225,11 @@ function ActionButton({ icon, label, onClick }: ActionButtonProps) {
       {label}
     </button>
   );
+}
+
+async function handleExportWord(content: string): Promise<void> {
+  const { exportTextToDocx } = await import("@/lib/export-docx");
+  await exportTextToDocx(content);
 }
 
 function cleanForExport(content: string): string {
