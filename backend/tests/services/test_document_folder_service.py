@@ -153,9 +153,7 @@ async def test_create_folder_enforces_depth_limit(db_session: AsyncSession) -> N
 
     parent_id: uuid.UUID | None = None
     for level in range(MAX_FOLDER_DEPTH):
-        folder = await service.create_folder(
-            org_id, user.id, f"level-{level}", parent_id=parent_id
-        )
+        folder = await service.create_folder(org_id, user.id, f"level-{level}", parent_id=parent_id)
         parent_id = folder.id
 
     with pytest.raises(ValidationError, match="nested more than"):
@@ -260,9 +258,7 @@ async def test_move_folder_into_own_descendant_is_rejected(
     service = DocumentFolderService(db_session)
 
     grandparent = await service.create_folder(org_id, user.id, "Airports")
-    parent = await service.create_folder(
-        org_id, user.id, "PHL", parent_id=grandparent.id
-    )
+    parent = await service.create_folder(org_id, user.id, "PHL", parent_id=grandparent.id)
     child = await service.create_folder(org_id, user.id, "2026", parent_id=parent.id)
 
     with pytest.raises(ValidationError, match="own subfolders"):
@@ -281,15 +277,18 @@ async def test_delete_folder_unfiles_documents_without_deleting_them(
 
     folder = await service.create_folder(org_id, user.id, "Audits")
     document = await _make_document(db_session, user, org_id)
-    await service.move_documents([document.id], folder.id, org_id)
+    document_id, folder_id = document.id, folder.id
+    await service.move_documents([document_id], folder_id, org_id)
 
-    await service.delete_folder(folder.id, org_id)
-    db_session.expire_all()
+    await service.delete_folder(folder_id, org_id)
 
-    surviving = (
-        await db_session.execute(select(Document).where(Document.id == document.id))
-    ).scalar_one()
-    assert surviving.folder_id is None
+    row = (
+        await db_session.execute(
+            select(Document.id, Document.folder_id).where(Document.id == document_id)
+        )
+    ).one_or_none()
+    assert row is not None, "the document must survive its folder"
+    assert row.folder_id is None
 
 
 @pytest.mark.asyncio
@@ -299,14 +298,12 @@ async def test_delete_folder_removes_subfolders(db_session: AsyncSession) -> Non
 
     parent = await service.create_folder(org_id, user.id, "Airports")
     child = await service.create_folder(org_id, user.id, "PHL", parent_id=parent.id)
+    parent_id, child_id = parent.id, child.id
 
-    await service.delete_folder(parent.id, org_id)
-    db_session.expire_all()
+    await service.delete_folder(parent_id, org_id)
 
     remaining = (
-        await db_session.execute(
-            select(DocumentFolder).where(DocumentFolder.id == child.id)
-        )
+        await db_session.execute(select(DocumentFolder.id).where(DocumentFolder.id == child_id))
     ).scalar_one_or_none()
     assert remaining is None
 
@@ -336,17 +333,21 @@ async def test_move_documents_into_folder(db_session: AsyncSession) -> None:
     folder = await service.create_folder(org_id, user.id, "Audits")
     first = await _make_document(db_session, user, org_id, "a.pdf")
     second = await _make_document(db_session, user, org_id, "b.pdf")
+    folder_id, first_id, second_id = folder.id, first.id, second.id
 
-    moved = await service.move_documents([first.id, second.id], folder.id, org_id)
-    db_session.expire_all()
+    moved = await service.move_documents([first_id, second_id], folder_id, org_id)
 
     assert moved == 2
-    rows = (
-        await db_session.execute(
-            select(Document).where(Document.id.in_([first.id, second.id]))
+    filed = (
+        (
+            await db_session.execute(
+                select(Document.folder_id).where(Document.id.in_([first_id, second_id]))
+            )
         )
-    ).scalars()
-    assert all(row.folder_id == folder.id for row in rows)
+        .scalars()
+        .all()
+    )
+    assert list(filed) == [folder_id, folder_id]
 
 
 @pytest.mark.asyncio
@@ -356,15 +357,15 @@ async def test_move_documents_to_root(db_session: AsyncSession) -> None:
 
     folder = await service.create_folder(org_id, user.id, "Audits")
     document = await _make_document(db_session, user, org_id)
-    await service.move_documents([document.id], folder.id, org_id)
+    document_id, folder_id = document.id, folder.id
+    await service.move_documents([document_id], folder_id, org_id)
 
-    await service.move_documents([document.id], None, org_id)
-    db_session.expire_all()
+    await service.move_documents([document_id], None, org_id)
 
     unfiled = (
-        await db_session.execute(select(Document).where(Document.id == document.id))
+        await db_session.execute(select(Document.folder_id).where(Document.id == document_id))
     ).scalar_one()
-    assert unfiled.folder_id is None
+    assert unfiled is None
 
 
 @pytest.mark.asyncio
@@ -376,18 +377,18 @@ async def test_move_documents_preserves_sharepoint_folder_path(
     service = DocumentFolderService(db_session)
 
     folder = await service.create_folder(org_id, user.id, "My Working Set")
-    document = await _make_document(
-        db_session, user, org_id, folder_path="Airports/PHL/Safety"
-    )
+    document = await _make_document(db_session, user, org_id, folder_path="Airports/PHL/Safety")
+    document_id, folder_id = document.id, folder.id
 
-    await service.move_documents([document.id], folder.id, org_id)
-    db_session.expire_all()
+    await service.move_documents([document_id], folder_id, org_id)
 
     moved = (
-        await db_session.execute(select(Document).where(Document.id == document.id))
-    ).scalar_one()
+        await db_session.execute(
+            select(Document.folder_path, Document.folder_id).where(Document.id == document_id)
+        )
+    ).one()
     assert moved.folder_path == "Airports/PHL/Safety"
-    assert moved.folder_id == folder.id
+    assert moved.folder_id == folder_id
 
 
 @pytest.mark.asyncio

@@ -316,9 +316,7 @@ async def move_documents(
     This only rewrites Document.folder_id — nothing is moved in SharePoint, and
     folder_path is left intact so the crawler still recognizes synced files.
     """
-    moved = await service.move_documents(
-        payload.document_ids, payload.folder_id, organization.id
-    )
+    moved = await service.move_documents(payload.document_ids, payload.folder_id, organization.id)
     await audit.log(
         action="document.moved",
         user=current_user,

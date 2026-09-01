@@ -1331,9 +1331,19 @@ class ChatService:
         # The application's permanent memory: rules a reviewer approved from
         # user feedback. Placed after the standing instructions so it reads as
         # a refinement of them, and before history so it governs this answer.
-        guidance_block = await self._guidance.build_prompt_block(
-            organization_id, function_type
-        )
+        # Guidance refines an answer rather than producing one, so a failure here
+        # degrades quality instead of denying the user a response — the same
+        # posture the document-context lookups above take.
+        try:
+            guidance_block = await self._guidance.build_prompt_block(organization_id, function_type)
+        except Exception:
+            logger.error(
+                "guidance_fetch_failed",
+                organization_id=str(organization_id),
+                function_type=function_type.value,
+                exc_info=True,
+            )
+            guidance_block = ""
         if guidance_block:
             messages.append({"role": "system", "content": guidance_block})
 

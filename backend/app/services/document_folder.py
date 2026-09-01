@@ -32,9 +32,7 @@ class DocumentFolderService:
         if not cleaned:
             raise ValidationError("Folder name cannot be empty")
         if len(cleaned) > MAX_FOLDER_NAME_LENGTH:
-            raise ValidationError(
-                f"Folder name cannot exceed {MAX_FOLDER_NAME_LENGTH} characters"
-            )
+            raise ValidationError(f"Folder name cannot exceed {MAX_FOLDER_NAME_LENGTH} characters")
         if "/" in cleaned or "\\" in cleaned:
             raise ValidationError("Folder name cannot contain path separators")
         return cleaned
@@ -134,9 +132,7 @@ class DocumentFolderService:
             parent = await self._require_folder(parent_id, organization_id)
             ancestors = await self._ancestors(parent, organization_id)
             if any(a.id == folder.id for a in ancestors):
-                raise ValidationError(
-                    "A folder cannot be moved into one of its own subfolders"
-                )
+                raise ValidationError("A folder cannot be moved into one of its own subfolders")
             await self._assert_depth_allows_child(parent, organization_id)
 
         await self._assert_name_available(
@@ -146,9 +142,7 @@ class DocumentFolderService:
             folder, parent_id=parent_id, clear_parent=parent_id is None
         )
 
-    async def delete_folder(
-        self, folder_id: uuid.UUID, organization_id: uuid.UUID
-    ) -> None:
+    async def delete_folder(self, folder_id: uuid.UUID, organization_id: uuid.UUID) -> None:
         """Remove a folder and its subfolders. Documents inside are unfiled, never deleted."""
         folder = await self._require_folder(folder_id, organization_id)
         await self._repo.delete(folder)
@@ -162,9 +156,7 @@ class DocumentFolderService:
         if not document_ids:
             raise ValidationError("No documents specified")
         if len(document_ids) > MAX_MOVE_BATCH:
-            raise ValidationError(
-                f"Cannot move more than {MAX_MOVE_BATCH} documents at once"
-            )
+            raise ValidationError(f"Cannot move more than {MAX_MOVE_BATCH} documents at once")
         if folder_id is not None:
             await self._require_folder(folder_id, organization_id)
 

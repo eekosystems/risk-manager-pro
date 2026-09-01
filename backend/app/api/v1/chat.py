@@ -320,9 +320,7 @@ async def get_conversation_transcript(
         author=TranscriptAuthor.model_validate(author),
         messages=[MessageResponse.model_validate(m) for m in conversation.messages],
     )
-    return DataResponse(
-        data=transcript, meta=MetaResponse(request_id=str(conversation_id))
-    )
+    return DataResponse(data=transcript, meta=MetaResponse(request_id=str(conversation_id)))
 
 
 @router.delete("/conversations/{conversation_id}", status_code=204)

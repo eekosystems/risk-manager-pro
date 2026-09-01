@@ -124,9 +124,7 @@ async def _seed_org_and_users(db: AsyncSession) -> tuple[Organization, User, Use
 async def _get_transcript(app: FastAPI, conversation_id: uuid.UUID) -> Response:
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        return await client.get(
-            f"/api/v1/chat/conversations/{conversation_id}/transcript"
-        )
+        return await client.get(f"/api/v1/chat/conversations/{conversation_id}/transcript")
 
 
 @pytest.mark.asyncio

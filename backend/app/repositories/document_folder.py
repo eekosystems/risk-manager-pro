@@ -38,9 +38,7 @@ class DocumentFolderRepository:
         result = await self._db.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def list_for_organization(
-        self, organization_id: uuid.UUID
-    ) -> list[DocumentFolder]:
+    async def list_for_organization(self, organization_id: uuid.UUID) -> list[DocumentFolder]:
         stmt = (
             select(DocumentFolder)
             .where(DocumentFolder.organization_id == organization_id)

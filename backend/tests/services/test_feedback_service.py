@@ -297,9 +297,7 @@ async def test_prompt_block_includes_global_and_own_org_rules(
     other_org_id = await _seed_second_org(db_session)
     service = GuidanceService(db_session)
 
-    await service.create(
-        content="Global rule.", scope=GuidanceScope.GLOBAL, created_by=user.id
-    )
+    await service.create(content="Global rule.", scope=GuidanceScope.GLOBAL, created_by=user.id)
     await service.create(
         content="Our rule.",
         scope=GuidanceScope.ORGANIZATION,

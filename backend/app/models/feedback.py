@@ -31,9 +31,7 @@ class MessageFeedback(Base):
     __tablename__ = "message_feedback"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    organization_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("organizations.id"), index=True
-    )
+    organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), index=True)
     conversation_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("conversations.id", ondelete="CASCADE"), index=True
     )
@@ -50,9 +48,7 @@ class MessageFeedback(Base):
         default=FeedbackStatus.NEW,
         index=True,
     )
-    reviewed_by: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("users.id"), default=None
-    )
+    reviewed_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), default=None)
     reviewed_at: Mapped[datetime | None] = mapped_column(default=None)
     review_note: Mapped[str | None] = mapped_column(String(1000), default=None)
     created_at: Mapped[datetime] = mapped_column(default=func.now(), index=True)

@@ -91,9 +91,7 @@ class FeedbackRepository:
             )
         ).all()
         user_rows = (
-            await self._db.execute(
-                select(User.id, User.display_name).where(User.id.in_(user_ids))
-            )
+            await self._db.execute(select(User.id, User.display_name).where(User.id.in_(user_ids)))
         ).all()
 
         return (
@@ -152,9 +150,7 @@ class GuidanceRepository:
         result = await self._db.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def list_all(
-        self, include_inactive: bool = True
-    ) -> list[ApplicationGuidance]:
+    async def list_all(self, include_inactive: bool = True) -> list[ApplicationGuidance]:
         stmt = select(ApplicationGuidance)
         if not include_inactive:
             stmt = stmt.where(ApplicationGuidance.is_active.is_(True))

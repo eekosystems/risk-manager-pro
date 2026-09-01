@@ -139,9 +139,7 @@ class FeedbackService:
         if not cleaned:
             raise ValidationError("Feedback comment cannot be empty")
         if len(cleaned) > MAX_COMMENT_LENGTH:
-            raise ValidationError(
-                f"Feedback cannot exceed {MAX_COMMENT_LENGTH} characters"
-            )
+            raise ValidationError(f"Feedback cannot exceed {MAX_COMMENT_LENGTH} characters")
         return cleaned
 
     async def submit(
@@ -157,9 +155,7 @@ class FeedbackService:
 
         # The conversation must belong to the caller's tenant, so feedback can
         # never be attached to another organization's output.
-        conversation = await self._conversations.get_by_id(
-            conversation_id, organization_id
-        )
+        conversation = await self._conversations.get_by_id(conversation_id, organization_id)
         if conversation is None:
             raise NotFoundError("Conversation", str(conversation_id))
 
@@ -193,9 +189,7 @@ class FeedbackService:
         """Message bodies and submitter names for a page, keyed by id."""
         return await self._repo.load_context_for(rows)
 
-    async def get_with_context(
-        self, feedback_id: uuid.UUID
-    ) -> tuple[MessageFeedback, str, str]:
+    async def get_with_context(self, feedback_id: uuid.UUID) -> tuple[MessageFeedback, str, str]:
         """Return the feedback plus the output it refers to and the submitter's name."""
         feedback = await self._repo.get_by_id(feedback_id)
         if feedback is None:
@@ -222,9 +216,7 @@ class FeedbackService:
         feedback = await self._repo.get_by_id(feedback_id)
         if feedback is None:
             raise NotFoundError("Feedback", str(feedback_id))
-        return await self._repo.set_status(
-            feedback, status, reviewed_by, review_note=review_note
-        )
+        return await self._repo.set_status(feedback, status, reviewed_by, review_note=review_note)
 
     async def promote(
         self,

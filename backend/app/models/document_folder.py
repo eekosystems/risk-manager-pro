@@ -18,9 +18,7 @@ class DocumentFolder(Base):
     __tablename__ = "document_folders"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    organization_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("organizations.id"), index=True
-    )
+    organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), index=True)
     name: Mapped[str] = mapped_column(String(255))
     parent_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("document_folders.id", ondelete="CASCADE"), default=None, index=True

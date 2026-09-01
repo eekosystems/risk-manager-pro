@@ -190,9 +190,7 @@ async def promote_feedback(
         metadata={
             "source_feedback_id": str(feedback_id),
             "scope": guidance.scope.value,
-            "function_type": guidance.function_type.value
-            if guidance.function_type
-            else "all",
+            "function_type": guidance.function_type.value if guidance.function_type else "all",
         },
     )
     return DataResponse(
@@ -247,9 +245,7 @@ async def create_guidance(
     )
 
 
-@guidance_router.patch(
-    "/{guidance_id}", response_model=DataResponse[GuidanceResponse]
-)
+@guidance_router.patch("/{guidance_id}", response_model=DataResponse[GuidanceResponse])
 async def update_guidance(
     guidance_id: uuid.UUID,
     payload: UpdateGuidanceRequest,
