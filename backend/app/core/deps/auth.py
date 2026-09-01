@@ -68,6 +68,23 @@ async def get_token_payload(request: Request) -> TokenPayload:
     return payload
 
 
+def _is_bootstrap_platform_admin(email: str) -> bool:
+    return bool(email) and email.strip().lower() in settings.platform_admin_email_set
+
+
+async def _apply_platform_admin_bootstrap(db: AsyncSession, user: User) -> None:
+    """Grant platform administration to addresses named in configuration.
+
+    Grant-only. An address removed from the setting keeps whatever access it
+    has, so this never fights the in-app toggle or silently demotes anyone.
+    """
+    if user.is_platform_admin or not _is_bootstrap_platform_admin(user.email):
+        return
+    user.is_platform_admin = True
+    await db.flush()
+    logger.info("platform_admin_bootstrapped", user_id=str(user.id))
+
+
 async def _get_or_create_user(db: AsyncSession, token: TokenPayload, request: Request) -> User:
     """Look up an existing user by Entra ID or auto-provision a new one."""
     stmt = select(User).where(User.entra_id == token.oid)
@@ -75,13 +92,14 @@ async def _get_or_create_user(db: AsyncSession, token: TokenPayload, request: Re
     user = result.scalar_one_or_none()
 
     if user is not None:
+        await _apply_platform_admin_bootstrap(db, user)
         return user
 
     user = User(
         entra_id=token.oid,
         email=token.preferred_username or f"{token.oid}@unknown",
         display_name=token.name or "Unknown User",
-        is_platform_admin=False,
+        is_platform_admin=_is_bootstrap_platform_admin(token.preferred_username or ""),
     )
     db.add(user)
     await db.flush()

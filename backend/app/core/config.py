@@ -59,6 +59,12 @@ class Settings(BaseSettings):
     # Azure AD / Entra ID
     azure_ad_tenant_id: str = ""
     azure_ad_client_id: str = ""
+    # Comma-separated addresses that are granted platform administration on
+    # sign-in. is_platform_admin is otherwise a database-only flag with no way
+    # to obtain it through the app, which left a new deployment with no admin
+    # at all. Grant-only: removing an address here never revokes access, so it
+    # cannot fight the in-app toggle.
+    platform_admin_emails: str = ""
     azure_ad_authority: str = ""
 
     # Microsoft Graph API
@@ -211,6 +217,13 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.app_env == "production"
+
+    @property
+    def platform_admin_email_set(self) -> frozenset[str]:
+        """Bootstrap platform admins, lowercased for case-insensitive matching."""
+        return frozenset(
+            part.strip().lower() for part in self.platform_admin_emails.split(",") if part.strip()
+        )
 
 
 settings = Settings()
