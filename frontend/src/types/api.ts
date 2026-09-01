@@ -50,6 +50,14 @@ export interface OrganizationDetail extends OrganizationSummary {
   updated_at: string;
 }
 
+/** The SharePoint folders a client account may import from. */
+export interface FolderScope {
+  organization_id: string;
+  folder_paths: string[];
+  /** True when the account imports the whole library (the platform account). */
+  unrestricted: boolean;
+}
+
 export interface OrganizationMember {
   id: string;
   user_id: string;

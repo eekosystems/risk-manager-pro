@@ -3,6 +3,7 @@ from app.models.conversation import Conversation
 from app.models.document import Document
 from app.models.document_folder import DocumentFolder
 from app.models.feedback import FeedbackRating, FeedbackStatus, MessageFeedback
+from app.models.folder_scope import OrganizationFolderScope
 from app.models.guidance import ApplicationGuidance, GuidanceScope
 from app.models.message import Message
 from app.models.notification import Notification
@@ -40,6 +41,7 @@ __all__ = [
     "Mitigation",
     "Notification",
     "Organization",
+    "OrganizationFolderScope",
     "OrganizationMembership",
     "OrganizationSettings",
     "PendingSyncChange",

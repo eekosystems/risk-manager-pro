@@ -17,13 +17,16 @@ from app.schemas.common import DataResponse, MetaResponse
 from app.schemas.organization import (
     AddMemberRequest,
     CreateOrganizationRequest,
+    FolderScopeResponse,
     MemberResponse,
     OrganizationListItem,
     OrganizationResponse,
+    SetFolderScopeRequest,
     UpdateMemberRoleRequest,
     UpdateOrganizationRequest,
 )
 from app.services.audit import AuditLogger
+from app.services.folder_scope import FolderScopeService
 from app.services.microsoft_graph import MicrosoftGraphService
 from app.services.organization import OrganizationService
 
@@ -144,6 +147,67 @@ async def add_member(
     return DataResponse(
         data=member_resp,
         meta=MetaResponse(request_id=str(member_resp.id)),
+    )
+
+
+@router.get("/{org_id}/folder-scopes", response_model=DataResponse[FolderScopeResponse])
+async def get_folder_scopes(
+    org_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    service: OrganizationService = Depends(_get_org_service),
+    db: AsyncSession = Depends(get_db),
+) -> DataResponse[FolderScopeResponse]:
+    """The SharePoint folders this account may import from."""
+    await service.verify_membership_or_admin(org_id, current_user)
+    organization = await service.get_organization(org_id)
+    scopes = FolderScopeService(db)
+    roots = await scopes.allowed_roots(organization)
+    return DataResponse(
+        data=FolderScopeResponse(
+            organization_id=org_id,
+            folder_paths=roots or [],
+            unrestricted=roots is None,
+        ),
+        meta=MetaResponse(request_id=str(org_id)),
+    )
+
+
+@router.put("/{org_id}/folder-scopes", response_model=DataResponse[FolderScopeResponse])
+async def set_folder_scopes(
+    org_id: uuid.UUID,
+    payload: SetFolderScopeRequest,
+    current_user: User = Depends(require_platform_admin),
+    service: OrganizationService = Depends(_get_org_service),
+    db: AsyncSession = Depends(get_db),
+    audit: AuditLogger = Depends(get_audit_logger),
+) -> DataResponse[FolderScopeResponse]:
+    """Replace the folders this account may import from.
+
+    Platform admins only: widening a scope grants access to data the account
+    could not previously reach, so the change is recorded with before and after.
+    """
+    organization = await service.get_organization(org_id)
+    scopes = FolderScopeService(db)
+    previous = await scopes.list_paths(org_id)
+    stored = await scopes.set_paths(org_id, payload.folder_paths, current_user.id)
+
+    await audit.log(
+        action="organization.folder_scope_updated",
+        user=current_user,
+        resource_type="organization",
+        resource_id=str(org_id),
+        organization_id=org_id,
+        metadata={"previous": previous, "current": stored},
+    )
+
+    roots = await scopes.allowed_roots(organization)
+    return DataResponse(
+        data=FolderScopeResponse(
+            organization_id=org_id,
+            folder_paths=roots or [],
+            unrestricted=roots is None,
+        ),
+        meta=MetaResponse(request_id=str(org_id)),
     )
 
 

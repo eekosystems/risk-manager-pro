@@ -27,6 +27,7 @@ from app.models.organization_membership import MembershipRole
 from app.repositories.document import DocumentRepository
 from app.schemas.common import DataResponse, MetaResponse
 from app.services.document_processor import DocumentProcessor
+from app.services.folder_scope import FolderScopeService
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -40,21 +41,6 @@ if TYPE_CHECKING:
 logger = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/sharepoint", tags=["sharepoint"])
-
-
-def _is_allowed_sync_path(folder_path: str) -> bool:
-    """H-2: constrain a caller-supplied sync path to the configured airport root.
-
-    Blocks traversal (``..``) and any path outside the airport-documents subtree,
-    so a valid user cannot point a sync at e.g. ``Confidential/Executive``.
-    """
-    root = settings.sharepoint_airport_root_folder.strip("/")
-    candidate = folder_path.strip("/")
-    if not candidate or ".." in candidate:
-        return False
-    if not root:
-        return True
-    return candidate == root or candidate.startswith(f"{root}/")
 
 
 class CrawlResult(BaseModel):
@@ -214,7 +200,30 @@ async def crawl_sharepoint(
     crawler: SharePointCrawler = request.app.state.services.sharepoint_crawler
     registry = request.app.state.services
 
-    files: list[SharePointFile] = await crawler.discover_files(drive_name=drive_name)
+    # An account may only import from the folders it was granted. Unscoped
+    # client accounts import nothing rather than the whole library; the
+    # platform organization keeps crawling everything as before.
+    allowed_roots = await FolderScopeService(db).allowed_roots(organization)
+    if allowed_roots is None:
+        files: list[SharePointFile] = await crawler.discover_files(drive_name=drive_name)
+    elif not allowed_roots:
+        logger.warning(
+            "sharepoint_crawl_no_scope",
+            organization_id=str(organization.id),
+        )
+        files = []
+    else:
+        seen: set[str] = set()
+        files = []
+        for root in allowed_roots:
+            for file in await crawler.discover_folder(root):
+                # A file can sit under two granted roots if one nests inside
+                # the other; import it once.
+                key = f"{file.folder_path or ''}/{file.name}"
+                if key in seen:
+                    continue
+                seen.add(key)
+                files.append(file)
 
     repo = DocumentRepository(db)
     existing_docs, _ = await repo.list_for_organization(organization.id, skip=0, limit=10000)
@@ -270,8 +279,9 @@ async def sync_folder(
     audit: AuditLogger = Depends(get_audit_logger),
 ) -> DataResponse[SyncFolderResult]:
     """Discover files in a folder and queue background re-download + reprocess."""
-    if not _is_allowed_sync_path(folder_path):
-        raise ForbiddenError("folder_path is outside the permitted SharePoint root")
+    scopes = FolderScopeService(db)
+    if not await scopes.is_path_allowed(organization, folder_path):
+        raise ForbiddenError("folder_path is outside this account's permitted folders")
 
     crawler: SharePointCrawler = request.app.state.services.sharepoint_crawler
     registry = request.app.state.services

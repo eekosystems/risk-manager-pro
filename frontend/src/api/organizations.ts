@@ -1,6 +1,7 @@
 import { apiClient } from "@/lib/api-client";
 import type {
   DataResponse,
+  FolderScope,
   MembershipRole,
   OrganizationDetail,
   OrganizationMember,
@@ -20,6 +21,28 @@ export async function createOrganization(payload: {
   const response = await apiClient.post<DataResponse<OrganizationDetail>>(
     "/organizations",
     payload,
+  );
+  return response.data.data;
+}
+
+export async function getFolderScopes(orgId: string): Promise<FolderScope> {
+  const response = await apiClient.get<DataResponse<FolderScope>>(
+    `/organizations/${orgId}/folder-scopes`,
+  );
+  return response.data.data;
+}
+
+/**
+ * Replace the SharePoint folders this account may import from. Platform admins
+ * only — widening a scope grants access to data the account could not reach.
+ */
+export async function setFolderScopes(
+  orgId: string,
+  folderPaths: string[],
+): Promise<FolderScope> {
+  const response = await apiClient.put<DataResponse<FolderScope>>(
+    `/organizations/${orgId}/folder-scopes`,
+    { folder_paths: folderPaths },
   );
   return response.data.data;
 }

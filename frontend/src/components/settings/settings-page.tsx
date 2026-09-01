@@ -5,6 +5,7 @@ import {
   Database,
   FileText,
   MessageSquareCode,
+  Building2,
   Settings,
   ShieldCheck,
   Sparkles,
@@ -19,6 +20,7 @@ import { ModelPreferencesTab } from "./tabs/model-preferences-tab";
 import { QaqcSettingsTab } from "./tabs/qaqc-settings-tab";
 import { UsersRolesTab } from "./tabs/users-roles-tab";
 import { FeedbackTab } from "./tabs/feedback-tab";
+import { ClientAccountsTab } from "./tabs/client-accounts-tab";
 
 import { useUserRole } from "@/hooks/use-user-role";
 
@@ -29,15 +31,18 @@ type SettingsTab =
   | "prompts"
   | "users"
   | "qaqc"
-  | "feedback";
+  | "feedback"
+  | "accounts";
 
 interface TabDefinition {
   id: SettingsTab;
   label: string;
   icon: typeof Settings;
   description: string;
-  /** Curating guidance changes how the AI answers for every tenant. */
+  /** Changes AI behaviour or tenancy across accounts — Faith Group only. */
   platformAdminOnly?: boolean;
+  /** Account-level administration, available to a client's own admin. */
+  orgAdminOnly?: boolean;
 }
 
 const TABS: TabDefinition[] = [
@@ -46,12 +51,14 @@ const TABS: TabDefinition[] = [
     label: "RAG Settings",
     icon: Database,
     description: "Configure retrieval-augmented generation pipeline",
+    platformAdminOnly: true,
   },
   {
     id: "model",
     label: "Model Preferences",
     icon: Brain,
     description: "AI model selection and parameters",
+    platformAdminOnly: true,
   },
   {
     id: "indexed-files",
@@ -64,18 +71,28 @@ const TABS: TabDefinition[] = [
     label: "Prompts",
     icon: MessageSquareCode,
     description: "System prompt and function-specific prompts",
+    platformAdminOnly: true,
   },
   {
     id: "users",
     label: "Users & Roles",
     icon: Users,
     description: "Manage team members and permissions",
+    orgAdminOnly: true,
   },
   {
     id: "qaqc",
     label: "QA/QC Reviewers",
     icon: ShieldCheck,
     description: "Configure QA/QC notification recipients",
+    platformAdminOnly: true,
+  },
+  {
+    id: "accounts",
+    label: "Client Accounts",
+    icon: Building2,
+    description: "Create client environments and assign their folders",
+    platformAdminOnly: true,
   },
   {
     id: "feedback",
@@ -91,11 +108,21 @@ interface SettingsPageProps {
 }
 
 export function SettingsPage({ onClose }: SettingsPageProps) {
-  const [activeTab, setActiveTab] = useState<SettingsTab>("rag");
-  const { isPlatformAdmin } = useUserRole();
-  const visibleTabs = TABS.filter(
-    (tab) => !tab.platformAdminOnly || isPlatformAdmin,
-  );
+  const [activeTab, setActiveTab] = useState<SettingsTab | null>(null);
+  const { isPlatformAdmin, isAdmin } = useUserRole();
+  // Client users see their files and nothing else. Their own account admin
+  // additionally gets Users & Roles so they can add colleagues.
+  const visibleTabs = TABS.filter((tab) => {
+    if (tab.platformAdminOnly) return isPlatformAdmin;
+    if (tab.orgAdminOnly) return isAdmin;
+    return true;
+  });
+  // The first tab differs by role — a client opens on Indexed Files, not on
+  // the RAG settings they cannot see. Resolved after the role loads.
+  const currentTab: SettingsTab | undefined =
+    activeTab && visibleTabs.some((t) => t.id === activeTab)
+      ? activeTab
+      : visibleTabs[0]?.id;
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
@@ -161,7 +188,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
                   onClick={() => setActiveTab(tab.id)}
                   className={clsx(
                     "flex items-center gap-3 rounded-xl px-4 py-3 text-left transition-all",
-                    activeTab === tab.id
+                    currentTab === tab.id
                       ? "gradient-brand text-white shadow-md shadow-brand-500/20"
                       : "text-gray-600 hover:bg-gray-50",
                   )}
@@ -172,7 +199,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
                     <span
                       className={clsx(
                         "text-[11px]",
-                        activeTab === tab.id
+                        currentTab === tab.id
                           ? "text-white/70"
                           : "text-gray-400",
                       )}
@@ -187,13 +214,14 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
 
           {/* Tab content */}
           <div className="flex-1 overflow-y-auto p-8">
-            {activeTab === "rag" && <RagSettingsTab />}
-            {activeTab === "model" && <ModelPreferencesTab />}
-            {activeTab === "indexed-files" && <IndexedFilesTab />}
-            {activeTab === "prompts" && <PromptsTab />}
-            {activeTab === "users" && <UsersRolesTab />}
-            {activeTab === "qaqc" && <QaqcSettingsTab />}
-            {activeTab === "feedback" && isPlatformAdmin && <FeedbackTab />}
+            {currentTab === "rag" && <RagSettingsTab />}
+            {currentTab === "model" && <ModelPreferencesTab />}
+            {currentTab === "indexed-files" && <IndexedFilesTab />}
+            {currentTab === "prompts" && <PromptsTab />}
+            {currentTab === "users" && <UsersRolesTab />}
+            {currentTab === "qaqc" && <QaqcSettingsTab />}
+            {currentTab === "feedback" && isPlatformAdmin && <FeedbackTab />}
+            {currentTab === "accounts" && isPlatformAdmin && <ClientAccountsTab />}
           </div>
         </div>
       </div>

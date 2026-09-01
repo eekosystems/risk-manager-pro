@@ -42,6 +42,19 @@ class OrganizationListItem(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class FolderScopeResponse(BaseModel):
+    """The SharePoint folders an account may import from."""
+
+    organization_id: uuid.UUID
+    folder_paths: list[str]
+    # True when the account imports the whole library (the platform org).
+    unrestricted: bool
+
+
+class SetFolderScopeRequest(BaseModel):
+    folder_paths: list[str] = Field(default_factory=list, max_length=50)
+
+
 class AddMemberRequest(BaseModel):
     user_id: uuid.UUID | None = None
     email: EmailStr | None = Field(None, max_length=320)
