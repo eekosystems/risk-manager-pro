@@ -24,6 +24,9 @@ COPY --from=builder /install /usr/local
 COPY app/ app/
 COPY alembic/ alembic/
 COPY alembic.ini .
+# Operational scripts (platform-admin granting, backfills) are run with
+# `az containerapp exec`, so they have to ship in the image.
+COPY scripts/ scripts/
 COPY start.sh .
 
 RUN sed -i 's/\r$//' start.sh && chmod +x start.sh && chown -R appuser:appuser /app
