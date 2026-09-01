@@ -5,6 +5,8 @@ from app.api.v1.audit import router as audit_router
 from app.api.v1.chat import router as chat_router
 from app.api.v1.document_folders import router as document_folders_router
 from app.api.v1.documents import router as documents_router
+from app.api.v1.feedback import guidance_router
+from app.api.v1.feedback import router as feedback_router
 from app.api.v1.health import router as health_router
 from app.api.v1.notifications import router as notifications_router
 from app.api.v1.organizations import router as organizations_router
@@ -22,6 +24,8 @@ api_router.include_router(users_router)
 api_router.include_router(chat_router)
 api_router.include_router(documents_router)
 api_router.include_router(document_folders_router)
+api_router.include_router(feedback_router)
+api_router.include_router(guidance_router)
 api_router.include_router(organizations_router)
 api_router.include_router(risks_router)
 api_router.include_router(rr_sync_router)

@@ -16,6 +16,7 @@ from app.repositories.conversation import ConversationRepository
 from app.repositories.document import DocumentRepository
 from app.schemas.chat import ChatRequest, ChatResponse, CitationSchema, MessageResponse
 from app.schemas.settings import PromptsPayload
+from app.services.feedback import GuidanceService
 from app.services.openai_client import AzureOpenAIClient
 from app.services.output_compliance import (
     build_compliance_notice,
@@ -963,6 +964,7 @@ class ChatService:
         self._settings = settings_service or SettingsService(db)
         self._repo = ConversationRepository(db)
         self._doc_repo = DocumentRepository(db)
+        self._guidance = GuidanceService(db)
 
     async def _resolve_conversation(
         self,
@@ -1325,6 +1327,15 @@ class ChatService:
         if awareness_sections:
             awareness_sections.append(_FILE_AWARENESS_INSTRUCTIONS)
             messages.append({"role": "system", "content": "\n\n".join(awareness_sections)})
+
+        # The application's permanent memory: rules a reviewer approved from
+        # user feedback. Placed after the standing instructions so it reads as
+        # a refinement of them, and before history so it governs this answer.
+        guidance_block = await self._guidance.build_prompt_block(
+            organization_id, function_type
+        )
+        if guidance_block:
+            messages.append({"role": "system", "content": guidance_block})
 
         for msg in history:
             messages.append({"role": msg.role.value, "content": msg.content})

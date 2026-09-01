@@ -17,6 +17,12 @@ vi.mock("@/lib/export-pdf", () => ({
   exportTextToPdf: (content: string) => exportTextToPdf(content),
 }));
 
+vi.mock("./feedback-modal", () => ({
+  FeedbackModal: ({ messageId }: { messageId: string }) => (
+    <div data-testid="feedback-modal">{messageId}</div>
+  ),
+}));
+
 function assistantMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {
   return {
     id: "msg-1",
@@ -28,8 +34,14 @@ function assistantMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {
   } as ChatMessage;
 }
 
-function renderList(messages: ChatMessage[]) {
-  return render(<MessageList messages={messages} isTyping={false} />);
+function renderList(messages: ChatMessage[], conversationId: string | null = "conv-1") {
+  return render(
+    <MessageList
+      messages={messages}
+      isTyping={false}
+      conversationId={conversationId}
+    />,
+  );
 }
 
 describe("MessageList export actions", () => {
@@ -59,5 +71,27 @@ describe("MessageList export actions", () => {
     renderList([assistantMessage({ id: "msg-user", role: "user" })]);
 
     expect(screen.queryByRole("button", { name: /Export Word/i })).not.toBeInTheDocument();
+  });
+
+  it("offers a Feedback button alongside the exports", () => {
+    renderList([assistantMessage()]);
+
+    expect(screen.getByRole("button", { name: /Feedback/i })).toBeInTheDocument();
+  });
+
+  it("opens the feedback modal for the message it was clicked on", async () => {
+    renderList([assistantMessage({ id: "msg-42" })]);
+
+    await userEvent.click(screen.getByRole("button", { name: /Feedback/i }));
+
+    expect(screen.getByTestId("feedback-modal")).toHaveTextContent("msg-42");
+  });
+
+  it("hides Feedback before the conversation exists to attach it to", () => {
+    renderList([assistantMessage()], null);
+
+    expect(
+      screen.queryByRole("button", { name: /Feedback/i }),
+    ).not.toBeInTheDocument();
   });
 });

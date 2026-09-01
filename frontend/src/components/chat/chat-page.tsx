@@ -457,6 +457,7 @@ export function ChatPage({
       <MessageList
         messages={localMessages}
         isTyping={isTyping}
+        conversationId={conversationId}
         {...(EMAIL_ON_CHAT_OUTPUT_ENABLED ? { onEmail: handleEmail } : {})}
         onCopied={handleCopied}
         onCopyFailed={handleCopyFailed}

@@ -7,6 +7,7 @@ import {
   MessageSquareCode,
   Settings,
   ShieldCheck,
+  Sparkles,
   Users,
   X,
 } from "lucide-react";
@@ -17,6 +18,9 @@ import { PromptsTab } from "./tabs/prompts-tab";
 import { ModelPreferencesTab } from "./tabs/model-preferences-tab";
 import { QaqcSettingsTab } from "./tabs/qaqc-settings-tab";
 import { UsersRolesTab } from "./tabs/users-roles-tab";
+import { FeedbackTab } from "./tabs/feedback-tab";
+
+import { useUserRole } from "@/hooks/use-user-role";
 
 type SettingsTab =
   | "rag"
@@ -24,13 +28,16 @@ type SettingsTab =
   | "indexed-files"
   | "prompts"
   | "users"
-  | "qaqc";
+  | "qaqc"
+  | "feedback";
 
 interface TabDefinition {
   id: SettingsTab;
   label: string;
   icon: typeof Settings;
   description: string;
+  /** Curating guidance changes how the AI answers for every tenant. */
+  platformAdminOnly?: boolean;
 }
 
 const TABS: TabDefinition[] = [
@@ -70,6 +77,13 @@ const TABS: TabDefinition[] = [
     icon: ShieldCheck,
     description: "Configure QA/QC notification recipients",
   },
+  {
+    id: "feedback",
+    label: "Feedback & Training",
+    icon: Sparkles,
+    description: "Review user feedback and curate application guidance",
+    platformAdminOnly: true,
+  },
 ];
 
 interface SettingsPageProps {
@@ -78,6 +92,10 @@ interface SettingsPageProps {
 
 export function SettingsPage({ onClose }: SettingsPageProps) {
   const [activeTab, setActiveTab] = useState<SettingsTab>("rag");
+  const { isPlatformAdmin } = useUserRole();
+  const visibleTabs = TABS.filter(
+    (tab) => !tab.platformAdminOnly || isPlatformAdmin,
+  );
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
@@ -137,7 +155,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
           {/* Tab sidebar */}
           <nav className="w-[260px] min-w-[260px] border-r border-gray-200 bg-white p-4">
             <div className="flex flex-col gap-1">
-              {TABS.map((tab) => (
+              {visibleTabs.map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
@@ -175,6 +193,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
             {activeTab === "prompts" && <PromptsTab />}
             {activeTab === "users" && <UsersRolesTab />}
             {activeTab === "qaqc" && <QaqcSettingsTab />}
+            {activeTab === "feedback" && isPlatformAdmin && <FeedbackTab />}
           </div>
         </div>
       </div>

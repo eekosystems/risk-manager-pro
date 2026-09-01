@@ -1,6 +1,6 @@
 import { clsx } from "clsx";
 import { format } from "date-fns";
-import { Check, Copy, Download, FileText, Mail } from "lucide-react";
+import { Check, Copy, Download, FileText, Mail, MessageSquarePlus } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { exportTextToPdf } from "@/lib/export-pdf";
@@ -8,12 +8,15 @@ import { stripFollowupsBlock, stripRrPayloadBlock } from "@/lib/followups";
 import type { ChatMessage, Citation } from "@/types/api";
 
 import { CitationChip } from "./citation-chip";
+import { FeedbackModal } from "./feedback-modal";
 import { CitationModal } from "./citation-modal";
 import { MarkdownContent } from "./markdown-content";
 
 interface MessageListProps {
   messages: ChatMessage[];
   isTyping: boolean;
+  /** Needed to attach feedback to a message; omitted before the first reply. */
+  conversationId?: string | null;
   onEmail?: (messageContent: string) => void;
   onCopied?: () => void;
   onCopyFailed?: () => void;
@@ -27,6 +30,7 @@ interface SelectedCitation {
 export function MessageList({
   messages,
   isTyping,
+  conversationId,
   onEmail,
   onCopied,
   onCopyFailed,
@@ -35,6 +39,7 @@ export function MessageList({
   const messageRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const lastMessageIdRef = useRef<string | null>(null);
   const [selected, setSelected] = useState<SelectedCitation | null>(null);
+  const [feedbackFor, setFeedbackFor] = useState<string | null>(null);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
 
   const wasTypingRef = useRef(false);
@@ -181,6 +186,13 @@ export function MessageList({
                       void handleExportWord(cleanForExport(msg.content));
                     }}
                   />
+                  {conversationId && (
+                    <ActionButton
+                      icon={<MessageSquarePlus size={12} />}
+                      label="Feedback"
+                      onClick={() => setFeedbackFor(msg.id)}
+                    />
+                  )}
                 </div>
               )}
               <MessageTimestamp
@@ -201,6 +213,14 @@ export function MessageList({
           citation={selected.citation}
           index={selected.index}
           onClose={handleClose}
+        />
+      )}
+
+      {feedbackFor && conversationId && (
+        <FeedbackModal
+          conversationId={conversationId}
+          messageId={feedbackFor}
+          onClose={() => setFeedbackFor(null)}
         />
       )}
     </div>

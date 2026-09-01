@@ -119,6 +119,51 @@ export interface ConversationDetail {
   messages: ChatMessage[];
 }
 
+export type FeedbackRating = "helpful" | "not_helpful";
+export type FeedbackStatus = "new" | "reviewed" | "promoted" | "dismissed";
+export type GuidanceScope = "global" | "organization";
+
+export interface FeedbackItem {
+  id: string;
+  conversation_id: string;
+  message_id: string;
+  rating: FeedbackRating;
+  status: FeedbackStatus;
+  comment: string;
+  created_at: string;
+}
+
+/** A feedback entry with the output it refers to, for the review queue. */
+export interface FeedbackReviewItem {
+  id: string;
+  organization_id: string;
+  conversation_id: string;
+  message_id: string;
+  rating: FeedbackRating;
+  status: FeedbackStatus;
+  comment: string;
+  submitted_by: string;
+  submitter_name: string;
+  message_excerpt: string;
+  review_note: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+}
+
+/** A curated rule injected into the system prompt on every matching answer. */
+export interface ApplicationGuidance {
+  id: string;
+  scope: GuidanceScope;
+  organization_id: string | null;
+  function_type: FunctionType | null;
+  content: string;
+  source_feedback_id: string | null;
+  is_active: boolean;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface TranscriptAuthor {
   id: string;
   display_name: string;

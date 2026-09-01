@@ -2,6 +2,8 @@ from app.models.audit import AuditEntry
 from app.models.conversation import Conversation
 from app.models.document import Document
 from app.models.document_folder import DocumentFolder
+from app.models.feedback import FeedbackRating, FeedbackStatus, MessageFeedback
+from app.models.guidance import ApplicationGuidance, GuidanceScope
 from app.models.message import Message
 from app.models.notification import Notification
 from app.models.organization import Organization
@@ -21,6 +23,7 @@ from app.models.user import User
 from app.models.workflow import Workflow
 
 __all__ = [
+    "ApplicationGuidance",
     "ACPIntelligenceItem",
     "AirportContextProfile",
     "AirportSubLocation",
@@ -29,7 +32,11 @@ __all__ = [
     "Conversation",
     "Document",
     "DocumentFolder",
+    "FeedbackRating",
+    "FeedbackStatus",
+    "GuidanceScope",
     "Message",
+    "MessageFeedback",
     "Mitigation",
     "Notification",
     "Organization",
