@@ -19,6 +19,8 @@ from dataclasses import dataclass
 
 import structlog
 
+from app.models.risk import RISK_MATRIX, RiskLevel
+
 logger = structlog.get_logger(__name__)
 
 
@@ -189,6 +191,103 @@ def find_incomplete_hierarchy(sections: list[HazardSection]) -> dict[str, list[s
     return incomplete
 
 
+# --- Risk band consistency (Sub-Prompt 3) ------------------------------------
+
+# Cell labels are likelihood-letter then severity-number ("C2"), matching the
+# Risk Register matrix: A1 is Frequent/Catastrophic, E5 is Extremely
+# Improbable/Minimal. The reversed order is not a valid label. The PVD outputs
+# reviewed on 2026-09-02 wrote "3B" against a likelihood scale the matrix does
+# not have (3 = "Occasional"), and the same cell carried High in one project and
+# Medium in another; a reversed label is therefore reported, never interpreted.
+MATRIX_CELL_RE = re.compile(r"\b[A-E][1-5]\b")
+_REVERSED_CELL_RE = re.compile(r"\b[1-5][A-E]\b")
+
+# Infrastructure designators share the cell-label shape — "Taxiway A1" and
+# "Gate B2" both read as valid matrix cells — so an SRA that names one while
+# rendering no scores at all would satisfy the notation check. A designator is
+# always introduced by its facility noun, so a candidate is rejected when one
+# leads into it (directly, or across a run like "Taxiways A1, B2").
+_DESIGNATOR_LEAD_IN_RE = re.compile(
+    r"(?:taxiway|twy|tw|runway|rwy|gate|stand|apron|ramp|connector|exit)s?\.?\s*"
+    r"(?:(?:[A-E][1-5]|[1-5][A-E])\s*(?:,|/|&|and|or|-|–|through)\s*)*\Z",
+    re.IGNORECASE,
+)
+# Widest lead-in we look back over: the facility noun plus a short designator run.
+_DESIGNATOR_LOOKBACK_CHARS = 48
+
+# The band the model states for a cell follows it closely: "C2 (High)",
+# "C2 – High", "C2 (Remote / Hazardous) — High", "Initial Risk: C2, High (row C
+# Remote, column 2 Hazardous)". The first band word within a short span on the
+# same sentence is taken as the stated band; the span stops at a sentence end or
+# at another cell label, and a band that opens a "High to Medium" pair is skipped,
+# so a comparison ("C2 to D2, from High to Medium") is not read as a band for
+# the second cell.
+_BAND_AFTER_CELL_RE = re.compile(
+    r"[^\n.;]{0,40}?\b(high|medium|low)\b(?!\s+to\s+(?:high|medium|low)\b)",
+    re.IGNORECASE,
+)
+
+# Cell D1 (Extremely Remote / Catastrophic) is the one cell where operator
+# matrices legitimately differ; the Risk Register renders it split. Either
+# band is accepted there.
+_SPLIT_CELL_BANDS: dict[str, frozenset[RiskLevel]] = {
+    "D1": frozenset({RiskLevel.HIGH, RiskLevel.MEDIUM}),
+}
+
+
+def is_matrix_cell_label(content: str, match: re.Match[str]) -> bool:
+    """False when the candidate is an infrastructure designator, not a cell label."""
+    window_start = max(0, match.start() - _DESIGNATOR_LOOKBACK_CHARS)
+    return not _DESIGNATOR_LEAD_IN_RE.search(content[window_start : match.start()])
+
+
+def matrix_bands(cell: str) -> frozenset[RiskLevel]:
+    """The band(s) the FAA 5x5 matrix assigns to a letter-first cell label.
+
+    Severity is displayed 1=Catastrophic … 5=Minimal but stored 1=Minimal …
+    5=Catastrophic, so the label's digit is flipped before the lookup.
+    """
+    if cell in _SPLIT_CELL_BANDS:
+        return _SPLIT_CELL_BANDS[cell]
+    likelihood, displayed_severity = cell[0], int(cell[1])
+    return frozenset({RISK_MATRIX[likelihood][6 - displayed_severity]})
+
+
+def find_band_mismatches(content: str) -> list[str]:
+    """Cells whose stated band disagrees with the matrix, e.g. "C2 stated Medium (matrix: High)".
+
+    Each distinct cell/band pair is reported once, in order of first appearance.
+    A cell with no band stated alongside it is not reported here; the
+    alphanumeric label alone is compliant.
+    """
+    mismatches: list[str] = []
+    seen: set[tuple[str, str]] = set()
+    for match in MATRIX_CELL_RE.finditer(content):
+        if not is_matrix_cell_label(content, match):
+            continue
+        band_match = _BAND_AFTER_CELL_RE.match(content, match.end())
+        if band_match is None or MATRIX_CELL_RE.search(
+            band_match.group(0)[: -len(band_match.group(1))]
+        ):
+            continue
+        cell = match.group(0)
+        stated = RiskLevel(band_match.group(1).lower())
+        if stated in matrix_bands(cell) or (cell, stated) in seen:
+            continue
+        seen.add((cell, stated))
+        expected = " or ".join(sorted(b.value.capitalize() for b in matrix_bands(cell)))
+        mismatches.append(f"{cell} stated {stated.value.capitalize()} (matrix: {expected})")
+    return mismatches
+
+
+def find_reversed_cell_labels(content: str) -> list[str]:
+    """Distinct number-first labels ("3B") that are not infrastructure designators."""
+    found = {
+        m.group(0) for m in _REVERSED_CELL_RE.finditer(content) if is_matrix_cell_label(content, m)
+    }
+    return sorted(found)
+
+
 # --- Named infrastructure grounding ------------------------------------------
 
 # Matches "Taxiway V", "Taxiways E, M, T and V", "TW A1", "Runway 13R-31L".
@@ -343,6 +442,36 @@ def check_analysis_output(
                         ),
                     )
                 )
+
+    if is_sra or is_phl:
+        mismatches = find_band_mismatches(content)
+        if mismatches:
+            issues.append(
+                ComplianceIssue(
+                    label="Risk Band Consistency",
+                    detail=(
+                        "The stated band disagrees with the FAA 5x5 matrix for: "
+                        + "; ".join(mismatches)
+                        + ". The matrix is the only authority for the band — correct "
+                        "the band or the score, not the matrix."
+                    ),
+                )
+            )
+
+        reversed_labels = find_reversed_cell_labels(content)
+        if reversed_labels:
+            issues.append(
+                ComplianceIssue(
+                    label="Matrix Cell Notation",
+                    detail=(
+                        "Cell labels are written number-first ("
+                        + ", ".join(reversed_labels)
+                        + "). Likelihood is the letter A-E and severity the number 1-5 "
+                        "(e.g. C2 = Remote / Hazardous), so these scores cannot be "
+                        "checked against the matrix and must be re-rendered."
+                    ),
+                )
+            )
 
     unsupported = find_unsupported_infrastructure(content, retrieved_text)
     if unsupported:

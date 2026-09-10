@@ -19,9 +19,11 @@ from app.schemas.settings import PromptsPayload
 from app.services.feedback import GuidanceService
 from app.services.openai_client import AzureOpenAIClient
 from app.services.output_compliance import (
+    MATRIX_CELL_RE,
     build_compliance_notice,
     check_analysis_output,
     extract_rr_payload,
+    is_matrix_cell_label,
 )
 from app.services.prompts import (
     GENERAL_PROMPT,
@@ -745,31 +747,14 @@ _MANDATORY_ELEMENT_SIGNALS: dict[FunctionType, dict[str, tuple[str, ...]]] = {
 
 
 # Regex-based checks specific to SRA outputs. Substring matching is not enough
-# for cell labels (we need patterns like "C2" or "Likelihood: C") so these
-# checks live alongside _MANDATORY_ELEMENT_SIGNALS rather than inside it.
-# Cell labels are likelihood-letter then severity-number, matching the Risk
-# Register matrix: A1 is Frequent/Catastrophic, E5 is Extremely Improbable/Minimal.
-# The reversed order is deliberately NOT accepted: "1A" inverts the score, so an
-# output still written that way must be flagged rather than quietly pass.
-_MATRIX_CELL_RE = re.compile(r"\b[A-E][1-5]\b")
+# for scoring prose (we need patterns like "Likelihood: C") so these checks live
+# alongside _MANDATORY_ELEMENT_SIGNALS rather than inside it. Cell-label
+# detection itself is shared with the compliance checks in output_compliance.
 # The keyword matches case-insensitively but the value does not: lowercase "a"
 # after "likelihood" is the English article, as in "the likelihood a vehicle
 # enters the RSA", and matching it reported scoring that was never rendered.
 _LIKELIHOOD_PROSE_RE = re.compile(r"(?i:likelihood)\s*[:\-]?\s*[A-E]\b")
 _SEVERITY_PROSE_RE = re.compile(r"(?i:severity)\s*[:\-]?\s*[1-5]\b")
-
-# Infrastructure designators share the cell-label shape — "Taxiway A1" and
-# "Gate B2" both read as valid matrix cells — so an SRA that names one while
-# rendering no scores at all would satisfy the check. A designator is always
-# introduced by its facility noun, so a candidate is rejected when one leads
-# into it (directly, or across a run like "Taxiways A1, B2").
-_DESIGNATOR_LEAD_IN_RE = re.compile(
-    r"(?:taxiway|twy|tw|runway|rwy|gate|stand|apron|ramp|connector|exit)s?\.?\s*"
-    r"(?:[A-E][1-5]\s*(?:,|/|&|and|or|-|–|through)\s*)*\Z",
-    re.IGNORECASE,
-)
-# Widest lead-in we look back over: the facility noun plus a short designator run.
-_DESIGNATOR_LOOKBACK_CHARS = 48
 
 _VISUAL_MATRIX_CELL_SIGNALS: tuple[str, ...] = (
     "matrix cell",
@@ -784,12 +769,6 @@ _VISUAL_MATRIX_CELL_SIGNALS: tuple[str, ...] = (
 )
 
 
-def _is_matrix_cell_label(content: str, match: re.Match[str]) -> bool:
-    """False when the candidate is an infrastructure designator, not a cell label."""
-    window_start = max(0, match.start() - _DESIGNATOR_LOOKBACK_CHARS)
-    return not _DESIGNATOR_LEAD_IN_RE.search(content[window_start : match.start()])
-
-
 def _has_matrix_cell_notation(content: str) -> bool:
     """True when the SRA output renders FAA 5x5 alphanumeric notation.
 
@@ -797,7 +776,7 @@ def _has_matrix_cell_notation(content: str) -> bool:
     expected alpha likelihood / numeric severity pattern. False here means the
     model rendered qualitative descriptors only.
     """
-    if any(_is_matrix_cell_label(content, m) for m in _MATRIX_CELL_RE.finditer(content)):
+    if any(is_matrix_cell_label(content, m) for m in MATRIX_CELL_RE.finditer(content)):
         return True
     return bool(_LIKELIHOOD_PROSE_RE.search(content) or _SEVERITY_PROSE_RE.search(content))
 

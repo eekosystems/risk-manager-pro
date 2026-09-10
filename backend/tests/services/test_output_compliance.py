@@ -10,9 +10,12 @@ from app.services.output_compliance import (
     build_compliance_notice,
     check_analysis_output,
     extract_rr_payload,
+    find_band_mismatches,
     find_hazards_missing_disposition,
     find_incomplete_hierarchy,
+    find_reversed_cell_labels,
     find_unsupported_infrastructure,
+    matrix_bands,
     split_hazard_sections,
 )
 
@@ -20,7 +23,7 @@ COMPLIANT_HAZARD = """
 H1 – Vehicle Incursion Into Active Movement Area
 Primary Worst Credible Outcome A construction vehicle enters an active taxiway.
 Initial Risk
-• Initial cell: 3B – High.
+• Initial cell: C2 – High.
 Controls (Hierarchy of Controls)
 • Avoid/Eliminate: not feasible; the work cannot be relocated off the airfield.
 • Substitute: ruled out; no lower-hazard construction method available.
@@ -28,7 +31,7 @@ Controls (Hierarchy of Controls)
 • Administrative: escort procedures and daily briefings.
 • PPE: high-visibility vests required for all personnel.
 Residual Risk
-• Residual cell: 2C – Medium.
+• Residual cell: D2 – Medium.
 Disposition: Accept with conditions, subject to the escort procedure being audited weekly.
 """
 
@@ -36,12 +39,12 @@ NONCOMPLIANT_HAZARD = """
 H2 – Mis-Marked Closures and Barricades
 Primary Worst Credible Outcome An aircraft taxis into an active construction zone.
 Initial Risk
-• Initial cell: 3B – High.
+• Initial cell: C2 – High.
 Controls
 • Engineer: barricades with retroreflective markers.
 • Administrative: daily inspection of closure markings.
 Residual Risk
-• Residual cell: 2B – Medium.
+• Residual cell: D2 – Medium.
 ALARP: risk is as low as reasonably practicable given the phasing constraints.
 """
 
@@ -257,6 +260,82 @@ def test_sra_issues_name_the_affected_hazards() -> None:
     disposition = next(i for i in issues if i.label == "Per-Hazard Risk Disposition")
     assert "H2" in disposition.detail
     assert "H1" not in disposition.detail
+
+
+# --- Risk band consistency ----------------------------------------------------
+
+
+def test_matrix_bands_follow_the_risk_register_matrix() -> None:
+    # C2 is Remote / Hazardous; the displayed severity 2 is stored as 4.
+    assert matrix_bands("C2") == {"high"}
+    assert matrix_bands("D2") == {"medium"}
+    assert matrix_bands("E3") == {"low"}
+    assert matrix_bands("A1") == {"high"}
+
+
+def test_split_cell_d1_accepts_either_band() -> None:
+    assert find_band_mismatches("Residual: D1 – High.\nResidual: D1 – Medium.") == []
+
+
+def test_band_matching_the_matrix_is_not_reported() -> None:
+    content = (
+        "Initial Risk: C2 (Remote / Hazardous) — High.\n"
+        "Residual Risk: D2 – Medium (row D Extremely Remote, column 2 Hazardous).\n"
+        "| E5 | Low |"
+    )
+
+    assert find_band_mismatches(content) == []
+
+
+def test_band_disagreeing_with_the_matrix_is_reported_once() -> None:
+    """The PVD defect: the same cell was High in one project and Medium in another."""
+    content = (
+        "H1 – Lighting\nInitial risk cell: C2, Medium (row C Remote, column 2 Hazardous).\n"
+        "H2 – Markings\nInitial risk cell: C2, Medium.\n"
+        "H3 – NOTAMs\nInitial risk cell: C2, High.\n"
+    )
+
+    assert find_band_mismatches(content) == ["C2 stated Medium (matrix: High)"]
+
+
+def test_band_is_not_read_across_a_sentence_or_another_cell() -> None:
+    content = (
+        "Residual: C2 (Remote / Hazardous). Risk is as low as reasonably practicable.\n"
+        "Reduced from C2 to D2, taking the band from High to Medium.\n"
+    )
+
+    assert find_band_mismatches(content) == []
+
+
+def test_a_designator_is_not_read_as_a_cell() -> None:
+    assert find_band_mismatches("Taxiway C2 carries high traffic at night.") == []
+    assert find_reversed_cell_labels("Gates 3B and 4A remain open; Runway 5A is closed.") == []
+
+
+def test_number_first_labels_are_reported_not_interpreted() -> None:
+    content = (
+        "Initial risk cell: 3B, High (row 3 Occasional, column B Hazardous). Residual 2B, Medium."
+    )
+
+    assert find_reversed_cell_labels(content) == ["2B", "3B"]
+    assert find_band_mismatches(content) == []
+
+
+def test_band_and_notation_issues_are_raised_on_sra_and_phl_outputs() -> None:
+    content = "Initial risk cell: C2 – Medium. Residual risk cell: 2B – Medium."
+
+    for flags in ({"is_sra": True, "is_phl": False}, {"is_sra": False, "is_phl": True}):
+        issues = check_analysis_output("<rr_payload>{}</rr_payload>" + content, **flags)
+        labels = [i.label for i in issues]
+        assert labels == ["Risk Band Consistency", "Matrix Cell Notation"]
+        assert "C2 stated Medium (matrix: High)" in issues[0].detail
+        assert "2B" in issues[1].detail
+
+
+def test_band_checks_do_not_run_on_general_answers() -> None:
+    content = "Initial risk cell: C2 – Medium. Residual risk cell: 2B – Medium."
+
+    assert check_analysis_output(content, is_sra=False, is_phl=False) == []
 
 
 # --- Infrastructure grounding -------------------------------------------------
