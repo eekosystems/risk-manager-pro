@@ -4,6 +4,7 @@ import ReactMarkdown, { type Components } from "react-markdown";
 import rehypeSanitize from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
 
+import { preprocessCitations } from "@/lib/citations";
 import { stripFollowupsBlock, stripRrPayloadBlock } from "@/lib/followups";
 import type { Citation } from "@/types/api";
 
@@ -154,16 +155,6 @@ function CitationTooltip({
 }
 
 /* ------------------------------------------------------------------ */
-/*  Pre-process markdown: convert [Source N] → clickable links        */
-/* ------------------------------------------------------------------ */
-function preprocessCitations(content: string): string {
-  return content.replace(
-    /\[Source (\d+)\]/g,
-    "[\\[Source $1\\]](#citation-$1)",
-  );
-}
-
-/* ------------------------------------------------------------------ */
 /*  Strip "### Sources Used" section + confidentiality warning        */
 /*  from AI output — the UI renders both separately.                  */
 /* ------------------------------------------------------------------ */
@@ -234,9 +225,9 @@ export function MarkdownContent({
       ...baseComponents,
       a: ({ children, href }) => {
         const match = href?.match(/^#citation-(\d+)$/);
-        if (match && citations) {
+        if (match) {
           const idx = parseInt(match[1]!, 10) - 1;
-          const citation = citations[idx];
+          const citation = citations?.[idx];
           if (citation) {
             return (
               <CitationTooltip
@@ -247,6 +238,10 @@ export function MarkdownContent({
               </CitationTooltip>
             );
           }
+          // A source number with no citation behind it (the model cited past
+          // the retrieved set) must not become a real anchor: "#citation-9"
+          // in a new tab is a link that goes nowhere. Show it as text.
+          return <span>{children}</span>;
         }
         if (!isSafeHref(href)) {
           return <span>{children}</span>;
