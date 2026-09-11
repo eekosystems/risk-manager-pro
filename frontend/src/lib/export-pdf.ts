@@ -6,6 +6,7 @@ import {
   type Run,
   parseBlocks,
 } from "./export-markdown";
+import { toStandardFontText } from "./pdf-text";
 
 
 const FONT = "helvetica";
@@ -356,7 +357,9 @@ export function exportTextToPdf(
   // footer. It previously rendered only as a repeated page footer.
   drawConfidentialityHeader();
 
-  const blocks = parseBlocks(content);
+  // The built-in font cannot draw characters outside WinAnsi; fold them before
+  // layout so wrapping measures the same text that gets drawn.
+  const blocks = parseBlocks(toStandardFontText(content));
   let prevKind: Block["kind"] | null = null;
 
   for (const block of blocks) {
