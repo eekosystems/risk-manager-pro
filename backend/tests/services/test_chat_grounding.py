@@ -15,6 +15,8 @@ from app.services.chat import (
     ChatService,
     _build_context_block,
     _build_grounding_notice,
+    _extract_citations,
+    _merge_document_chunks,
     _resolve_grounding,
 )
 from app.services.rag import SearchResult
@@ -31,6 +33,17 @@ def _result(source: str, content: str = "chunk text") -> SearchResult:
         section=None,
         score=0.03,
         chunk_id=f"{source}_0",
+    )
+
+
+def _chunk(source: str, index: int) -> SearchResult:
+    return SearchResult(
+        content=f"chunk {index}",
+        source=source,
+        section=f"Chunk {index + 1}",
+        score=1.0,
+        chunk_id=f"doc_{index}",
+        retrieved_by="document",
     )
 
 
@@ -237,3 +250,86 @@ async def test_rag_failure_still_reports_a_miss_for_targeted_queries(
 
     assert results == []
     assert grounding.is_miss is True
+
+
+# --- Whole-document grounding for analysis turns ------------------------------
+
+
+def test_document_chunks_are_merged_into_ordered_parts() -> None:
+    merged = _merge_document_chunks([_chunk("CSPP.pdf", i) for i in range(6)])
+
+    assert [m.section for m in merged] == ["Parts 1-4 of 6", "Parts 5-6 of 6"]
+    assert merged[0].content.startswith("chunk 0") and merged[0].content.endswith("chunk 3")
+    assert "chunk 4" not in merged[0].content
+    assert all(m.retrieved_by == "document" for m in merged)
+    assert _extract_citations(merged)[0].match_tier == "Document"
+
+
+def test_context_block_says_the_document_is_complete() -> None:
+    block = _build_context_block(_merge_document_chunks([_chunk("CSPP.pdf", 0)]))
+
+    assert "COMPLETE text of CSPP.pdf" in block
+    assert "[Source 1: CSPP.pdf — Part 1 of 1]" in block
+
+
+@pytest.mark.asyncio
+async def test_analysis_turn_reads_the_targeted_document_whole(chat_service: ChatService) -> None:
+    """The PVD failure: the top-20 relevance chunks never included the Taxiway E paragraph."""
+    chat_service._rag.fetch_documents = AsyncMock(  # type: ignore[method-assign]
+        return_value=[_chunk("CSPP.pdf", i) for i in range(5)]
+    )
+    chat_service._rag.hybrid_search = AsyncMock(return_value=[_result("CSPP.pdf")])  # type: ignore[method-assign]
+
+    results, block, grounding = await chat_service._build_rag_context(
+        query="generate a PHL for the cargo ramp CSPP",
+        organization_id=ORGANIZATION_ID,
+        conversation_id=CONVERSATION_ID,
+        top_k=5,
+        score_threshold=0.5,
+        source_filter=["CSPP.pdf"],
+        full_document=True,
+    )
+
+    assert [r.section for r in results] == ["Parts 1-4 of 5", "Part 5 of 5"]
+    assert grounding.is_miss is False
+    assert "COMPLETE text" in block
+    chat_service._rag.hybrid_search.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_a_document_over_budget_falls_back_to_relevance_search(
+    chat_service: ChatService,
+) -> None:
+    chat_service._rag.fetch_documents = AsyncMock(return_value=None)  # type: ignore[method-assign]
+    chat_service._rag.hybrid_search = AsyncMock(return_value=[_result("CSPP.pdf")])  # type: ignore[method-assign]
+
+    results, block, _grounding = await chat_service._build_rag_context(
+        query="generate a PHL for the cargo ramp CSPP",
+        organization_id=ORGANIZATION_ID,
+        conversation_id=CONVERSATION_ID,
+        top_k=5,
+        score_threshold=0.0,
+        source_filter=["CSPP.pdf"],
+        full_document=True,
+    )
+
+    assert [r.retrieved_by for r in results] == ["search"]
+    assert "COMPLETE text" not in block
+    chat_service._rag.hybrid_search.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_conversational_turns_still_use_relevance_search(chat_service: ChatService) -> None:
+    chat_service._rag.fetch_documents = AsyncMock()  # type: ignore[method-assign]
+    chat_service._rag.hybrid_search = AsyncMock(return_value=[_result("CSPP.pdf")])  # type: ignore[method-assign]
+
+    await chat_service._build_rag_context(
+        query="what does the CSPP say about haul routes?",
+        organization_id=ORGANIZATION_ID,
+        conversation_id=CONVERSATION_ID,
+        top_k=5,
+        score_threshold=0.0,
+        source_filter=["CSPP.pdf"],
+    )
+
+    chat_service._rag.fetch_documents.assert_not_called()

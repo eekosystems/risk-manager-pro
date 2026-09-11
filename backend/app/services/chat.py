@@ -553,12 +553,60 @@ def _build_grounding_notice(grounding: RagGrounding) -> str:
     )
 
 
+# How many consecutive chunks of a whole document are presented as one source.
+# Four 500-token chunks is about a page of narrative: enough that a phase
+# description reads in one piece, few enough that a citation still points at
+# a specific passage. Also keeps the citation chips for a full CSPP in the teens
+# rather than the dozens.
+_DOCUMENT_WINDOW_CHUNKS = 4
+
+
+def _merge_document_chunks(results: list[SearchResult]) -> list[SearchResult]:
+    """Fold a document's chunks (already in reading order) into page-sized sources."""
+    merged: list[SearchResult] = []
+    by_source: dict[str, list[SearchResult]] = {}
+    for r in results:
+        by_source.setdefault(r.source, []).append(r)
+    for source, chunks in by_source.items():
+        total = len(chunks)
+        for start in range(0, total, _DOCUMENT_WINDOW_CHUNKS):
+            window = chunks[start : start + _DOCUMENT_WINDOW_CHUNKS]
+            first, last = start + 1, start + len(window)
+            label = f"Part {first}" if first == last else f"Parts {first}-{last}"
+            merged.append(
+                SearchResult(
+                    content="\n\n".join(c.content for c in window),
+                    source=source,
+                    source_type=window[0].source_type,
+                    section=f"{label} of {total}",
+                    score=1.0,
+                    chunk_id=window[0].chunk_id,
+                    retrieved_by="document",
+                )
+            )
+    return merged
+
+
 def _build_context_block(results: list[SearchResult], grounding: RagGrounding | None = None) -> str:
     directive = (
         _build_grounding_directive(grounding) + "\n" if grounding and grounding.is_miss else ""
     )
     if not results:
         return directive + "No relevant documents found in the knowledge base."
+
+    whole_documents = sorted({r.source for r in results if r.retrieved_by == "document"})
+    if whole_documents:
+        directive += (
+            "The reference material below is the COMPLETE text of "
+            + ", ".join(whole_documents)
+            + ", presented in reading order and split into consecutive parts. "
+            "It is not a relevance sample: every phase, work area, closure, "
+            "decommissioning, and interface the document describes is present. "
+            "Read all parts before analysing, and take the project-specific "
+            "status of every named surface (active, closed for a phase, closed "
+            "permanently, decommissioned, relocated, new) from the text rather "
+            "than assuming it.\n"
+        )
 
     sections: list[str] = []
     for i, r in enumerate(results, 1):
@@ -668,7 +716,11 @@ def _extract_citations(results: list[SearchResult]) -> list[CitationSchema]:
             content=r.content,
             chunk_id=r.chunk_id,
             rank=i,
-            match_tier=_compute_match_tier(i, r.score, total),
+            match_tier=(
+                "Document"
+                if r.retrieved_by == "document"
+                else _compute_match_tier(i, r.score, total)
+            ),
         )
         for i, r in enumerate(results, 1)
     ]
@@ -976,12 +1028,21 @@ class ChatService:
         source_filter: list[str] | None = None,
         requested_sources: list[str] | None = None,
         unindexed_sources: list[str] | None = None,
+        full_document: bool = False,
     ) -> tuple[list[SearchResult], str, RagGrounding]:
         """Run RAG search and return results, a context block, and a grounding verdict.
 
         Two separate questions are answered here and must stay separate:
         which documents to *filter* retrieval by, and which documents the user
         *asked for*. Grounding is judged against the second, never the first.
+
+        `full_document` is set for analysis turns (PHL, SRA, System Analysis).
+        A hazard analysis of a targeted document must see the whole document:
+        the top-20 passages most similar to "generate a PHL for this CSPP" are
+        the generic ones, and the phase-specific paragraph that turns a taxiway
+        from an active adjacent surface into a decommissioning hazard never
+        ranks. When the targeted documents fit the budget they are read whole,
+        in order; otherwise this falls back to relevance search below.
 
         Filter precedence for the targeted search:
           1. `source_filter`, when the caller has already resolved it (the
@@ -1012,7 +1073,19 @@ class ChatService:
             list(requested_sources) if requested_sources is not None else list(targeted_filter)
         )
         try:
-            if targeted_filter:
+            if targeted_filter and full_document:
+                whole = await self._rag.fetch_documents(
+                    organization_id=organization_id, sources=targeted_filter
+                )
+                if whole:
+                    search_results = _merge_document_chunks(whole)
+                elif whole is None:
+                    logger.info(
+                        "rag_full_document_fallback_to_search",
+                        conversation_id=str(conversation_id),
+                        requested=targeted_filter,
+                    )
+            if targeted_filter and not search_results:
                 search_results = await self._rag.hybrid_search(
                     query,
                     organization_id=organization_id,
@@ -1511,6 +1584,7 @@ class ChatService:
             source_filter=docs.source_filter,
             requested_sources=docs.requested_sources,
             unindexed_sources=docs.unindexed_sources,
+            full_document=routed_function in _ANALYSIS_FUNCTIONS,
         )
 
         messages = await self._prepare_messages(
@@ -1651,6 +1725,7 @@ class ChatService:
             source_filter=docs.source_filter,
             requested_sources=docs.requested_sources,
             unindexed_sources=docs.unindexed_sources,
+            full_document=routed_function in _ANALYSIS_FUNCTIONS,
         )
 
         messages = await self._prepare_messages(

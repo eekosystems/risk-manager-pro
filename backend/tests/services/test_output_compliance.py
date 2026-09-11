@@ -14,6 +14,7 @@ from app.services.output_compliance import (
     find_hazards_missing_disposition,
     find_incomplete_hierarchy,
     find_reversed_cell_labels,
+    find_unreflected_closures,
     find_unsupported_infrastructure,
     matrix_bands,
     split_hazard_sections,
@@ -336,6 +337,63 @@ def test_band_checks_do_not_run_on_general_answers() -> None:
     content = "Initial risk cell: C2 – Medium. Residual risk cell: 2B – Medium."
 
     assert check_analysis_output(content, is_sra=False, is_phl=False) == []
+
+
+# --- Source closure status ----------------------------------------------------
+
+CSPP_WITH_DECOMMISSIONING = (
+    "Work Area A lies south and west of Taxiways T, M, and E. "
+    "In Phase 1 Work Area B, Taxiway E will be decommissioned and closed permanently, "
+    "including disconnecting its lighting and signage circuit and updating the "
+    "Airfield Lighting Control System. Taxiway T remains open throughout."
+)
+
+
+def test_a_decommissioned_surface_named_as_active_is_reported() -> None:
+    """The PVD failure: Taxiway E listed with the active taxiways, no closure hazard."""
+    output = (
+        "Hazard 1 – Aircraft / vehicle conflict at work area interfaces (Taxiways T, M, E).\n"
+        "Taxiway lights obscured or de-energized and NOTAM'd out of service."
+    )
+
+    assert find_unreflected_closures(output, CSPP_WITH_DECOMMISSIONING) == ["Taxiway E"]
+
+
+def test_an_output_that_reflects_the_closure_is_not_reported() -> None:
+    output = (
+        "Hazard 1 – Interfaces with Taxiways T and M.\n"
+        "Hazard 2 – Permanent decommissioning of Taxiway E in Phase 1 Work Area B: "
+        "lighting circuit disconnection and ALCS update."
+    )
+
+    assert find_unreflected_closures(output, CSPP_WITH_DECOMMISSIONING) == []
+
+
+def test_a_closed_surface_the_output_never_names_is_not_reported() -> None:
+    output = "Hazard 1 – FOD from demolition near Taxiway T."
+
+    assert find_unreflected_closures(output, CSPP_WITH_DECOMMISSIONING) == []
+
+
+def test_a_surface_the_source_keeps_open_is_not_a_closure() -> None:
+    source = "Taxiway T remains open. Taxiway E is closed permanently in Phase 1."
+
+    assert find_unreflected_closures("Taxiways T and E interface.", source) == ["Taxiway E"]
+
+
+def test_closure_check_needs_source_text() -> None:
+    assert find_unreflected_closures("Taxiway E is active.", "") == []
+
+
+def test_closure_issue_is_raised_on_analysis_outputs() -> None:
+    output = "<rr_payload>{}</rr_payload>\nInterfaces: Taxiways T, M, E."
+
+    issues = check_analysis_output(
+        output, is_sra=False, is_phl=True, retrieved_text=CSPP_WITH_DECOMMISSIONING
+    )
+
+    assert [i.label for i in issues] == ["Source Closure Status Not Reflected"]
+    assert "Taxiway E" in issues[0].detail
 
 
 # --- Infrastructure grounding -------------------------------------------------

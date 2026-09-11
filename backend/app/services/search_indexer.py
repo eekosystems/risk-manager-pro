@@ -48,6 +48,7 @@ class SearchIndexer:
                     "source": source,
                     "source_type": source_type,
                     "section": f"Chunk {i + 1}",
+                    "chunk_index": i,
                     "content": chunk,
                     "content_vector": embedding,
                 }

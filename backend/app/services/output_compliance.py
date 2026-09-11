@@ -386,6 +386,62 @@ def find_unsupported_infrastructure(content: str, retrieved_text: str) -> list[s
     return unsupported
 
 
+# --- Source closure status -----------------------------------------------------
+
+# Language a CSPP uses when a surface stops being an operating surface. The PVD
+# South Cargo Ramp CSPP decommissioned Taxiway E in Phase 1 Work Area B; the
+# analysis named Taxiway E alongside the active taxiways as if nothing changed.
+_CLOSURE_TERM_RE = re.compile(
+    r"\bdecommission\w*\b"
+    r"|\bpermanent(?:ly)?\s+clos\w+\b"
+    r"|\bclos\w+\s+permanently\b"
+    r"|\bpermanent\s+closure\b"
+    r"|\b(?:removed|taken)\s+(?:out\s+of|from)\s+service\b"
+    r"|\bdemolish\w*\b"
+    r"|\babandon\w*\b",
+    re.IGNORECASE,
+)
+_SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+|\n+")
+
+
+def _closure_designators(text: str) -> dict[str, str]:
+    """Designators named in the same sentence as closure language, with their kind."""
+    closed: dict[str, str] = {}
+    for sentence in _SENTENCE_SPLIT_RE.split(text):
+        if not _CLOSURE_TERM_RE.search(sentence):
+            continue
+        for kind, pattern in (("Taxiway", _TAXIWAY_RUN_RE), ("Runway", _RUNWAY_RUN_RE)):
+            for designator in _designators(sentence, pattern):
+                closed.setdefault(f"{kind} {designator}", kind)
+    return closed
+
+
+def find_unreflected_closures(content: str, retrieved_text: str) -> list[str]:
+    """Surfaces the source closes or decommissions that the output names without that status.
+
+    A surface the source never closes, or one the output never names, is not
+    reported: the first is not a closure and the second is a coverage question
+    for the analyst. What is reported is the specific failure of naming a
+    decommissioned surface as though it were still an ordinary active one.
+    """
+    if not retrieved_text.strip():
+        return []
+    closed_in_source = _closure_designators(retrieved_text)
+    if not closed_in_source:
+        return []
+    named_in_output = {
+        f"{kind} {designator}"
+        for kind, pattern in (("Taxiway", _TAXIWAY_RUN_RE), ("Runway", _RUNWAY_RUN_RE))
+        for designator in _designators(content, pattern)
+    }
+    reflected_in_output = set(_closure_designators(content))
+    return sorted(
+        name
+        for name in closed_in_source
+        if name in named_in_output and name not in reflected_in_output
+    )
+
+
 # --- Aggregation --------------------------------------------------------------
 
 
@@ -469,6 +525,23 @@ def check_analysis_output(
                         + "). Likelihood is the letter A-E and severity the number 1-5 "
                         "(e.g. C2 = Remote / Hazardous), so these scores cannot be "
                         "checked against the matrix and must be re-rendered."
+                    ),
+                )
+            )
+
+        unreflected = find_unreflected_closures(content, retrieved_text)
+        if unreflected:
+            issues.append(
+                ComplianceIssue(
+                    label="Source Closure Status Not Reflected",
+                    detail=(
+                        "The source document closes or decommissions "
+                        + ", ".join(unreflected)
+                        + ", but this output names the surface without that status. "
+                        "A closure or decommissioning changes the hazard picture "
+                        "(lighting and signage circuits, ALCS updates, marking "
+                        "removal, pilot and driver familiarity) and must be "
+                        "assessed as such."
                     ),
                 )
             )
