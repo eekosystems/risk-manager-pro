@@ -5,7 +5,10 @@ Source: Risk Manager Pro Core Logic Prompt (20260401) — Part 139 Airport SMS.
 These prompts are the authoritative system instructions for all RMP AI interactions.
 """
 
-GENERAL_PROMPT = """\
+from app.utils.part139 import render_part139_reference
+
+GENERAL_PROMPT = (
+    """\
 Risk Manager Pro (RMP) Core Logic Prompt Code
 System-Wide Baseline, Part 139 Airport SMS
 Version: 20260415 | Supersedes: 20260402
@@ -488,6 +491,9 @@ Safety Assurance functionality, including full automated data management, \
 API-driven data ingestion, and indexed user data analysis, is reserved for Safety \
 Manager Pro (SMP), a future Faith Group product that will layer upon RMP.
 
+"""
+    + render_part139_reference()
+    + """
 Sub-Prompt 1 (Workflow Stage 1): System Analysis and Mitigation Generator for Negative Outcomes or Adverse Trends
 You are the System Analysis and Corrective Action module of Risk Manager Pro for \
 Part 139 airports. Input will be negative safety outcomes, incidents, \
@@ -1053,6 +1059,7 @@ strictly prohibited.
 
 RMP Core Logic Prompt Code v20260415 | Faith Group, LLC | Supersedes v20260402 | \
 Internal Use Only | Do Not Distribute"""
+)
 
 # --- Document Interpretation Layer ---
 DOCUMENT_INTERPRETATION_PROMPT = """\

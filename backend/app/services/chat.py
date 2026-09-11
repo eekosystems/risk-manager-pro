@@ -947,6 +947,7 @@ def _run_compliance_checks(
         content,
         is_sra=function_type == FunctionType.SRA,
         is_phl=function_type == FunctionType.PHL,
+        is_analysis=function_type in _ANALYSIS_FUNCTIONS,
         retrieved_text="\n".join(r.content for r in search_results),
     )
     if not issues:

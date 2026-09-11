@@ -13,6 +13,7 @@ from app.services.output_compliance import (
     find_band_mismatches,
     find_hazards_missing_disposition,
     find_incomplete_hierarchy,
+    find_mistitled_citations,
     find_reversed_cell_labels,
     find_unreflected_closures,
     find_unsupported_infrastructure,
@@ -335,6 +336,68 @@ def test_band_and_notation_issues_are_raised_on_sra_and_phl_outputs() -> None:
 
 def test_band_checks_do_not_run_on_general_answers() -> None:
     content = "Initial risk cell: C2 – Medium. Residual risk cell: 2B – Medium."
+
+    assert check_analysis_output(content, is_sra=False, is_phl=False) == []
+
+
+# --- Regulatory citation titles -----------------------------------------------
+
+
+def test_a_title_from_another_section_is_reported() -> None:
+    """The PVD failure: §139.329 carrying §139.323's title, and a paraphrase of neither."""
+    content = (
+        "• 14 CFR §139.329 (Traffic and wind direction indicators – safe operations).\n"
+        "• 14 CFR §139.329 (Traffic control).\n"
+        "• 14 CFR §139.329 (Traffic control).\n"
+    )
+
+    assert find_mistitled_citations(content) == [
+        "§139.329 cited as 'Traffic and wind direction indicators – safe operations' "
+        "(official title: Pedestrians and ground vehicles)",
+        "§139.329 cited as 'Traffic control' (official title: Pedestrians and ground vehicles)",
+    ]
+
+
+def test_shortened_and_glossed_titles_are_accepted() -> None:
+    content = (
+        "• 14 CFR §139.311 (Marking and lighting).\n"
+        "• 14 CFR §139.305 (Paved areas – FOD control).\n"
+        "• 14 CFR §139.319 – Aircraft rescue and firefighting\n"
+        "• 14 CFR 139.327: Self-inspection program\n"
+        "• §139.325 (Airport emergency plan – security coordination)\n"
+        "• 14 CFR §139.323 (Traffic and wind direction indicators).\n"
+    )
+
+    assert find_mistitled_citations(content) == []
+
+
+def test_paragraph_references_and_bare_numbers_are_not_titles() -> None:
+    content = (
+        "Confidential reporting per §139.402(c)(2) and §139.402(b).\n"
+        "See 14 CFR §139.309 and AC 150/5370-2G.\n"
+        "§139.402(c) (Safety assurance) applies."
+    )
+
+    assert find_mistitled_citations(content) == []
+
+
+def test_a_section_that_does_not_exist_is_reported() -> None:
+    assert find_mistitled_citations("• 14 CFR §139.330 (Vehicle operations).") == [
+        "§139.330 is not a section of Part 139"
+    ]
+
+
+def test_citation_titles_are_checked_on_every_analysis_output() -> None:
+    content = "Regulatory Citations\n• 14 CFR §139.329 (Traffic control)."
+
+    for flags in (
+        {"is_sra": True, "is_phl": False},
+        {"is_sra": False, "is_phl": True, "is_analysis": True},
+        {"is_sra": False, "is_phl": False, "is_analysis": True},
+    ):
+        issues = check_analysis_output("<rr_payload>{}</rr_payload>" + content, **flags)
+        assert [i.label for i in issues] == ["Regulatory Citation Titles"]
+        assert "Pedestrians and ground vehicles" in issues[0].detail
 
     assert check_analysis_output(content, is_sra=False, is_phl=False) == []
 

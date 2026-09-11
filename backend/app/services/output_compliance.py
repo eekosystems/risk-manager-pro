@@ -20,6 +20,7 @@ from dataclasses import dataclass
 import structlog
 
 from app.models.risk import RISK_MATRIX, RiskLevel
+from app.utils.part139 import PART_139_SECTIONS
 
 logger = structlog.get_logger(__name__)
 
@@ -442,6 +443,67 @@ def find_unreflected_closures(content: str, retrieved_text: str) -> list[str]:
     )
 
 
+# --- Regulatory citation titles -----------------------------------------------
+
+# A Part 139 section cited with a title: "14 CFR §139.329 (Traffic control)",
+# "§139.329 – Pedestrians and ground vehicles", "14 CFR 139.311: Marking and
+# lighting". Paragraph references after the number ("(b)(2)") are stepped over.
+# Two PVD projects cited §139.329 as "Traffic and wind direction indicators" —
+# the title of §139.323 — across several sessions: the number was right for the
+# ground-vehicle hazards it backed, the title was drawn from memory.
+_PART139_CITATION_RE = re.compile(
+    r"(?:14\s*CFR\s*)?(?:Part\s*139\s*)?§?\s*139\.(?P<section>\d{1,3})(?:\([a-z0-9]{1,3}\))*"
+    r"\s*(?:\((?P<paren>[^()\n]{3,120})\)|[-–—:]\s*(?P<dash>[^\n;.]{3,120}))",
+    re.IGNORECASE,
+)
+# A stated title often carries a gloss after a dash or colon ("Paved areas – FOD
+# control"); only the part before it is the title.
+_TITLE_GLOSS_SPLIT_RE = re.compile(r"\s+[-–—:]\s+|:\s+")
+_TITLE_TOKEN_RE = re.compile(r"[a-z]+")
+# Words too common across Part 139 titles to show that two titles are the same.
+_TITLE_STOPWORDS = frozenset({"and", "the", "for", "with", "from", "into", "other", "airport"})
+
+
+def _title_tokens(title: str) -> set[str]:
+    stated = _TITLE_GLOSS_SPLIT_RE.split(title.strip(), maxsplit=1)[0]
+    return {
+        token
+        for token in _TITLE_TOKEN_RE.findall(stated.lower())
+        if len(token) >= 3 and token not in _TITLE_STOPWORDS
+    }
+
+
+def find_mistitled_citations(content: str) -> list[str]:
+    """Part 139 citations whose stated title belongs to no such section.
+
+    A title is accepted when it shares at least one significant word with the
+    official title, so a shortened or glossed title ("Marking and lighting",
+    "Paved areas – FOD control") passes and only a title taken from a different
+    section, or a section that does not exist, is reported.
+    """
+    findings: list[str] = []
+    seen: set[tuple[str, str]] = set()
+    for match in _PART139_CITATION_RE.finditer(content):
+        section = f"139.{match.group('section')}"
+        stated = (match.group("paren") or match.group("dash") or "").strip()
+        stated_tokens = _title_tokens(stated)
+        if not stated_tokens:
+            continue
+        official = PART_139_SECTIONS.get(section)
+        if official is None:
+            finding = f"§{section} is not a section of Part 139"
+        elif stated_tokens & _title_tokens(official):
+            continue
+        else:
+            finding = f"§{section} cited as '{stated}' (official title: {official})"
+        key = (section, stated.lower())
+        if key in seen:
+            continue
+        seen.add(key)
+        findings.append(finding)
+    return findings
+
+
 # --- Aggregation --------------------------------------------------------------
 
 
@@ -450,10 +512,29 @@ def check_analysis_output(
     *,
     is_sra: bool,
     is_phl: bool,
+    is_analysis: bool = False,
     retrieved_text: str = "",
 ) -> list[ComplianceIssue]:
-    """Run every applicable output requirement check and collect what failed."""
+    """Run every applicable output requirement check and collect what failed.
+
+    `is_analysis` covers every formal RMP analysis (System Analysis included),
+    for checks that apply to any output that cites regulation.
+    """
     issues: list[ComplianceIssue] = []
+
+    if is_sra or is_phl or is_analysis:
+        mistitled = find_mistitled_citations(content)
+        if mistitled:
+            issues.append(
+                ComplianceIssue(
+                    label="Regulatory Citation Titles",
+                    detail=(
+                        "; ".join(mistitled)
+                        + ". Correct the title, not the section number, unless the "
+                        "section itself is wrong for the finding it supports."
+                    ),
+                )
+            )
 
     if is_phl and extract_rr_payload(content) is None:
         issues.append(
