@@ -118,20 +118,42 @@ class SharePointRiskSummary:
 # ---------------------------------------------------------------------------
 
 
-_SEVERITY_ALIASES: dict[str, int] = {
-    "1": 1, "e": 1, "minimal": 1, "negligible": 1,
-    "2": 2, "d": 2, "minor": 2,
-    "3": 3, "c": 3, "major": 3, "moderate": 3,
-    "4": 4, "b": 4, "hazardous": 4, "critical": 4,
-    "5": 5, "a": 5, "catastrophic": 5, "severe": 5,
+# Descriptive names are matched before symbols, longest first, so
+# "Catastrophic (1)" reads as Catastrophic and "severe" is never mistaken for
+# the letter "e". Symbols follow the FAA 5x5 as client documents print it:
+# severity 1 is Catastrophic, and storage runs the other way (5 = Catastrophic).
+# Letter severities (A most severe) appear in older Faith Group outputs.
+_SEVERITY_NAMES: dict[str, int] = {
+    "catastrophic": 5, "severe": 5,
+    "hazardous": 4, "critical": 4,
+    "major": 3, "moderate": 3,
+    "minor": 2,
+    "minimal": 1, "negligible": 1,
 }  # fmt: skip
 
-_LIKELIHOOD_ALIASES: dict[str, str] = {
-    "a": "A", "5": "A", "frequent": "A",
-    "b": "B", "4": "B", "probable": "B", "occasional": "B",
-    "c": "C", "3": "C", "remote": "C",
-    "d": "D", "2": "D", "extremely remote": "D", "improbable": "D",
-    "e": "E", "1": "E", "extremely improbable": "E",
+_SEVERITY_SYMBOLS: dict[str, int] = {
+    "1": 5, "a": 5,
+    "2": 4, "b": 4,
+    "3": 3, "c": 3,
+    "4": 2, "d": 2,
+    "5": 1, "e": 1,
+}  # fmt: skip
+
+_LIKELIHOOD_NAMES: dict[str, str] = {
+    "frequent": "A",
+    "probable": "B", "occasional": "B",
+    "remote": "C",
+    "extremely remote": "D", "improbable": "D",
+    "extremely improbable": "E",
+}  # fmt: skip
+
+# Numeric likelihood scales run 5 = Frequent in the documents that use them.
+_LIKELIHOOD_SYMBOLS: dict[str, str] = {
+    "a": "A", "5": "A",
+    "b": "B", "4": "B",
+    "c": "C", "3": "C",
+    "d": "D", "2": "D",
+    "e": "E", "1": "E",
 }  # fmt: skip
 
 _RISK_LEVEL_ALIASES: dict[str, str] = {
@@ -140,6 +162,9 @@ _RISK_LEVEL_ALIASES: dict[str, str] = {
     "high": "high", "orange": "high",
     "extreme": "high", "red": "high", "critical": "high",
 }  # fmt: skip
+
+# A lone scale symbol: a digit 1-5 or a letter a-e not embedded in a word.
+_SCALE_SYMBOL_RE = re.compile(r"(?<![a-z0-9])([1-5]|[a-e])(?![a-z0-9])")
 
 # FG 5x5 — mirrors app.models.risk.RISK_MATRIX (duplicated to avoid a
 # circular import).
@@ -156,35 +181,30 @@ def _compute_risk_level(severity: int, likelihood: str) -> str:
     return _RISK_MATRIX.get(likelihood, {}).get(severity, "low")
 
 
-def _normalize_severity(value: Any) -> int | None:
+def _lookup_scale_value[T](value: object, names: dict[str, T], symbols: dict[str, T]) -> T | None:
+    """Resolve a scale value by descriptive name first, then by a lone symbol."""
     if value is None or isinstance(value, bool):
         return None
-    if isinstance(value, (int, float)):
-        iv = int(value)
-        return iv if 1 <= iv <= 5 else None
-    s = str(value).strip().lower()
-    if not s:
+    text = str(value).strip().lower()
+    if not text:
         return None
-    if s in _SEVERITY_ALIASES:
-        return _SEVERITY_ALIASES[s]
-    for alias, sev in _SEVERITY_ALIASES.items():
-        if alias in s:
-            return sev
+    for name in sorted(names, key=len, reverse=True):
+        if name in text:
+            return names[name]
+    match = _SCALE_SYMBOL_RE.search(text)
+    if match:
+        return symbols[match.group(1)]
     return None
+
+
+def _normalize_severity(value: Any) -> int | None:
+    if isinstance(value, float):
+        value = int(value)
+    return _lookup_scale_value(value, _SEVERITY_NAMES, _SEVERITY_SYMBOLS)
 
 
 def _normalize_likelihood(value: Any) -> str | None:
-    if value is None:
-        return None
-    s = str(value).strip().lower()
-    if not s:
-        return None
-    if s in _LIKELIHOOD_ALIASES:
-        return _LIKELIHOOD_ALIASES[s]
-    for alias, code in _LIKELIHOOD_ALIASES.items():
-        if alias in s:
-            return code
-    return None
+    return _lookup_scale_value(value, _LIKELIHOOD_NAMES, _LIKELIHOOD_SYMBOLS)
 
 
 def _normalize_risk_level(value: Any) -> str | None:
@@ -749,7 +769,10 @@ def _apply_import_rules(
 #       (a/b/c/d, i/ii/iii, etc.) instead of rolling them up into the
 #       parent header. Forces a full re-scan to drop the rolled-up parent
 #       rows and surface the individual sub-hazards.
-_CACHE_SCHEMA_VERSION = "v5"
+#   v6: scale symbols now read the FAA way (severity 1 = Catastrophic) and
+#       names are matched before symbols, so "Catastrophic (1)" no longer
+#       lands as Minimal. Forces a re-scan to re-place affected rows.
+_CACHE_SCHEMA_VERSION = "v6"
 
 
 def _build_cache_key(drive_item_id: str, size: int, content_type: str) -> str:
