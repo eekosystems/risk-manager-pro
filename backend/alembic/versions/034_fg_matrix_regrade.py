@@ -1,8 +1,9 @@
-"""Re-grade four FG 5x5 cells and move the split cell from D1 to E1.
+"""Re-grade five FG 5x5 cells and move the split cell from D1 to E1.
 
 Faith Group asked for the on-screen matrix to change:
   A3, B3 : medium -> high   (Frequent / Probable + Major)
   C4     : low    -> medium (Remote + Minor)
+  D3     : low    -> medium (Extremely Remote + Major)
   E1     : medium -> high   (Extremely Improbable + Catastrophic, now the
                              split cell; reported as High unless an
                              airport-specific matrix says otherwise)
@@ -36,6 +37,7 @@ _FORWARD: list[tuple[str, int, str]] = [
     ("A", 3, "high"),
     ("B", 3, "high"),
     ("C", 2, "medium"),
+    ("D", 3, "medium"),
     ("E", 5, "high"),
 ]
 
@@ -43,6 +45,7 @@ _REVERSE: list[tuple[str, int, str]] = [
     ("A", 3, "medium"),
     ("B", 3, "medium"),
     ("C", 2, "low"),
+    ("D", 3, "low"),
     ("E", 5, "medium"),
 ]
 

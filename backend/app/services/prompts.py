@@ -752,7 +752,7 @@ only authority:
   A Frequent           High         High     High   Medium  Low
   B Probable           High         High     High   Medium  Low
   C Remote             High         High     Medium Medium  Low
-  D Extremely Remote   High         Medium   Low    Low     Low
+  D Extremely Remote   High         Medium   Medium Low     Low
   E Extremely Improb.  High*        Low      Low    Low     Low
 
 * Cell E1 (Extremely Improbable / Catastrophic) is the one cell where operator \
