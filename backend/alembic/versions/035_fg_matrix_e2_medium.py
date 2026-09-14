@@ -1,13 +1,15 @@
-"""Re-grade FG 5x5 cell E3 from Low to Medium.
+"""Re-grade FG 5x5 cell E2 from Low to Medium and teach the PHL the notation.
 
-Faith Group asked for E3 (Extremely Improbable + Major) to read Medium,
-matching the D3 change in migration 034. Stored risk_level was stamped at
-insert time, so rows at that coordinate carry the old band. Severity is
-stored 1=Minimal..5=Catastrophic; Major is 3 in both display and stored
-order.
+FAA Order 5200.11A, Appendix C (the matrix Faith Group works from) shows row
+E as Low at Minimal, Minor and Major, Medium at Hazardous, and the High/Medium
+split at Catastrophic. Migration 024 had set E2 to Low; this restores it.
+Stored risk_level was stamped at insert time, so rows at that coordinate carry
+the old band. Severity is stored 1=Minimal..5=Catastrophic, so display E2
+(Hazardous) is stored severity 4.
 
-Saved organization prompts embed the band table, so they are re-synced from
-the code defaults the same way migrations 030 and 034 did. As there,
+Saved organization prompts embed the band table and, from this revision, the
+PHL prompt also carries the matrix notation rules, so prompts are re-synced
+from the code defaults the same way migrations 030 and 034 did. As there,
 downgrade restores the stored band but not the prior prompt text.
 
 Revision ID: 035
@@ -28,8 +30,7 @@ depends_on = None
 def _set_band(level: str) -> None:
     op.get_bind().execute(
         sa.text(
-            "UPDATE risk_entries SET risk_level = :level "
-            "WHERE likelihood = 'E' AND severity = 3"
+            "UPDATE risk_entries SET risk_level = :level WHERE likelihood = 'E' AND severity = 4"
         ),
         {"level": level},
     )

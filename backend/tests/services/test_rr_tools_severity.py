@@ -50,8 +50,8 @@ def test_non_numeric_severity_is_rejected() -> None:
         ("D2", RiskLevel.MEDIUM),  # Extremely Remote + Hazardous
         ("D3", RiskLevel.MEDIUM),  # Extremely Remote + Major
         ("D4", RiskLevel.LOW),  # Extremely Remote + Minor
-        ("E3", RiskLevel.MEDIUM),  # Extremely Improbable + Major
-        ("E4", RiskLevel.LOW),  # Extremely Improbable + Minor
+        ("E2", RiskLevel.MEDIUM),  # Extremely Improbable + Hazardous
+        ("E3", RiskLevel.LOW),  # Extremely Improbable + Major
     ],
 )
 def test_matrix_cell_labels_land_in_the_band_the_chart_shows(

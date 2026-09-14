@@ -651,9 +651,13 @@ against the Lagging, Leading, and Predictive framework to sharpen the screening 
 Step 4. Use this assessment to inform the likelihood/severity estimates and \
 monitoring recommendations; do not present the pillar classification as a labeled \
 field, tag, or section in the PHL output.
-4. Initial Screening: Provide qualitative preliminary likelihood/severity estimates \
-(70% weighted by FG precedents where applicable) and flag any item that appears \
-Medium or higher for Full SRA.
+4. Initial Screening: Provide preliminary likelihood/severity estimates for every \
+hazard in the configured matrix notation -- likelihood LETTER A-E, severity \
+NUMBER 1-5, cell label letter-first, e.g. "C2 (Remote / Hazardous)" -- with the \
+band read from the Risk Band Assignment table below (70% weighted by FG \
+precedents where applicable), and flag any item that appears Medium or higher \
+for Full SRA. The Risk Matrix Notation rules below apply to the PHL screening \
+exactly as they apply to the SRA.
 
 Output Requirements
 Structured JSON (for database ingestion into Risk Register) wrapped in a single \
@@ -724,7 +728,8 @@ provided enough information to determine a credible outcome, ask for it \
 before proceeding with scoring.
  \
 Risk Matrix Notation (MANDATORY, NEVER OVERRIDDEN): Every risk determination \
-in the SRA -- initial risk, residual risk, and any intermediate score -- MUST \
+in a PHL screening or an SRA -- initial risk, residual risk, and any \
+intermediate score -- MUST \
 be rendered in the configured matrix's notation. For the FAA 5x5 default, this \
 means:
 
@@ -738,7 +743,11 @@ Frequent and Catastrophic. E1 is Extremely Improbable and Catastrophic. A5 is \
 Frequent and Minimal. E5 is Extremely Improbable and Minimal. NEVER write the \
 number first -- "1A" is not a valid cell label and inverts the meaning. Severity \
 1 is the MOST severe outcome and 5 the least; likelihood A is the MOST frequent \
-and E the least. State the plain-language pair alongside the label the first \
+and E the least. These ten names (FAA Order 5200.11A, Appendix C) are the only \
+likelihood and severity terms RMP uses: never substitute descriptors from another \
+matrix such as 'Occasional', 'Improbable', 'Likely', 'Critical' or 'Marginal', \
+never letter a severity, and never number a likelihood. State the plain-language \
+pair alongside the label the first \
 time a score appears, e.g. "C3 (Remote / Major)". The cell label must be shown \
 explicitly (e.g. "Initial Risk: C2 (High)").
 
@@ -753,7 +762,7 @@ only authority:
   B Probable           High         High     High   Medium  Low
   C Remote             High         High     Medium Medium  Low
   D Extremely Remote   High         Medium   Medium Low     Low
-  E Extremely Improb.  High*        Low      Medium Low     Low
+  E Extremely Improb.  High*        Medium   Low    Low     Low
 
 * Cell E1 (Extremely Improbable / Catastrophic) is the one cell where operator \
 matrices legitimately differ. Report it as High unless an airport-specific \
@@ -1512,7 +1521,17 @@ _SUB_PROMPT_2 = GENERAL_PROMPT[
     )
 ]
 
-PHL_PROMPT = _BASELINE_CONTEXT + _SUB_PROMPT_2
+# Matrix notation and band rules are written once, inside Sub-Prompt 3, and
+# shared with the PHL so its initial screening uses the same cell labels.
+_MATRIX_RULES_END = "front-end suppression rule.\n"
+_MATRIX_RULES = GENERAL_PROMPT[
+    GENERAL_PROMPT.index("Risk Matrix Notation (MANDATORY") : GENERAL_PROMPT.index(
+        _MATRIX_RULES_END
+    )
+    + len(_MATRIX_RULES_END)
+]
+
+PHL_PROMPT = _BASELINE_CONTEXT + _SUB_PROMPT_2 + "\n" + _MATRIX_RULES
 
 # --- Sub-Prompt 3: Safety Risk Assessment (SRA) ---
 _SUB_PROMPT_3 = GENERAL_PROMPT[

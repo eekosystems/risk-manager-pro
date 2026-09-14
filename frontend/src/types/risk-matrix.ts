@@ -42,7 +42,7 @@ export const RISK_MATRIX: Record<Likelihood, Record<Severity, RiskLevel>> = {
   B: { 1: "low",     2: "medium", 3: "high",    4: "high",    5: "high"    },
   C: { 1: "low",     2: "medium", 3: "medium",  4: "high",    5: "high"    },
   D: { 1: "low",     2: "low",    3: "medium",  4: "medium",  5: "high"    },
-  E: { 1: "low",     2: "low",    3: "medium",  4: "low",     5: "high"    },
+  E: { 1: "low",     2: "low",    3: "low",     4: "medium",  5: "high"    },
 };
 
 export const RISK_LEVEL_CONFIG: Record<

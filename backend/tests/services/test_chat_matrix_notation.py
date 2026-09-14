@@ -66,3 +66,14 @@ def test_the_english_article_after_likelihood_is_not_a_likelihood_value() -> Non
 def test_reversed_cell_order_is_not_accepted() -> None:
     """Writing 1A instead of A1 inverts the score, so it must be flagged."""
     assert _has_matrix_cell_notation("Initial Risk: 1A") is False
+
+
+def test_phl_prompt_carries_the_matrix_notation_and_band_rules() -> None:
+    """The PHL screening scores hazards, so it needs the same cell-label rules as the SRA."""
+    from app.services.prompts import PHL_PROMPT, SRA_PROMPT
+
+    for prompt in (PHL_PROMPT, SRA_PROMPT):
+        assert "Risk Matrix Notation (MANDATORY" in prompt
+        assert "Risk Band Assignment (MANDATORY)" in prompt
+        assert "'Occasional'" in prompt
+        assert "E Extremely Improb.  High*        Medium   Low    Low     Low" in prompt

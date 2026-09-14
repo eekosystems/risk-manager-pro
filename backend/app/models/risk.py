@@ -158,8 +158,8 @@ RISK_MATRIX: dict[str, dict[int, RiskLevel]] = {
     "E": {
         1: RiskLevel.LOW,
         2: RiskLevel.LOW,
-        3: RiskLevel.MEDIUM,
-        4: RiskLevel.LOW,
+        3: RiskLevel.LOW,
+        4: RiskLevel.MEDIUM,
         5: RiskLevel.HIGH,
     },
 }
