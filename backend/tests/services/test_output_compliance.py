@@ -271,7 +271,8 @@ def test_matrix_bands_follow_the_risk_register_matrix() -> None:
     # C2 is Remote / Hazardous; the displayed severity 2 is stored as 4.
     assert matrix_bands("C2") == {"high"}
     assert matrix_bands("D2") == {"medium"}
-    assert matrix_bands("E3") == {"low"}
+    assert matrix_bands("E3") == {"medium"}
+    assert matrix_bands("E4") == {"low"}
     assert matrix_bands("A1") == {"high"}
 
 

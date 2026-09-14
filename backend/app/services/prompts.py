@@ -753,7 +753,7 @@ only authority:
   B Probable           High         High     High   Medium  Low
   C Remote             High         High     Medium Medium  Low
   D Extremely Remote   High         Medium   Medium Low     Low
-  E Extremely Improb.  High*        Low      Low    Low     Low
+  E Extremely Improb.  High*        Low      Medium Low     Low
 
 * Cell E1 (Extremely Improbable / Catastrophic) is the one cell where operator \
 matrices legitimately differ. Report it as High unless an airport-specific \
