@@ -749,13 +749,13 @@ only authority:
 
                     Sev 1        Sev 2      Sev 3   Sev 4  Sev 5
                     Catastrophic Hazardous  Major   Minor  Minimal
-  A Frequent           High         High     Medium Medium  Low
-  B Probable           High         High     Medium Medium  Low
-  C Remote             High         High     Medium Low     Low
-  D Extremely Remote   High*        Medium   Low    Low     Low
-  E Extremely Improb.  Medium       Low      Low    Low     Low
+  A Frequent           High         High     High   Medium  Low
+  B Probable           High         High     High   Medium  Low
+  C Remote             High         High     Medium Medium  Low
+  D Extremely Remote   High         Medium   Low    Low     Low
+  E Extremely Improb.  High*        Low      Low    Low     Low
 
-* Cell D1 (Extremely Remote / Catastrophic) is the one cell where operator \
+* Cell E1 (Extremely Improbable / Catastrophic) is the one cell where operator \
 matrices legitimately differ. Report it as High unless an airport-specific \
 matrix says otherwise, and note the split.
 

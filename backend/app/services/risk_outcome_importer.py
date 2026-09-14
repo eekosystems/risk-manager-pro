@@ -169,11 +169,11 @@ _SCALE_SYMBOL_RE = re.compile(r"(?<![a-z0-9])([1-5]|[a-e])(?![a-z0-9])")
 # FG 5x5 — mirrors app.models.risk.RISK_MATRIX (duplicated to avoid a
 # circular import).
 _RISK_MATRIX: dict[str, dict[int, str]] = {
-    "A": {1: "low", 2: "medium", 3: "medium", 4: "high", 5: "high"},
-    "B": {1: "low", 2: "medium", 3: "medium", 4: "high", 5: "high"},
-    "C": {1: "low", 2: "low", 3: "medium", 4: "high", 5: "high"},
+    "A": {1: "low", 2: "medium", 3: "high", 4: "high", 5: "high"},
+    "B": {1: "low", 2: "medium", 3: "high", 4: "high", 5: "high"},
+    "C": {1: "low", 2: "medium", 3: "medium", 4: "high", 5: "high"},
     "D": {1: "low", 2: "low", 3: "low", 4: "medium", 5: "high"},
-    "E": {1: "low", 2: "low", 3: "low", 4: "low", 5: "medium"},
+    "E": {1: "low", 2: "low", 3: "low", 4: "low", 5: "high"},
 }
 
 

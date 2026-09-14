@@ -228,11 +228,11 @@ _BAND_AFTER_CELL_RE = re.compile(
     re.IGNORECASE,
 )
 
-# Cell D1 (Extremely Remote / Catastrophic) is the one cell where operator
+# Cell E1 (Extremely Improbable / Catastrophic) is the one cell where operator
 # matrices legitimately differ; the Risk Register renders it split. Either
 # band is accepted there.
 _SPLIT_CELL_BANDS: dict[str, frozenset[RiskLevel]] = {
-    "D1": frozenset({RiskLevel.HIGH, RiskLevel.MEDIUM}),
+    "E1": frozenset({RiskLevel.HIGH, RiskLevel.MEDIUM}),
 }
 
 

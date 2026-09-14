@@ -42,11 +42,11 @@ def test_non_numeric_severity_is_rejected() -> None:
         # Read straight off the Risk Register matrix: rows A-E, columns 1-5.
         ("A1", RiskLevel.HIGH),  # Frequent + Catastrophic
         ("A5", RiskLevel.LOW),  # Frequent + Minimal
-        ("E1", RiskLevel.MEDIUM),  # Extremely Improbable + Catastrophic
+        ("E1", RiskLevel.HIGH),  # Extremely Improbable + Catastrophic (split cell, High side)
         ("E5", RiskLevel.LOW),  # Extremely Improbable + Minimal
         ("C2", RiskLevel.HIGH),  # Remote + Hazardous
-        ("C4", RiskLevel.LOW),  # Remote + Minor
-        ("B3", RiskLevel.MEDIUM),  # Probable + Major
+        ("C4", RiskLevel.MEDIUM),  # Remote + Minor
+        ("B3", RiskLevel.HIGH),  # Probable + Major
         ("D2", RiskLevel.MEDIUM),  # Extremely Remote + Hazardous
     ],
 )

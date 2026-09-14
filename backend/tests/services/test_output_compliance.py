@@ -276,7 +276,7 @@ def test_matrix_bands_follow_the_risk_register_matrix() -> None:
 
 
 def test_split_cell_d1_accepts_either_band() -> None:
-    assert find_band_mismatches("Residual: D1 – High.\nResidual: D1 – Medium.") == []
+    assert find_band_mismatches("Residual: E1 – High.\nResidual: E1 – Medium.") == []
 
 
 def test_band_matching_the_matrix_is_not_reported() -> None:
