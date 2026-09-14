@@ -670,11 +670,36 @@ _DEFAULT_FOLLOWUPS_BY_FUNCTION: dict[FunctionType, str] = {
     ),
     FunctionType.RISK_REGISTER: (
         "forward | view_risk_register | View Risk Register | -\n"
-        "confirm | general | Confirm Risk Register Entry | Confirm the Risk Register entry above is accurate before we proceed.\n"
+        "confirm | risk_register | Confirm Risk Register Entry | Confirm the Risk Register entry above is accurate and save it.\n"
         "revise | risk_register | Add Another Hazard To Register | I'd like to add another hazard to the Risk Register.\n"
         "explore | sra | Run SRA On Captured Hazard | Run a Safety Risk Assessment on the hazard I just captured."
     ),
 }
+
+
+# Injected at runtime rather than kept in the editable Risk Register prompt:
+# organizations can save their own prompt text, and the prompt describes
+# saving in narrative terms ("assign a unique immutable Risk Record ID"),
+# which lets the model describe a save without performing one.
+_RISK_REGISTER_TOOL_CONTRACT = """Risk Register persistence contract:
+- The ONLY way to save a hazard record is to call the `save_risk_register_record`
+  function. Writing that a record was saved, recorded, or assigned a Risk Record ID
+  without a successful function result is prohibited — the register would not
+  contain it.
+- Never invent a Risk Record ID. The `record_id` returned by the function is the
+  record's identifier; quote that value, and only after the function returns
+  `ok: true`.
+- Once the user confirms the presented record (any affirmative reply, including a
+  'Confirm' chip), call the function in that same turn. Do not ask for
+  confirmation a second time.
+- Mitigation actions are optional at save time. Ask once for owner and due date;
+  if the user does not supply them, save the record without mitigations and note
+  that accountability is still required.
+- If the function returns `ok: false`, report the error plainly, ask for the
+  missing or invalid field, and try again once it is supplied.
+- Chips emitted in Risk Register mode that continue the entry (confirm, validate,
+  revise, clarify) MUST use mode `risk_register`, never `general`, so the next
+  turn keeps this function available."""
 
 
 def _build_default_followups_block(function_type: FunctionType) -> str:
@@ -1361,6 +1386,10 @@ class ChatService:
         history = await self._repo.get_messages(conversation_id, organization_id, limit=20)
         messages: list[dict[str, str]] = [
             {"role": "system", "content": system_prompt},
+        ]
+        if function_type == FunctionType.RISK_REGISTER:
+            messages.append({"role": "system", "content": _RISK_REGISTER_TOOL_CONTRACT})
+        messages += [
             {
                 "role": "system",
                 "content": (
@@ -1504,20 +1533,27 @@ class ChatService:
         """Pick the prompt for this turn. Falls back to request.function_type.
 
         Guards (in order):
-          1. routing_locked → user clicked a follow-up chip; trust the mode
+          1. Tool flow in progress on the conversation (RISK_REGISTER) and
+             the turn is not an explicit hop into another analysis function
+             → stay in Risk Register. The entry flow spans several turns
+             (present the record, confirm, save), and the confirmation turn
+             is the one that calls `save_risk_register_record`. A chip that
+             locks routing to GENERAL — the default mode for confirm and
+             clarify chips — must not strip the tools on that turn, or the
+             model confirms the entry in prose and nothing is saved.
+          2. routing_locked → user clicked a follow-up chip; trust the mode
              they confirmed and skip classification entirely.
-          2. Killswitch off → keep request.function_type.
-          3. Tool flow in progress on the conversation (RISK_REGISTER) →
-             never reroute; the wizard's multi-turn tool loop must not be
-             interrupted by a mid-flow user reply (e.g. "JFK") being
-             misclassified as something else.
+          3. Killswitch off → keep request.function_type.
           4. Otherwise classify every turn so the UI can live-switch.
         """
+        in_register_flow = conversation.function_type == FunctionType.RISK_REGISTER
+        if in_register_flow and request.function_type == FunctionType.GENERAL:
+            return FunctionType.RISK_REGISTER
         if request.routing_locked:
             return request.function_type
         if not app_settings.chat_smart_routing:
             return request.function_type
-        if conversation.function_type == FunctionType.RISK_REGISTER:
+        if in_register_flow:
             return FunctionType.RISK_REGISTER
         return await classify_function(
             request.message, self._openai, fallback=request.function_type

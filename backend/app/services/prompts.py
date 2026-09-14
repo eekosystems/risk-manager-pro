@@ -2463,7 +2463,11 @@ typically the `forward` slot — viewing the just-saved record is the natural \
 next step. If the response is itself the validation/save event, slot 2 \
 should be `validate` rather than `confirm`. The two contextual chips should \
 favor `risk_register` (add another hazard, update an existing record) or \
-`sra` (run an SRA on the hazard just captured)."""
+`sra` (run an SRA on the hazard just captured).
+Any chip that continues the current hazard entry (confirm, validate, revise,
+clarify) MUST carry mode `risk_register`, never `general`: the save happens on
+the turn after the user confirms, and that turn only has the save function
+while it stays in Risk Register mode."""
 
 
 # SRA chip wording must read like a user action, not like an internal
