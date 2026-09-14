@@ -55,7 +55,7 @@ AZURE_AD_CLIENT_ID=<app-client-id>
 AZURE_AD_AUTHORITY=https://login.microsoftonline.com/<tenant-id>
 
 # RBAC rollout flag — leave false locally to avoid 403 loops during dev
-RMP_ENFORCE_RBAC=false
+ENFORCE_RBAC=false
 ```
 
 Never commit `.env`. See `backend/.gitignore`.
@@ -93,7 +93,7 @@ so autogenerate picks them up.
 
 ## 5. RBAC Rollout Notes
 
-The `RMP_ENFORCE_RBAC` env flag gates whether missing membership roles return
+The `ENFORCE_RBAC` env flag gates whether missing membership roles return
 403 or fall through. Keep it `false` in dev so local users without proper
 memberships can still hit the API. Enable `true` in production once the
 membership backfill script has run:

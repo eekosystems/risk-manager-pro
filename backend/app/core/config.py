@@ -136,7 +136,7 @@ class Settings(BaseSettings):
 
     # RBAC enforcement on risks/documents/chat endpoints. Enforced by default;
     # production refuses to boot with it disabled (see validator below). Set
-    # RMP_ENFORCE_RBAC=false only in non-prod during a membership-backfill window.
+    # ENFORCE_RBAC=false only in non-prod during a membership-backfill window.
     enforce_rbac: bool = True
 
     # Azure Monitor / Application Insights
@@ -167,7 +167,7 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def _enforce_rbac_in_production(self) -> "Settings":
         if self.app_env == "production" and not self.enforce_rbac:
-            raise ValueError("enforce_rbac must be true in production (set RMP_ENFORCE_RBAC=true)")
+            raise ValueError("enforce_rbac must be true in production (set ENFORCE_RBAC=true)")
         return self
 
     @model_validator(mode="after")
@@ -179,7 +179,7 @@ class Settings(BaseSettings):
         if self.app_env == "production" and len(self.qaqc_preference_token_secret) < 32:
             raise ValueError(
                 "qaqc_preference_token_secret must be at least 32 chars in production "
-                "(set RMP_QAQC_PREFERENCE_TOKEN_SECRET)"
+                "(set QAQC_PREFERENCE_TOKEN_SECRET)"
             )
         return self
 

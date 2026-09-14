@@ -54,7 +54,7 @@ Verify:
 - `http://localhost:8000/docs` → interactive API docs
 - `http://localhost:5173` → app loads and you can sign in
 
-> Keep `RMP_ENFORCE_RBAC=false` (a.k.a. `ENFORCE_RBAC`) locally so a dev account without full memberships
+> Keep `ENFORCE_RBAC=false` locally so a dev account without full memberships
 > can still hit the API. It is mandatory `true` in production.
 
 ## 3. Where things live
