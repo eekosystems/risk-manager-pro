@@ -13,6 +13,8 @@ from app.services.output_compliance import (
     find_band_mismatches,
     find_hazards_missing_disposition,
     find_incomplete_hierarchy,
+    find_misordered_hierarchy,
+    find_missing_layer_residuals,
     find_mistitled_citations,
     find_reversed_cell_labels,
     find_unreflected_closures,
@@ -29,9 +31,9 @@ Initial Risk
 Controls (Hierarchy of Controls)
 • Avoid/Eliminate: not feasible; the work cannot be relocated off the airfield.
 • Substitute: ruled out; no lower-hazard construction method available.
-• Engineer: barricades and low-profile lighting at all access points.
-• Administrative: escort procedures and daily briefings.
-• PPE: high-visibility vests required for all personnel.
+• Engineer: barricades and low-profile lighting at all access points. Residual after this tier: D2 – Medium.
+• Administrative: escort procedures and daily briefings. Residual after this tier: D2 – Medium.
+• PPE: high-visibility vests required for all personnel. Residual after this tier: D2 – Medium.
 Residual Risk
 • Residual cell: D2 – Medium.
 Disposition: Accept with conditions, subject to the escort procedure being audited weekly.
@@ -238,12 +240,13 @@ def test_reports_the_hierarchy_levels_a_hazard_never_addresses() -> None:
     assert incomplete["H2"] == ["Avoid/Eliminate", "Substitute", "PPE"]
 
 
-def test_a_level_ruled_out_in_words_still_counts_as_addressed() -> None:
+def test_a_level_ruled_out_on_its_own_line_counts_as_addressed() -> None:
     """Explicitly ruling a level out satisfies the requirement."""
     sections = split_hazard_sections(
-        "H1 – A\nAvoid: not feasible. Substitute: none available. Engineer: x. "
-        "Administrative: y. PPE: none required.\n"
-        "H2 – B\nEngineer only.\n"
+        "H1 – A\n- Avoid/Eliminate: not feasible.\n- Substitute: none available.\n"
+        "- Engineer: x. Residual: D2 – Medium.\n- Administrative: y. Residual: D3 – Medium.\n"
+        "- PPE: none required.\n"
+        "H2 – B\nEngineer: barrier only.\n"
     )
 
     incomplete = find_incomplete_hierarchy(sections)
@@ -252,16 +255,162 @@ def test_a_level_ruled_out_in_words_still_counts_as_addressed() -> None:
     assert incomplete["H2"] == ["Avoid/Eliminate", "Substitute", "Administrative", "PPE"]
 
 
+def test_a_one_line_summary_naming_the_tiers_is_not_addressed() -> None:
+    """The abbreviated form names every tier yet gives none its own line."""
+    sections = split_hazard_sections(
+        "H1 – A\nControls (hierarchy of controls summary): elimination and substitution "
+        "are not practical here; engineering (barricades), administrative (escort "
+        "procedures) and PPE (hi-vis) controls apply.\nResidual Risk: D3 – Medium.\n"
+        "H2 – B\nAvoid: not feasible. Substitute: none. Engineer: x. Administrative: y. "
+        "PPE: vests.\n"
+    )
+
+    incomplete = find_incomplete_hierarchy(sections)
+
+    assert incomplete["H1"] == [
+        "Avoid/Eliminate",
+        "Substitute",
+        "Engineer",
+        "Administrative",
+        "PPE",
+    ]
+    assert incomplete["H2"] == ["Substitute", "Engineer", "Administrative", "PPE"]
+
+
+def test_tier_labels_are_recognised_as_bullets_headings_bold_and_table_rows() -> None:
+    sections = split_hazard_sections(
+        "H1 – A\n1. Avoid/Eliminate — not applicable; the circuit must be de-energised.\n"
+        "#### Substitution\nNot applicable — no lower-hazard method.\n"
+        "**Engineering controls:** portable lighting. Residual: D2 – Medium.\n"
+        "| Administrative | NOTAM and daily brief | D3 – Medium |\n"
+        "- PPE (Tier 5): hi-vis vests. Residual after this tier: D3 – Medium.\n"
+        "H2 – B\nEngineer: barrier only.\n"
+    )
+
+    assert "H1" not in find_incomplete_hierarchy(sections)
+    assert "H1" not in find_missing_layer_residuals(sections)
+
+
+def test_a_merged_tier_label_addresses_neither_tier() -> None:
+    sections = split_hazard_sections(
+        "H1 – A\n- Avoid/Eliminate: not applicable.\n- Substitute: not applicable.\n"
+        "- Engineer / Administrative: barricades and escorts. Residual: D2 – Medium.\n"
+        "- PPE: vests. Residual: D2 – Medium.\n"
+        "H2 – B\nEngineer: barrier only.\n"
+    )
+
+    assert find_incomplete_hierarchy(sections)["H1"] == ["Engineer", "Administrative"]
+
+
+def test_reports_hazards_whose_tiers_are_out_of_order() -> None:
+    sections = split_hazard_sections(
+        "H1 – A\n- Avoid/Eliminate: n/a.\n- Substitute: n/a.\n- Engineer: x. Residual: D2.\n"
+        "- Administrative: y. Residual: D2.\n- PPE: z. Residual: D2.\n"
+        "H2 – B\n- Engineer: x. Residual: D2.\n- Avoid/Eliminate: n/a.\n- Substitute: n/a.\n"
+        "- PPE: z. Residual: D2.\n- Administrative: y. Residual: D2.\n"
+        "H3 – C\n- Engineer: x.\n- Avoid/Eliminate: n/a.\n"
+    )
+
+    # H3 is incomplete, not misordered: order is only judged on a full set.
+    assert find_misordered_hierarchy(sections) == ["H2"]
+
+
+# --- Residual risk per control layer -----------------------------------------
+
+
+def test_reports_applied_tiers_with_no_residual_cell() -> None:
+    sections = split_hazard_sections(COMPLIANT_HAZARD + NONCOMPLIANT_HAZARD)
+
+    unscored = find_missing_layer_residuals(sections)
+
+    assert "H1" not in unscored
+    assert unscored["H2"] == ["Engineer"]
+
+
+def test_ruled_out_tiers_need_no_residual() -> None:
+    sections = split_hazard_sections(
+        "H1 – A\n- Avoid/Eliminate: Not applicable — the work cannot move.\n"
+        "- Substitute: ruled out.\n- Engineer: N/A\n"
+        "- Administrative: escorts. Residual after this tier: D2 – Medium.\n"
+        "- PPE: no additional PPE required.\n"
+        "H2 – B\n- Engineer: barrier.\n"
+    )
+
+    assert find_missing_layer_residuals(sections) == {"H2": ["Engineer"]}
+
+
+def test_a_bare_label_reads_its_statement_from_the_next_line() -> None:
+    sections = split_hazard_sections(
+        "H1 – A\n#### Avoid/Eliminate\nNot applicable — the vault cannot be relocated.\n"
+        "#### Substitute\nNot applicable.\n#### Engineer\nBarricades.\nResidual: D2 – Medium.\n"
+        "#### Administrative\nEscorts.\n#### PPE\nNot applicable.\n"
+        "H2 – B\n- Engineer: barrier.\n"
+    )
+
+    assert find_missing_layer_residuals(sections)["H1"] == ["Administrative"]
+
+
+def test_the_initial_cell_on_a_tier_line_is_not_its_residual() -> None:
+    sections = split_hazard_sections(
+        "H1 – A\n- Avoid/Eliminate: n/a.\n- Substitute: n/a.\n"
+        "- Engineer: barricades reduce the initial C2 exposure.\n"
+        "- Administrative: escorts (initial C2 → D2).\n- PPE: n/a.\n"
+        "H2 – B\n- Engineer: barrier.\n"
+    )
+
+    assert find_missing_layer_residuals(sections)["H1"] == ["Engineer"]
+
+
+def test_a_residual_per_layer_table_can_supply_the_cells() -> None:
+    sections = split_hazard_sections(
+        "H1 – A\n- Avoid/Eliminate: n/a.\n- Substitute: n/a.\n- Engineer: barricades.\n"
+        "- Administrative: escorts.\n- PPE: vests.\n"
+        "| Layer | Residual |\n| Engineer | D2 – Medium |\n| Administrative | D3 – Medium |\n"
+        "| PPE | D3 – Medium |\n"
+        "H2 – B\n- Engineer: barrier.\n"
+    )
+
+    assert "H1" not in find_missing_layer_residuals(sections)
+
+
+def test_an_infrastructure_designator_is_not_a_residual_cell() -> None:
+    sections = split_hazard_sections(
+        "H1 – A\n- Avoid/Eliminate: n/a.\n- Substitute: n/a.\n"
+        "- Engineer: barricades at Taxiway B2.\n- Administrative: n/a.\n- PPE: n/a.\n"
+        "H2 – B\n- Engineer: barrier.\n"
+    )
+
+    assert find_missing_layer_residuals(sections)["H1"] == ["Engineer"]
+
+
 def test_sra_issues_name_the_affected_hazards() -> None:
     issues = check_analysis_output(
         COMPLIANT_HAZARD + NONCOMPLIANT_HAZARD, is_sra=True, is_phl=False
     )
 
     labels = {i.label for i in issues}
-    assert labels == {"Per-Hazard Risk Disposition", "Hierarchy of Controls Coverage"}
-    disposition = next(i for i in issues if i.label == "Per-Hazard Risk Disposition")
-    assert "H2" in disposition.detail
-    assert "H1" not in disposition.detail
+    assert labels == {
+        "Per-Hazard Risk Disposition",
+        "Hierarchy of Controls Coverage",
+        "Residual Risk Per Control Layer",
+    }
+    for label in labels:
+        issue = next(i for i in issues if i.label == label)
+        assert "H2" in issue.detail
+        assert "H1" not in issue.detail
+
+
+def test_sra_issue_names_out_of_order_tiers() -> None:
+    content = COMPLIANT_HAZARD + (
+        "\nH2 – Reordered\n- PPE: vests. Residual: D2 – Medium.\n- Avoid/Eliminate: n/a.\n"
+        "- Substitute: n/a.\n- Engineer: x. Residual: D2 – Medium.\n"
+        "- Administrative: y. Residual: D2 – Medium.\nDisposition: Accept.\n"
+    )
+
+    issues = check_analysis_output(content, is_sra=True, is_phl=False)
+
+    assert [i.label for i in issues] == ["Hierarchy of Controls Coverage"]
+    assert "tiers out of order in H2" in issues[0].detail
 
 
 # --- Risk band consistency ----------------------------------------------------
@@ -533,8 +682,10 @@ def test_compliant_output_produces_no_issues() -> None:
     content = (
         COMPLIANT_HAZARD
         + "\nH3 – Second Hazard\n"
-        + "Avoid: not feasible. Substitute: none. Engineer: barrier. "
-        + "Administrative: briefing. PPE: vests.\nDisposition: Accept.\n"
+        + "- Avoid/Eliminate: not feasible.\n- Substitute: none.\n"
+        + "- Engineer: barrier. Residual after this tier: D2 – Medium.\n"
+        + "- Administrative: briefing. Residual after this tier: D3 – Medium.\n"
+        + "- PPE: vests. Residual after this tier: D3 – Medium.\nDisposition: Accept.\n"
     )
 
     assert check_analysis_output(content, is_sra=True, is_phl=False) == []

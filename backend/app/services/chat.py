@@ -1364,7 +1364,11 @@ class ChatService:
             "as 'Not applicable — <reason>'. Never merge two tiers under one "
             "label, never omit a tier because it is a poor fit, and never "
             "collapse the hierarchy into an unlabeled list of mitigations. "
-            "Substitute is the tier most often dropped; it must appear.\n"
+            "Substitute is the tier most often dropped; it must appear. Every "
+            "applied tier states the residual cell after it in matrix notation "
+            "(e.g. 'Residual after this tier: D2 — Medium'). This full breakdown "
+            "applies to every hazard however many there are; a one-line summary "
+            "that names the tiers is non-compliant.\n"
             "- Predictive what-if projections for every analyzed hazard or trend, "
             "tied to concrete time windows when the data supports it.\n"
             "- Discrepancy flags between FG precedents and current airport data, "
@@ -1379,8 +1383,13 @@ class ChatService:
             "- Audit trail entry: timestamp, action, resource(s) analyzed, "
             "outcome, and any escalation flags.\n"
             "If output length pressure forces compression, compress scoring-"
-            "narrative depth and secondary commentary FIRST. Never drop any of "
-            "the mandatory elements above to fit length."
+            "narrative prose and secondary commentary FIRST. The per-hazard "
+            "hierarchy of controls, the residual cell after each applied tier, "
+            "and the matrix cell notation are scored determinations, not "
+            "narrative: never abbreviate them, and never drop any of the "
+            "mandatory elements above to fit length. If the hazard set cannot "
+            "be completed in full, finish as many hazards as fit in full and "
+            "state which remain."
         )
 
         history = await self._repo.get_messages(conversation_id, organization_id, limit=20)

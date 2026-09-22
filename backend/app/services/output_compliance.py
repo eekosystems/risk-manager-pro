@@ -171,25 +171,174 @@ def find_hazards_missing_disposition(sections: list[HazardSection]) -> list[str]
 
 # --- Hierarchy of controls (Sub-Prompt 3) ------------------------------------
 
-# All five levels must be considered and explicitly ruled in or out. Avoid and
-# Substitute are the ones routinely dropped when they are not an obvious fit.
-_HIERARCHY_LEVELS: tuple[tuple[str, re.Pattern[str]], ...] = (
-    ("Avoid/Eliminate", re.compile(r"\b(?:avoid\w*|eliminat\w*)\b", re.IGNORECASE)),
-    ("Substitute", re.compile(r"\bsubstitut\w*\b", re.IGNORECASE)),
-    ("Engineer", re.compile(r"\bengineer\w*\b", re.IGNORECASE)),
-    ("Administrative", re.compile(r"\badministrativ\w*\b", re.IGNORECASE)),
-    ("PPE", re.compile(r"\bPPE\b|\bpersonal protective equipment\b", re.IGNORECASE)),
+# Sub-Prompt 3 requires every SRA hazard to carry all five tiers, each under
+# its own label and in this order, with the residual cell restated after each
+# tier that is applied. This check used to pass any hazard whose text merely
+# mentioned the five tier names, so the abbreviated form a 13-hazard SRA
+# produced for 11 of its hazards ("elimination and substitution are not
+# practical; engineering, administrative and PPE controls apply") counted as
+# complete. A tier now counts only when it heads its own line — a bullet, a
+# numbered item, a table row, a bold label or a heading — and an applied tier
+# must be followed by a residual cell before the next tier begins.
+_TIER_LABEL_PREFIX = (
+    r"^[ \t]*(?:\|[ \t]*)?(?:#{1,6}[ \t]*)?(?:[-*•·]|\d{1,2}[.)])?[ \t]*"
+    r"(?:\*\*|__)?[ \t]*(?:tier[ \t]*\d[ \t]*[:\-–—][ \t]*)?"
 )
+_TIER_LABEL_SUFFIX = (
+    r"(?:[ \t]+(?:controls?|tier|layer|level|measures?))?"
+    r"(?:[ \t]*\([^)\n]{0,60}\))?[ \t]*(?:\*\*|__)?[ \t]*(?:[:\-–—|]|$)"
+)
+_TIER_NAMES: tuple[tuple[str, str], ...] = (
+    (
+        "Avoid/Eliminate",
+        r"(?:avoid(?:ance)?|eliminat(?:e|ion))"
+        r"(?:[ \t]*/[ \t]*(?:avoid(?:ance)?|eliminat(?:e|ion)))?",
+    ),
+    ("Substitute", r"substitut(?:e|ion)"),
+    ("Engineer", r"engineer(?:ing|ed)?"),
+    ("Administrative", r"administrative|admin"),
+    ("PPE", r"PPE|personal protective equipment"),
+)
+HIERARCHY_ORDER: tuple[str, ...] = tuple(name for name, _ in _TIER_NAMES)
+_HIERARCHY_LEVELS: tuple[tuple[str, re.Pattern[str]], ...] = tuple(
+    (
+        name,
+        re.compile(
+            _TIER_LABEL_PREFIX + f"(?:{pattern})" + _TIER_LABEL_SUFFIX,
+            re.IGNORECASE | re.MULTILINE,
+        ),
+    )
+    for name, pattern in _TIER_NAMES
+)
+
+# How a tier is ruled out. The spec's form is "Not applicable -- <reason>";
+# real outputs also write "ruled out", "not feasible", "N/A" and "none".
+_TIER_RULED_OUT_RE = re.compile(
+    r"\bnot applicable\b|\bn/a\b|\bnot feasible\b|\bnot practica(?:l|ble)\b"
+    r"|\bruled out\b"
+    r"|\bnot (?:available|possible|viable|used|applied|required|warranted|selected)\b"
+    r"|\bno (?:[\w-]+[ \t]+){0,4}(?:available|identified|feasible|required|practicable)\b"
+    r"|\bnone\b",
+    re.IGNORECASE,
+)
+
+# A cell on a tier's own lines is its residual unless the line introduces it as
+# the initial score ("Engineer: barricades (initial C2 → D2)").
+_INITIAL_LEAD_IN_RE = re.compile(r"\binitial\b(?:(?![A-E][1-5])[^\n]){0,40}\Z", re.IGNORECASE)
+
+
+@dataclass(frozen=True)
+class _TierBlock:
+    """One labelled tier line and the text that follows it up to the next tier."""
+
+    tier: str
+    start: int
+    label_text: str
+    body: str
+
+
+def _text_after_label(section_body: str, match: re.Match[str]) -> str:
+    """The tier's own statement: the rest of its line, or the next line if bare."""
+    line_end = section_body.find("\n", match.end())
+    if line_end == -1:
+        line_end = len(section_body)
+    rest = section_body[match.end() : line_end].strip()
+    if rest:
+        return rest
+    for line in section_body[line_end:].splitlines():
+        if line.strip():
+            return line.strip()
+    return ""
+
+
+def _tier_blocks(section_body: str) -> list[_TierBlock]:
+    matches: list[tuple[int, str, re.Match[str]]] = sorted(
+        (
+            (match.start(), name, match)
+            for name, pattern in _HIERARCHY_LEVELS
+            for match in pattern.finditer(section_body)
+        ),
+        key=lambda item: item[0],
+    )
+    blocks: list[_TierBlock] = []
+    for i, (start, name, match) in enumerate(matches):
+        end = matches[i + 1][0] if i + 1 < len(matches) else len(section_body)
+        blocks.append(
+            _TierBlock(
+                tier=name,
+                start=start,
+                label_text=_text_after_label(section_body, match),
+                body=section_body[start:end],
+            )
+        )
+    return blocks
+
+
+def _states_residual_cell(block_body: str) -> bool:
+    """True when the block carries a matrix cell that is not the initial score."""
+    for match in MATRIX_CELL_RE.finditer(block_body):
+        if not is_matrix_cell_label(block_body, match):
+            continue
+        line_start = block_body.rfind("\n", 0, match.start()) + 1
+        if _INITIAL_LEAD_IN_RE.search(block_body[line_start : match.start()]):
+            continue
+        return True
+    return False
 
 
 def find_incomplete_hierarchy(sections: list[HazardSection]) -> dict[str, list[str]]:
-    """Map each hazard label to the hierarchy levels it never mentions."""
+    """Map each hazard label to the tiers that never head their own line.
+
+    A tier mentioned only inside prose or a one-line summary is not addressed:
+    the spec requires each tier under its own label.
+    """
     incomplete: dict[str, list[str]] = {}
     for section in sections:
-        missing = [name for name, pattern in _HIERARCHY_LEVELS if not pattern.search(section.body)]
+        present = {block.tier for block in _tier_blocks(section.body)}
+        missing = [name for name in HIERARCHY_ORDER if name not in present]
         if missing:
             incomplete[section.label] = missing
     return incomplete
+
+
+def find_misordered_hierarchy(sections: list[HazardSection]) -> list[str]:
+    """Hazard labels whose five tiers all appear but not in hierarchy order."""
+    misordered: list[str] = []
+    for section in sections:
+        first_seen: dict[str, int] = {}
+        for block in _tier_blocks(section.body):
+            first_seen.setdefault(block.tier, block.start)
+        if len(first_seen) < len(HIERARCHY_ORDER):
+            continue
+        positions = [first_seen[name] for name in HIERARCHY_ORDER]
+        if positions != sorted(positions):
+            misordered.append(section.label)
+    return misordered
+
+
+def find_missing_layer_residuals(sections: list[HazardSection]) -> dict[str, list[str]]:
+    """Map each hazard label to the applied tiers with no residual cell after them.
+
+    Whether a tier is applied is read from its first labelled line; a tier that
+    is ruled out there needs no residual. Any later block headed by the same
+    tier (a residual-per-layer table row, say) can supply the cell.
+    """
+    unscored: dict[str, list[str]] = {}
+    for section in sections:
+        applied: set[str] = set()
+        scored: set[str] = set()
+        seen: set[str] = set()
+        for block in _tier_blocks(section.body):
+            if block.tier not in seen:
+                seen.add(block.tier)
+                if not _TIER_RULED_OUT_RE.search(block.label_text):
+                    applied.add(block.tier)
+            if _states_residual_cell(block.body):
+                scored.add(block.tier)
+        missing = [name for name in HIERARCHY_ORDER if name in applied and name not in scored]
+        if missing:
+            unscored[section.label] = missing
+    return unscored
 
 
 # --- Risk band consistency (Sub-Prompt 3) ------------------------------------
@@ -565,17 +714,40 @@ def check_analysis_output(
                 )
 
             incomplete = find_incomplete_hierarchy(sections)
-            if incomplete:
-                detail = "; ".join(
-                    f"{label} (missing {', '.join(levels)})"
-                    for label, levels in sorted(incomplete.items())
-                )
+            misordered = find_misordered_hierarchy(sections)
+            if incomplete or misordered:
+                gaps = [
+                    f"{label} (no labelled line for {', '.join(levels)})"
+                    for label, levels in incomplete.items()
+                ]
+                if misordered:
+                    gaps.append(f"tiers out of order in {', '.join(misordered)}")
                 issues.append(
                     ComplianceIssue(
                         label="Hierarchy of Controls Coverage",
                         detail=(
-                            "All five levels must be ruled in or out with a stated "
-                            f"reason. Levels never addressed — {detail}."
+                            "Every hazard must list all five tiers — Avoid/Eliminate, "
+                            "Substitute, Engineer, Administrative, PPE — each heading "
+                            "its own line, in that order, applied or ruled out with a "
+                            "stated reason. A one-line summary that names the tiers "
+                            f"does not satisfy this. Gaps — {'; '.join(gaps)}."
+                        ),
+                    )
+                )
+
+            unscored = find_missing_layer_residuals(sections)
+            if unscored:
+                detail = "; ".join(
+                    f"{label} ({', '.join(levels)})" for label, levels in unscored.items()
+                )
+                issues.append(
+                    ComplianceIssue(
+                        label="Residual Risk Per Control Layer",
+                        detail=(
+                            "The residual risk cell must be restated in matrix "
+                            "notation after every tier that is applied, so the "
+                            "before/after effect of each layer is visible. Applied "
+                            f"tiers with no residual cell — {detail}."
                         ),
                     )
                 )

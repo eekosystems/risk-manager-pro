@@ -708,7 +708,23 @@ combined label (no "Engineer / Administrative"), and the hierarchy is never \
 collapsed into an unlabeled list of mitigations. Substitute is the tier most \
 often dropped when it is a poor fit; it must still be ruled in or out explicitly.
 6. Calculate Residual Risk Score after each layer of mitigation, again applying 70% \
-FG weighting to precedent effectiveness data.
+FG weighting to precedent effectiveness data. Write the residual cell, in matrix \
+notation with its band, on the line of every tier that is applied (e.g. \
+"Engineer: portable battery lighting on the closed segment. Residual after this \
+tier: D2 (Extremely Remote / Hazardous) -- Medium"), so the before/after effect \
+of each layer is visible; a ruled-out tier carries no residual. The final \
+residual is the cell after the last applied tier.
+Per-Hazard Template (MANDATORY, identical for every hazard): render each hazard \
+with the same fixed structure -- Primary Worst Credible Outcome, Initial Risk \
+cell, the five labelled tiers each with its residual cell, ALARP status, and the \
+Accept / Accept with conditions / Reject disposition. The number of hazards \
+NEVER reduces this structure: a 13-hazard or 25-hazard SRA gives every hazard \
+the same full breakdown a 1-hazard SRA gets. Never write "the remaining hazards \
+follow the same pattern", never abbreviate later hazards to a summary, and \
+never put a single combined table in place of the per-hazard breakdown (a \
+summary table may be added, never substituted). If the full set cannot be \
+completed in one output, complete as many hazards as fit in full, state exactly \
+which hazards remain, and continue them in the next output when asked.
 7. Determine ALARP status and whether Accountable Executive acceptance is required.
 
 Output Requirements
@@ -817,11 +833,15 @@ mitigation -- stated explicitly with rationale.
 Drop Order Under Length Pressure: If the output approaches its length ceiling, \
 drop scoring-narrative depth and secondary commentary first. Do NOT drop any \
 Mandatory Closing Subsection (A-G), do NOT drop the alphanumeric matrix \
-notation, and do NOT truncate the before/after comparison table mid-row.
+notation, do NOT drop or abbreviate any tier of the per-hazard hierarchy of \
+controls or the residual cell after each applied tier (these are scored \
+determinations, not narrative), and do NOT truncate the before/after \
+comparison table mid-row.
  \
-Before ending the output, verify each of A-G is present, the alphanumeric \
-matrix notation appears on every risk determination, and the Primary Worst \
-Credible Outcome field is at the top. If any is missing, restore it before \
+Before ending the output, verify each of A-G is present, every hazard carries \
+all five labelled tiers with a residual cell after each applied tier, the \
+alphanumeric matrix notation appears on every risk determination, and the \
+Primary Worst Credible Outcome field is at the top. If any is missing, restore it before \
 finalizing. Default to conservative scoring. The human shall always remain as \
 the final control for all RMP-produced outcomes.
 
