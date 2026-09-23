@@ -86,12 +86,9 @@ export function RiskListView({ onSelectRisk, onCreateNew }: RiskListViewProps) {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
   // Single wide fetch — we filter client-side so the airport-pill bar stays
-  // populated even when a specific airport is selected.
-  const { data, isLoading } = useRisks({
-    ...(statusFilter ? { status: statusFilter } : {}),
-    ...(riskLevelFilter ? { risk_level: riskLevelFilter } : {}),
-    limit: 500,
-  });
+  // populated even when a specific airport is selected, and so the status and
+  // risk-level filters apply to SharePoint rows as well as DB rows.
+  const { data, isLoading } = useRisks({ limit: 500 });
   const deleteMutation = useDeleteRisk();
 
   // Pull the SharePoint risk-outcome scan — airport list + hazards extracted
@@ -181,6 +178,18 @@ export function RiskListView({ onSelectRisk, onCreateNew }: RiskListViewProps) {
     if (airportFilter === ALL_AIRPORTS) return allRisks;
     return allRisks.filter((r) => r.airport_identifier === airportFilter);
   }, [allRisks, airportFilter]);
+
+  // Apply the status and risk-level dropdowns to the hazard list only; the
+  // matrix keeps showing the airport's full distribution.
+  const listedRisks: RiskEntryListItem[] = useMemo(
+    () =>
+      risks.filter(
+        (r) =>
+          (!statusFilter || r.status === statusFilter) &&
+          (!riskLevelFilter || r.risk_level === riskLevelFilter),
+      ),
+    [risks, statusFilter, riskLevelFilter],
+  );
 
   // Apply the matrix-cell drill-down filter — final list shown in right panel.
   const cellRisks: RiskEntryListItem[] = useMemo(() => {
@@ -355,8 +364,12 @@ export function RiskListView({ onSelectRisk, onCreateNew }: RiskListViewProps) {
             actionLabel="New Risk Entry"
             onAction={onCreateNew}
           />
+        ) : listedRisks.length === 0 ? (
+          <div className="p-10 text-center text-[13px] text-slate-400">
+            No risk entries match the selected status and risk level.
+          </div>
         ) : (
-          risks.map((risk, index) => {
+          listedRisks.map((risk, index) => {
             const levelCfg =
               RISK_LEVEL_CONFIG[risk.risk_level as RiskLevel] ?? RISK_LEVEL_CONFIG.low;
             const statusCfg = STATUS_LABELS[risk.status] ?? STATUS_LABELS.open;
@@ -366,7 +379,7 @@ export function RiskListView({ onSelectRisk, onCreateNew }: RiskListViewProps) {
                 key={risk.id}
                 onClick={() => handleSelectRisk(risk.id)}
                 className={`flex cursor-pointer items-center gap-4 px-5 py-4 transition-colors hover:bg-gray-50 ${
-                  index < risks.length - 1 ? "border-b border-gray-100" : ""
+                  index < listedRisks.length - 1 ? "border-b border-gray-100" : ""
                 }`}
               >
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50">

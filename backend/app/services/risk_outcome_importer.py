@@ -75,12 +75,15 @@ class SharePointParseNote:
 
 
 def _risk_from_dict(d: dict[str, Any]) -> SharePointRisk:
+    # The band is re-derived from the cell rather than read back, so rows
+    # cached under an earlier grid follow the current one without a re-scan.
+    severity = int(d["severity"])
     return SharePointRisk(
         airport_identifier=d["airport_identifier"],
         hazard=d["hazard"],
-        severity=int(d["severity"]),
+        severity=severity,
         likelihood=d["likelihood"],
-        risk_level=d["risk_level"],
+        risk_level=_compute_risk_level(severity, d["likelihood"]),
         source_file=d["source_file"],
         source_url=d.get("source_url"),
         report_year=d.get("report_year"),
@@ -518,9 +521,22 @@ async def _extract_risks_via_llm(
         if dedup_key in seen:
             continue
         seen.add(dedup_key)
-        risk_level = _normalize_risk_level(row.get("risk_level")) or _compute_risk_level(
-            severity, likelihood
-        )
+        # The register places every hazard on the FG 5x5 by its cell, so the
+        # badge takes the band from the same cell. A band the document states
+        # under its own matrix is only reported when it disagrees.
+        risk_level = _compute_risk_level(severity, likelihood)
+        stated_level = _normalize_risk_level(row.get("risk_level"))
+        if stated_level is not None and stated_level != risk_level:
+            notes.append(
+                SharePointParseNote(
+                    airport_identifier=airport,
+                    source_file=source_file,
+                    message=(
+                        f"stated risk level {stated_level} differs from FG 5x5 "
+                        f"cell {likelihood}{6 - severity} ({risk_level}); using the matrix"
+                    ),
+                )
+            )
         risks.append(
             SharePointRisk(
                 airport_identifier=airport,
