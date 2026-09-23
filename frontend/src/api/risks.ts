@@ -5,8 +5,10 @@ import type {
   DataResponse,
   MitigationItem,
   PaginatedResponse,
+  ResidualAssessment,
   RiskEntryDetail,
   RiskEntryListItem,
+  SrmdImportResult,
   UpdateMitigationRequest,
   UpdateRiskEntryRequest,
 } from "@/types/api";
@@ -98,4 +100,39 @@ export async function deleteMitigation(
   mitigationId: string,
 ): Promise<void> {
   await apiClient.delete(`/risks/${riskId}/mitigations/${mitigationId}`);
+}
+
+export async function importSrmdHazards(): Promise<SrmdImportResult> {
+  const response =
+    await apiClient.post<DataResponse<SrmdImportResult>>("/risks/import-srmd");
+  return response.data.data;
+}
+
+export async function requestResidualAssessment(
+  riskId: string,
+): Promise<ResidualAssessment> {
+  const response = await apiClient.post<DataResponse<ResidualAssessment>>(
+    `/risks/${riskId}/residual-assessments`,
+  );
+  return response.data.data;
+}
+
+export async function confirmResidualAssessment(
+  riskId: string,
+  assessmentId: string,
+): Promise<ResidualAssessment> {
+  const response = await apiClient.post<DataResponse<ResidualAssessment>>(
+    `/risks/${riskId}/residual-assessments/${assessmentId}/confirm`,
+  );
+  return response.data.data;
+}
+
+export async function dismissResidualAssessment(
+  riskId: string,
+  assessmentId: string,
+): Promise<ResidualAssessment> {
+  const response = await apiClient.post<DataResponse<ResidualAssessment>>(
+    `/risks/${riskId}/residual-assessments/${assessmentId}/dismiss`,
+  );
+  return response.data.data;
 }

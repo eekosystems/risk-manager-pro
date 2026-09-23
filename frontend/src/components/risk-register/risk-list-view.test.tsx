@@ -1,10 +1,14 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { RiskOutcomeSummary, SharePointRiskRow } from "@/api/sharepoint";
-import type { RiskEntryListItem } from "@/types/api";
+import type {
+  MitigationItem,
+  ResidualAssessment,
+  RiskEntryListItem,
+} from "@/types/api";
 
 import { RiskListView } from "./risk-list-view";
 
@@ -23,11 +27,41 @@ const dbRisk: RiskEntryListItem = {
   record_status: "open",
   validation_status: "rmp_validated",
   source: "manual_entry",
+  residual_severity: null,
+  residual_likelihood: null,
+  residual_risk_level: null,
+  source_document_url: null,
+  mitigations: [{ id: "m-1", title: "Hold-short signage", status: "pending" }],
+  latest_assessment: null,
   created_at: "2026-09-01T00:00:00Z",
   updated_at: "2026-09-01T00:00:00Z",
 };
 
-function spRow(hazard: string, riskLevel: string): SharePointRiskRow {
+const proposal: ResidualAssessment = {
+  id: "assessment-1",
+  risk_entry_id: "db-1",
+  status: "proposed",
+  trigger: "mitigation.created",
+  residual_severity: 4,
+  residual_likelihood: "E",
+  residual_risk_level: "medium",
+  result: {
+    tiers: [],
+    alarp_status: "ALARP achieved",
+    rationale: "Signage lowers likelihood.",
+    sources: [],
+  },
+  error_code: null,
+  created_at: "2026-09-23T00:00:00Z",
+  completed_at: "2026-09-23T00:01:00Z",
+  decided_at: null,
+};
+
+function spRow(
+  hazard: string,
+  riskLevel: string,
+  extra: Partial<SharePointRiskRow> = {},
+): SharePointRiskRow {
   return {
     airport_identifier: "DEN",
     hazard,
@@ -36,6 +70,11 @@ function spRow(hazard: string, riskLevel: string): SharePointRiskRow {
     risk_level: riskLevel,
     source_file: "srmd.pdf",
     source_url: null,
+    residual_severity: null,
+    residual_likelihood: null,
+    residual_risk_level: null,
+    mitigations: [],
+    ...extra,
   };
 }
 
@@ -43,7 +82,14 @@ const summary: RiskOutcomeSummary = {
   airports: ["DEN"],
   risks: [
     spRow("Foreign Object Debris (FOD)", "low"),
-    spRow("FOD - Clean Soil hauled", "medium"),
+    spRow("FOD - Clean Soil hauled", "medium", {
+      severity: 3,
+      likelihood: "C",
+      residual_severity: 2,
+      residual_likelihood: "D",
+      residual_risk_level: "low",
+      mitigations: ["Cover loads in transit", "Sweep haul route daily"],
+    }),
   ],
   notes: [],
   generated_at: 0,
@@ -53,9 +99,51 @@ const summary: RiskOutcomeSummary = {
   last_scan_completed_at: 0,
 };
 
+const editorMitigation: MitigationItem = {
+  id: "m-1",
+  risk_entry_id: "db-1",
+  title: "Hold-short signage",
+  description: "Hold-short signage",
+  assignee: null,
+  due_date: null,
+  verification_method: null,
+  status: "pending",
+  completed_at: null,
+  created_at: "2026-09-01T00:00:00Z",
+  updated_at: "2026-09-01T00:00:00Z",
+};
+
+const mocks = vi.hoisted(() => ({
+  dbRisks: [] as RiskEntryListItem[],
+  canEdit: true,
+  importMutate: vi.fn(),
+  confirmMutate: vi.fn(),
+  updateMutate: vi.fn(),
+}));
+
+function mutation(mutate = vi.fn()) {
+  return { mutate, isPending: false };
+}
+
 vi.mock("@/hooks/use-risks", () => ({
-  useRisks: () => ({ data: { data: [dbRisk] }, isLoading: false }),
-  useDeleteRisk: () => ({ mutate: vi.fn(), isPending: false }),
+  useRisks: () => ({ data: { data: mocks.dbRisks }, isLoading: false }),
+  useDeleteRisk: () => mutation(),
+  useImportSrmdHazards: () => mutation(mocks.importMutate),
+  useConfirmResidualAssessment: () => mutation(mocks.confirmMutate),
+  useDismissResidualAssessment: () => mutation(),
+  useRequestResidualAssessment: () => mutation(),
+  useMitigations: () => ({ data: [editorMitigation], isLoading: false }),
+  useCreateMitigation: () => mutation(),
+  useUpdateMitigation: () => mutation(mocks.updateMutate),
+  useDeleteMitigation: () => mutation(),
+}));
+
+vi.mock("@/hooks/use-user-role", () => ({
+  useUserRole: () => ({ canEdit: mocks.canEdit }),
+}));
+
+vi.mock("@/hooks/use-toast", () => ({
+  useToast: () => ({ addToast: vi.fn() }),
 }));
 
 vi.mock("@/api/sharepoint", () => ({
@@ -80,6 +168,21 @@ function listedTitles(): string[] {
     "FOD - Clean Soil hauled",
   ].filter((title) => screen.queryAllByText(title).length > 0);
 }
+
+function rowFor(title: string): HTMLElement {
+  const [titleEl] = screen.getAllByText(title, {
+    selector: "span.font-semibold",
+  });
+  const row = titleEl?.closest(".grid");
+  if (!(row instanceof HTMLElement)) throw new Error(`no row for ${title}`);
+  return row;
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  mocks.dbRisks = [dbRisk];
+  mocks.canEdit = true;
+});
 
 describe("RiskListView filters", () => {
   it("applies the risk-level filter to SharePoint and DB rows alike", async () => {
@@ -120,5 +223,91 @@ describe("RiskListView filters", () => {
         "No risk entries match the selected status and risk level.",
       ),
     ).toBeInTheDocument();
+  });
+});
+
+describe("RiskListView initial risk, residual risk and mitigations", () => {
+  it("shows an SRMD hazard's initial cell, residual cell and mitigations", async () => {
+    renderView();
+    await screen.findAllByText("FOD - Clean Soil hauled");
+
+    const row = within(rowFor("FOD - Clean Soil hauled"));
+    expect(row.getByText("C3")).toBeInTheDocument();
+    expect(row.getByText("D4")).toBeInTheDocument();
+    expect(row.getByText("• Cover loads in transit")).toBeInTheDocument();
+    expect(row.getByText("• Sweep haul route daily")).toBeInTheDocument();
+    expect(row.getByText("Import SRMD hazards to edit")).toBeInTheDocument();
+    expect(row.queryByText("Edit mitigations")).not.toBeInTheDocument();
+  });
+
+  it("imports the SRMD hazards still read from the scan", async () => {
+    renderView();
+    await screen.findAllByText("FOD - Clean Soil hauled");
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /Import 2 SRMD hazards/ }),
+    );
+
+    expect(mocks.importMutate).toHaveBeenCalledTimes(1);
+  });
+
+  it("confirms a proposed residual", async () => {
+    mocks.dbRisks = [{ ...dbRisk, latest_assessment: proposal }];
+    renderView();
+    await screen.findAllByText("Foreign Object Debris (FOD)");
+
+    const row = within(rowFor("Runway incursion at hold short line"));
+    expect(row.getByText("Proposed")).toBeInTheDocument();
+    expect(row.getByText("E2")).toBeInTheDocument();
+    await userEvent.click(row.getByRole("button", { name: "Confirm" }));
+
+    expect(mocks.confirmMutate).toHaveBeenCalledWith(
+      "assessment-1",
+      expect.anything(),
+    );
+  });
+
+  it("saves an edited mitigation from the inline editor", async () => {
+    renderView();
+    await screen.findAllByText("Foreign Object Debris (FOD)");
+
+    await userEvent.click(
+      within(rowFor("Runway incursion at hold short line")).getByRole(
+        "button",
+        {
+          name: "Edit mitigations",
+        },
+      ),
+    );
+    const field = screen.getByLabelText("Mitigation: Hold-short signage");
+    await userEvent.clear(field);
+    await userEvent.type(field, "Hold-short signage with flashing beacons");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(mocks.updateMutate).toHaveBeenCalledWith(
+      {
+        mitigationId: "m-1",
+        payload: {
+          title: "Hold-short signage with flashing beacons",
+          description: "Hold-short signage with flashing beacons",
+        },
+      },
+      expect.anything(),
+    );
+  });
+
+  it("gives viewers a read-only row", async () => {
+    mocks.canEdit = false;
+    mocks.dbRisks = [{ ...dbRisk, latest_assessment: proposal }];
+    renderView();
+    await screen.findAllByText("Foreign Object Debris (FOD)");
+
+    expect(
+      screen.queryByRole("button", { name: "Confirm" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("Edit mitigations")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Import/ }),
+    ).not.toBeInTheDocument();
   });
 });

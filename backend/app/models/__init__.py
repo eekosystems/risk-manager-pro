@@ -9,6 +9,7 @@ from app.models.message import Message
 from app.models.notification import Notification
 from app.models.organization import Organization
 from app.models.organization_membership import OrganizationMembership
+from app.models.residual_assessment import ResidualAssessment
 from app.models.risk import AirportSubLocation, Mitigation, RiskEntry
 from app.models.risk_outcome_cache import RiskOutcomeCache
 from app.models.risk_threshold import RiskAlertThreshold
@@ -45,6 +46,7 @@ __all__ = [
     "OrganizationMembership",
     "OrganizationSettings",
     "PendingSyncChange",
+    "ResidualAssessment",
     "RiskAlertThreshold",
     "RiskEntry",
     "RiskOutcomeCache",

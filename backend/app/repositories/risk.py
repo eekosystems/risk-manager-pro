@@ -40,7 +40,11 @@ class RiskRepository:
         risk_level: str | None = None,
         airport_identifier: str | None = None,
     ) -> tuple[list[RiskEntry], int]:
-        base = select(RiskEntry).where(RiskEntry.organization_id == organization_id)
+        base = (
+            select(RiskEntry)
+            .options(selectinload(RiskEntry.mitigations))
+            .where(RiskEntry.organization_id == organization_id)
+        )
         count_base = (
             select(func.count())
             .select_from(RiskEntry)
@@ -63,6 +67,16 @@ class RiskRepository:
         stmt = base.order_by(RiskEntry.created_at.desc()).offset(skip).limit(limit)
         result = await self._db.execute(stmt)
         return list(result.scalars().all()), total
+
+    async def existing_srmd_refs(self, organization_id: uuid.UUID, refs: list[str]) -> set[str]:
+        if not refs:
+            return set()
+        stmt = select(RiskEntry.srmd_ref).where(
+            RiskEntry.organization_id == organization_id,
+            RiskEntry.srmd_ref.in_(refs),
+        )
+        result = await self._db.execute(stmt)
+        return {ref for ref in result.scalars().all() if ref is not None}
 
     async def update(self, entry: RiskEntry) -> RiskEntry:
         await self._db.flush()

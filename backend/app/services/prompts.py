@@ -1561,6 +1561,9 @@ _SUB_PROMPT_3 = GENERAL_PROMPT[
 ]
 
 SRA_PROMPT = _BASELINE_CONTEXT + _SUB_PROMPT_3
+# SP3 without the chat follow-up instructions appended below, for the
+# structured residual re-assessment run outside a conversation.
+SRA_CORE_PROMPT = SRA_PROMPT
 
 # --- Sub-Prompt 4 (standalone): Risk Register / Hazard Management Module ---
 _RISK_REGISTER_SUB_PROMPT = """\

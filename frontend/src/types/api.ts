@@ -266,7 +266,8 @@ export type RecordSource =
   | "rmp_sp4"
   | "manual_entry"
   | "fg_push"
-  | "client_push";
+  | "client_push"
+  | "sharepoint_srmd";
 export type SyncStatus = "fg_only" | "client_only" | "dual_in_sync" | "dual_pending";
 
 export interface RiskEntryListItem {
@@ -284,8 +285,65 @@ export interface RiskEntryListItem {
   record_status: RecordStatus;
   validation_status: ValidationStatus;
   source: RecordSource;
+  residual_severity: number | null;
+  residual_likelihood: string | null;
+  residual_risk_level: string | null;
+  source_document_url: string | null;
+  mitigations: MitigationSummary[];
+  latest_assessment: ResidualAssessment | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface MitigationSummary {
+  id: string;
+  title: string;
+  status: MitigationStatus;
+}
+
+export type ResidualAssessmentStatus =
+  | "pending"
+  | "proposed"
+  | "confirmed"
+  | "dismissed"
+  | "failed"
+  | "superseded";
+
+export interface ControlTierResult {
+  tier: string;
+  applied: boolean;
+  controls: string;
+  residual_severity: number | null;
+  residual_likelihood: string | null;
+  residual_risk_level: string | null;
+}
+
+export interface ResidualAssessmentResult {
+  tiers: ControlTierResult[];
+  alarp_status: string;
+  rationale: string;
+  sources: string[];
+}
+
+export interface ResidualAssessment {
+  id: string;
+  risk_entry_id: string;
+  status: ResidualAssessmentStatus;
+  trigger: string;
+  residual_severity: number | null;
+  residual_likelihood: string | null;
+  residual_risk_level: string | null;
+  result: ResidualAssessmentResult | null;
+  error_code: string | null;
+  created_at: string;
+  completed_at: string | null;
+  decided_at: string | null;
+}
+
+export interface SrmdImportResult {
+  imported: number;
+  already_imported: number;
+  risk_ids: string[];
 }
 
 export interface MitigationItem {
@@ -325,11 +383,15 @@ export interface RiskEntryDetail {
   risk_matrix_applied: RiskMatrixApplied;
   existing_controls: string | null;
   residual_risk_level: string | null;
+  residual_severity: number | null;
+  residual_likelihood: string | null;
   record_status: RecordStatus;
   validation_status: ValidationStatus;
   source: RecordSource;
   sync_status: SyncStatus;
   acm_cross_reference: string | null;
+  source_document_name: string | null;
+  source_document_url: string | null;
   created_at: string;
   updated_at: string;
   mitigations: MitigationItem[];

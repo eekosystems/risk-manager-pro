@@ -81,6 +81,10 @@ class SharePointRiskRow(BaseModel):
     report_year: int | None = None
     matrix_size: str | None = None
     import_classification: str = "clean"
+    residual_severity: int | None = None
+    residual_likelihood: str | None = None
+    residual_risk_level: str | None = None
+    mitigations: list[str] = []
 
 
 class SharePointParseNoteOut(BaseModel):

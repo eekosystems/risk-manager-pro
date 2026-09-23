@@ -1,13 +1,22 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type QueryClient,
+} from "@tanstack/react-query";
 
 import {
+  confirmResidualAssessment,
   createMitigation,
   createRisk,
   deleteMitigation,
   deleteRisk,
+  dismissResidualAssessment,
   getMitigations,
   getRisk,
   getRisks,
+  importSrmdHazards,
+  requestResidualAssessment,
   updateMitigation,
   updateRisk,
   type GetRisksParams,
@@ -19,10 +28,20 @@ import type {
   UpdateRiskEntryRequest,
 } from "@/types/api";
 
+// While any re-assessment is still running, poll so its proposal appears
+// without a manual refresh.
+const REASSESSMENT_POLL_MS = 5000;
+
 export function useRisks(params?: GetRisksParams) {
   return useQuery({
     queryKey: ["risks", params],
     queryFn: () => getRisks(params),
+    refetchInterval: (query) =>
+      query.state.data?.data.some(
+        (risk) => risk.latest_assessment?.status === "pending",
+      )
+        ? REASSESSMENT_POLL_MS
+        : false,
   });
 }
 
@@ -86,9 +105,7 @@ export function useCreateMitigation(riskId: string) {
   return useMutation({
     mutationFn: (payload: CreateMitigationRequest) =>
       createMitigation(riskId, payload),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["risk", riskId] });
-    },
+    onSuccess: () => invalidateRisk(queryClient, riskId),
   });
 }
 
@@ -102,9 +119,7 @@ export function useUpdateMitigation(riskId: string) {
       mitigationId: string;
       payload: UpdateMitigationRequest;
     }) => updateMitigation(riskId, mitigationId, payload),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["risk", riskId] });
-    },
+    onSuccess: () => invalidateRisk(queryClient, riskId),
   });
 }
 
@@ -113,8 +128,49 @@ export function useDeleteMitigation(riskId: string) {
   return useMutation({
     mutationFn: (mitigationId: string) =>
       deleteMitigation(riskId, mitigationId),
+    onSuccess: () => invalidateRisk(queryClient, riskId),
+  });
+}
+
+// A mitigation or residual change alters the record and the register row
+// (a re-assessment is queued on every mitigation change).
+function invalidateRisk(queryClient: QueryClient, riskId: string) {
+  void queryClient.invalidateQueries({ queryKey: ["risk", riskId] });
+  void queryClient.invalidateQueries({ queryKey: ["risks"] });
+}
+
+export function useImportSrmdHazards() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: importSrmdHazards,
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["risk", riskId] });
+      void queryClient.invalidateQueries({ queryKey: ["risks"] });
     },
+  });
+}
+
+export function useRequestResidualAssessment(riskId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => requestResidualAssessment(riskId),
+    onSuccess: () => invalidateRisk(queryClient, riskId),
+  });
+}
+
+export function useConfirmResidualAssessment(riskId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (assessmentId: string) =>
+      confirmResidualAssessment(riskId, assessmentId),
+    onSuccess: () => invalidateRisk(queryClient, riskId),
+  });
+}
+
+export function useDismissResidualAssessment(riskId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (assessmentId: string) =>
+      dismissResidualAssessment(riskId, assessmentId),
+    onSuccess: () => invalidateRisk(queryClient, riskId),
   });
 }

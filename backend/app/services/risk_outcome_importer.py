@@ -23,7 +23,6 @@ from __future__ import annotations
 
 import asyncio
 import dataclasses
-import json
 import re
 import time
 from dataclasses import dataclass, field
@@ -36,6 +35,7 @@ from app.core.database import async_session_factory
 from app.repositories.risk_outcome_cache import RiskOutcomeCacheRepository
 from app.services.document_processor import DocumentProcessor
 from app.services.sharepoint_crawler import is_risk_outcome_folder, normalize_folder_name
+from app.utils.json_payload import parse_json_payload
 
 if TYPE_CHECKING:
     from app.services.openai_client import AzureOpenAIClient
@@ -65,6 +65,12 @@ class SharePointRisk:
     # modes so it is always visible in the UI / logs. In shadow mode every row
     # is still kept; in enforce mode the importer routes rows by this label.
     import_classification: str = "clean"
+    # Post-mitigation cell the document states for this hazard, when it states one.
+    residual_severity: int | None = None
+    residual_likelihood: str | None = None
+    residual_risk_level: str | None = None
+    # Mitigations / controls the document lists for this hazard, verbatim.
+    mitigations: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -78,6 +84,15 @@ def _risk_from_dict(d: dict[str, Any]) -> SharePointRisk:
     # The band is re-derived from the cell rather than read back, so rows
     # cached under an earlier grid follow the current one without a re-scan.
     severity = int(d["severity"])
+    raw_residual_severity = d.get("residual_severity")
+    raw_residual_likelihood = d.get("residual_likelihood")
+    residual_severity: int | None = None
+    residual_likelihood: str | None = None
+    residual_risk_level: str | None = None
+    if raw_residual_severity is not None and raw_residual_likelihood is not None:
+        residual_severity = int(raw_residual_severity)
+        residual_likelihood = str(raw_residual_likelihood)
+        residual_risk_level = _compute_risk_level(residual_severity, residual_likelihood)
     return SharePointRisk(
         airport_identifier=d["airport_identifier"],
         hazard=d["hazard"],
@@ -89,6 +104,10 @@ def _risk_from_dict(d: dict[str, Any]) -> SharePointRisk:
         report_year=d.get("report_year"),
         matrix_size=d.get("matrix_size"),
         import_classification=d.get("import_classification", "clean"),
+        residual_severity=residual_severity,
+        residual_likelihood=residual_likelihood,
+        residual_risk_level=residual_risk_level,
+        mitigations=[str(m) for m in d.get("mitigations") or []],
     )
 
 
@@ -222,6 +241,20 @@ def _normalize_risk_level(value: Any) -> str | None:
     return None
 
 
+def _normalize_mitigations(value: Any) -> list[str]:
+    """Verbatim mitigation strings, blanks and repeats dropped, order kept."""
+    if not isinstance(value, list):
+        return []
+    seen: set[str] = set()
+    out: list[str] = []
+    for item in value:
+        text = str(item).strip() if isinstance(item, (str, int, float)) else ""
+        if text and text.lower() not in seen:
+            seen.add(text.lower())
+            out.append(text)
+    return out
+
+
 def _airport_from_segments(segments: list[str]) -> str | None:
     """Return the airport folder name for a file path under the configured root.
 
@@ -310,10 +343,13 @@ STRICT RULES — no exceptions:
 6. If a hazard row shows BOTH an initial/inherent risk pair AND a
    residual/mitigated/post-control risk pair (common in SRMP tables that
    include "Initial Risk" + "Residual Risk" or "Pre-Mitigation" +
-   "Post-Mitigation" columns), return ONLY the initial/inherent pair.
-   Never emit two rows for the same hazard at different matrix
-   positions. The register tracks inherent risk; mitigated values are
-   captured separately on the mitigation record.
+   "Post-Mitigation" columns), put the initial/inherent pair in
+   `severity` / `likelihood` and the residual pair in
+   `residual_severity` / `residual_likelihood`, using the same
+   descriptive names. Never emit two rows for the same hazard at
+   different matrix positions. Omit both residual fields unless the
+   document states BOTH a residual severity and a residual likelihood
+   for that hazard; never estimate them.
 7. SECTION HEADERS WITH INDENTED SUB-HAZARDS: many SRMP documents group
    related hazards under a parent heading that itself has NO severity or
    likelihood. Example:
@@ -340,6 +376,12 @@ STRICT RULES — no exceptions:
    schemes (i/ii/iii, bullets, dashes, etc.) — any indented child with
    its own explicit S/L is a hazard; any parent header without its own
    explicit S/L is not.
+8. MITIGATIONS: in `mitigations`, list every mitigation, control, or
+   safety measure the document states for that specific hazard, one
+   entry per measure, each copied verbatim (rule 1 applies). Include
+   existing controls and proposed mitigations alike. Do not borrow
+   measures listed against a different hazard, and do not add measures
+   the document does not state. Use an empty list when none are stated.
 
 Return ONLY this JSON shape (no prose):
 
@@ -349,7 +391,10 @@ Return ONLY this JSON shape (no prose):
       "hazard": "<verbatim hazard text as it appears in the document>",
       "severity": "<Catastrophic | Hazardous | Major | Minor | Minimal>",
       "likelihood": "<Frequent | Probable | Remote | Extremely Remote | Extremely Improbable>",
-      "risk_level": "<low | medium | high — include ONLY if explicitly stated in the source, otherwise omit. Map any higher rating the source uses (e.g. Extreme/Red/Critical) to high>"
+      "risk_level": "<low | medium | high — include ONLY if explicitly stated in the source, otherwise omit. Map any higher rating the source uses (e.g. Extreme/Red/Critical) to high>",
+      "residual_severity": "<Catastrophic | Hazardous | Major | Minor | Minimal — omit unless stated (rule 6)>",
+      "residual_likelihood": "<Frequent | Probable | Remote | Extremely Remote | Extremely Improbable — omit unless stated (rule 6)>",
+      "mitigations": ["<verbatim mitigation or control text>"]
     }}
   ]
 }}
@@ -370,27 +415,6 @@ Return ONLY the JSON object.
 # 90k chars per chunk leaves plenty of room for the prompt + JSON response.
 _MAX_CHARS_PER_CHUNK = 90_000
 _MAX_PARALLEL_EXTRACTIONS = 2
-
-
-def _parse_json_payload(raw: str) -> dict[str, Any] | None:
-    s = raw.strip()
-    if s.startswith("```"):
-        s = s.split("\n", 1)[-1]
-        if s.endswith("```"):
-            s = s.rsplit("```", 1)[0]
-        s = s.strip()
-    try:
-        obj = json.loads(s)
-    except json.JSONDecodeError:
-        start = s.find("{")
-        end = s.rfind("}")
-        if start == -1 or end == -1 or end <= start:
-            return None
-        try:
-            obj = json.loads(s[start : end + 1])
-        except json.JSONDecodeError:
-            return None
-    return obj if isinstance(obj, dict) else None
 
 
 def _chunk_text(text: str, chunk_chars: int = _MAX_CHARS_PER_CHUNK) -> list[str]:
@@ -435,12 +459,13 @@ async def _extract_risks_from_chunk(
         raw = await openai_client.chat_completion(
             messages,
             temperature=0.0,
-            max_tokens=8000,
+            # Verbatim mitigation lists make each row several times longer.
+            max_tokens=16000,
             json_mode=True,
         )
     except Exception as exc:  # noqa: BLE001
         return [], (f"LLM extraction failed on chunk {chunk_idx + 1}/{chunk_total}: {exc}")
-    payload = _parse_json_payload(raw)
+    payload = parse_json_payload(raw)
     if payload is None or not isinstance(payload.get("risks"), list):
         return [], (
             f"LLM did not return a {{risks:[...]}} object on chunk {chunk_idx + 1}/{chunk_total}"
@@ -537,6 +562,17 @@ async def _extract_risks_via_llm(
                     ),
                 )
             )
+        residual_severity = _normalize_severity(row.get("residual_severity"))
+        residual_likelihood = _normalize_likelihood(row.get("residual_likelihood"))
+        if (residual_severity is None) != (residual_likelihood is None):
+            notes.append(
+                SharePointParseNote(
+                    airport_identifier=airport,
+                    source_file=source_file,
+                    message=f"row {idx} has only half a residual cell; residual left blank",
+                )
+            )
+            residual_severity = residual_likelihood = None
         risks.append(
             SharePointRisk(
                 airport_identifier=airport,
@@ -546,6 +582,14 @@ async def _extract_risks_via_llm(
                 risk_level=risk_level,
                 source_file=source_file,
                 source_url=source_url,
+                residual_severity=residual_severity,
+                residual_likelihood=residual_likelihood,
+                residual_risk_level=(
+                    _compute_risk_level(residual_severity, residual_likelihood)
+                    if residual_severity is not None and residual_likelihood is not None
+                    else None
+                ),
+                mitigations=_normalize_mitigations(row.get("mitigations")),
             )
         )
 
@@ -674,7 +718,7 @@ async def _extract_doc_metadata(
             max_tokens=200,
             json_mode=True,
         )
-        payload = _parse_json_payload(raw) or {}
+        payload = parse_json_payload(raw) or {}
         year_val = payload.get("report_year")
         if isinstance(year_val, int) and 1990 <= year_val <= 2099:
             report_year = year_val
@@ -788,7 +832,10 @@ def _apply_import_rules(
 #   v6: scale symbols now read the FAA way (severity 1 = Catastrophic) and
 #       names are matched before symbols, so "Catastrophic (1)" no longer
 #       lands as Minimal. Forces a re-scan to re-place affected rows.
-_CACHE_SCHEMA_VERSION = "v6"
+#   v7: extraction also returns the residual cell the document states and
+#       the verbatim mitigations listed per hazard. Forces a re-scan so
+#       every row carries them.
+_CACHE_SCHEMA_VERSION = "v7"
 
 
 def _build_cache_key(drive_item_id: str, size: int, content_type: str) -> str:

@@ -60,6 +60,11 @@ export interface RiskPositionCount {
   count: number;
 }
 
+/** FAA 5x5 cell label, likelihood letter first: stored severity 4 at C is "C2". */
+export function formatCell(likelihood: string, severity: number): string {
+  return `${likelihood}${6 - severity}`;
+}
+
 export const SEVERITIES: Severity[] = [1, 2, 3, 4, 5];
 export const LIKELIHOODS: Likelihood[] = ["A", "B", "C", "D", "E"];
 

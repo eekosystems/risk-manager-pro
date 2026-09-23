@@ -3,6 +3,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
+from app.models.residual_assessment import ResidualAssessmentStatus
 from app.models.risk import (
     HazardCategory5M,
     HazardCategoryICAO,
@@ -111,11 +112,15 @@ class RiskEntryResponse(BaseModel):
     risk_matrix_applied: RiskMatrixApplied
     existing_controls: str | None
     residual_risk_level: RiskLevel | None
+    residual_severity: int | None
+    residual_likelihood: str | None
     record_status: RecordStatus
     validation_status: ValidationStatus
     source: RecordSource
     sync_status: SyncStatus
     acm_cross_reference: str | None
+    source_document_name: str | None
+    source_document_url: str | None
 
     created_at: datetime
     updated_at: datetime
@@ -125,6 +130,49 @@ class RiskEntryResponse(BaseModel):
 
 class RiskEntryDetailResponse(RiskEntryResponse):
     mitigations: list[MitigationResponse]
+
+
+class MitigationSummary(BaseModel):
+    id: uuid.UUID
+    title: str
+    status: MitigationStatus
+
+    model_config = {"from_attributes": True}
+
+
+class ControlTierResult(BaseModel):
+    """One tier of the hierarchy of controls in an SP3 re-assessment."""
+
+    tier: str
+    applied: bool
+    controls: str
+    residual_severity: int | None = None
+    residual_likelihood: str | None = None
+    residual_risk_level: RiskLevel | None = None
+
+
+class ResidualAssessmentResult(BaseModel):
+    tiers: list[ControlTierResult]
+    alarp_status: str
+    rationale: str
+    sources: list[str] = []
+
+
+class ResidualAssessmentResponse(BaseModel):
+    id: uuid.UUID
+    risk_entry_id: uuid.UUID
+    status: ResidualAssessmentStatus
+    trigger: str
+    residual_severity: int | None
+    residual_likelihood: str | None
+    residual_risk_level: RiskLevel | None
+    result: ResidualAssessmentResult | None = Field(default=None, validation_alias="result_json")
+    error_code: str | None
+    created_at: datetime
+    completed_at: datetime | None
+    decided_at: datetime | None
+
+    model_config = {"from_attributes": True, "populate_by_name": True}
 
 
 class RiskEntryListItem(BaseModel):
@@ -142,6 +190,12 @@ class RiskEntryListItem(BaseModel):
     record_status: RecordStatus
     validation_status: ValidationStatus
     source: RecordSource
+    residual_severity: int | None
+    residual_likelihood: str | None
+    residual_risk_level: RiskLevel | None
+    source_document_url: str | None
+    mitigations: list[MitigationSummary]
+    latest_assessment: ResidualAssessmentResponse | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -183,3 +237,12 @@ class SubLocationResponse(BaseModel):
 class CreateSubLocationRequest(BaseModel):
     airport_identifier: str = Field(..., min_length=1, max_length=20)
     name: str = Field(..., min_length=1, max_length=255)
+
+
+# --- SharePoint SRMD import ---
+
+
+class SrmdImportResult(BaseModel):
+    imported: int
+    already_imported: int
+    risk_ids: list[uuid.UUID]

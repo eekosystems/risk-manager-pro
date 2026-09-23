@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import {
   AlertTriangle,
   Clock,
+  Download,
   ExternalLink,
   Loader2,
   Plus,
@@ -19,18 +20,28 @@ import {
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { RiskMatrix } from "@/components/ui/risk-matrix";
-import { useDeleteRisk, useRisks } from "@/hooks/use-risks";
+import { useDeleteRisk, useImportSrmdHazards, useRisks } from "@/hooks/use-risks";
+import { useToast } from "@/hooks/use-toast";
+import { useUserRole } from "@/hooks/use-user-role";
 import type { RiskEntryListItem, RiskStatus } from "@/types/api";
 import {
   LIKELIHOOD_LABELS,
   RISK_LEVEL_CONFIG,
   SEVERITY_LABELS,
   type Likelihood,
-  type RiskLevel,
   type RiskMatrixSelection,
   type RiskPositionCount,
   type Severity,
 } from "@/types/risk-matrix";
+
+import { MitigationInlineEditor } from "./mitigation-inline-editor";
+import { MitigationsCell } from "./mitigations-cell";
+import { ResidualRiskCell } from "./residual-risk-cell";
+import { RiskCellBadge } from "./risk-cell-badge";
+
+// Hazard | Initial Risk | Residual Risk | Mitigations | actions
+const ROW_GRID =
+  "grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_110px_170px_minmax(0,240px)_36px] md:items-start md:gap-4";
 
 const STATUS_LABELS: Record<RiskStatus, { label: string; className: string }> = {
   open: { label: "Open", className: "text-brand-600 bg-brand-50" },
@@ -48,13 +59,15 @@ const ALL_AIRPORTS = "__all__";
  * Synthetic fields we don't have from the PDF extraction:
  * - id: `sp:<file>:<hash>` so it's stable across renders and distinguishable
  *   from DB ids
- * - status: "open" (these are external observations, not tracked state)
- * - validation_status: "user_reported" to flag they weren't RMP-validated
- * - source: "fg_push" since they come from Faith Group's SharePoint
+ * - status: "open" (not yet imported, so there is no tracked state)
+ * - validation_status: "rmp_validated", as SRMD hazards are once imported
+ * - mitigation ids: synthetic, since the mitigations exist only in the PDF
+ *   until the hazard is imported
  */
 function spToListItem(r: SharePointRiskRow, idx: number): RiskEntryListItem {
+  const id = `sp:${r.source_file}:${idx}`;
   return {
-    id: `sp:${r.source_file}:${idx}`,
+    id,
     title: r.hazard,
     hazard: r.hazard,
     severity: r.severity,
@@ -66,8 +79,18 @@ function spToListItem(r: SharePointRiskRow, idx: number): RiskEntryListItem {
     operational_domain: null,
     hazard_category_5m: null,
     record_status: "monitoring",
-    validation_status: "user_reported",
-    source: "fg_push",
+    validation_status: "rmp_validated",
+    source: "sharepoint_srmd",
+    residual_severity: r.residual_severity,
+    residual_likelihood: r.residual_likelihood,
+    residual_risk_level: r.residual_risk_level,
+    source_document_url: r.source_url,
+    mitigations: (r.mitigations ?? []).map((title, i) => ({
+      id: `${id}:m${i}`,
+      title,
+      status: "pending",
+    })),
+    latest_assessment: null,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
@@ -84,6 +107,10 @@ export function RiskListView({ onSelectRisk, onCreateNew }: RiskListViewProps) {
   const [airportFilter, setAirportFilter] = useState<string>(ALL_AIRPORTS);
   const [selectedCell, setSelectedCell] = useState<RiskMatrixSelection | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [editingMitigationsFor, setEditingMitigationsFor] = useState<string | null>(null);
+  const { canEdit } = useUserRole();
+  const { addToast } = useToast();
+  const importMutation = useImportSrmdHazards();
 
   // Single wide fetch — we filter client-side so the airport-pill bar stays
   // populated even when a specific airport is selected, and so the status and
@@ -149,6 +176,24 @@ export function RiskListView({ onSelectRisk, onCreateNew }: RiskListViewProps) {
     });
     return m;
   }, [spSummary?.risks]);
+
+  // SRMD hazards still read straight from the scan; importing them makes
+  // their mitigations editable.
+  const unimportedCount = useMemo(
+    () => allRisks.filter((r) => r.id.startsWith("sp:")).length,
+    [allRisks],
+  );
+
+  function handleImport() {
+    importMutation.mutate(undefined, {
+      onSuccess: (result) =>
+        addToast(
+          `Imported ${result.imported} SRMD ${result.imported === 1 ? "hazard" : "hazards"}`,
+          "success",
+        ),
+      onError: () => addToast("Could not import the SRMD hazards", "error"),
+    });
+  }
 
   function handleSelectRisk(riskId: string) {
     if (riskId.startsWith("sp:")) {
@@ -348,6 +393,21 @@ export function RiskListView({ onSelectRisk, onCreateNew }: RiskListViewProps) {
           <option value="medium">Medium</option>
           <option value="low">Low</option>
         </select>
+        {canEdit && unimportedCount > 0 && (
+          <Button
+            variant="secondary"
+            className="ml-auto"
+            onClick={handleImport}
+            disabled={importMutation.isPending}
+          >
+            {importMutation.isPending ? (
+              <Loader2 size={16} className="mr-2 animate-spin" />
+            ) : (
+              <Download size={16} className="mr-2" />
+            )}
+            Import {unimportedCount} SRMD {unimportedCount === 1 ? "hazard" : "hazards"}
+          </Button>
+        )}
       </div>
 
       {/* Risk table */}
@@ -369,85 +429,35 @@ export function RiskListView({ onSelectRisk, onCreateNew }: RiskListViewProps) {
             No risk entries match the selected status and risk level.
           </div>
         ) : (
-          listedRisks.map((risk, index) => {
-            const levelCfg =
-              RISK_LEVEL_CONFIG[risk.risk_level as RiskLevel] ?? RISK_LEVEL_CONFIG.low;
-            const statusCfg = STATUS_LABELS[risk.status] ?? STATUS_LABELS.open;
-            const isSharePoint = risk.id.startsWith("sp:");
-            return (
-              <div
+          <>
+            <div
+              className={`${ROW_GRID} hidden border-b border-gray-100 px-5 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400 md:grid`}
+            >
+              <span>Hazard</span>
+              <span>Initial Risk</span>
+              <span>Residual Risk</span>
+              <span>Mitigations</span>
+              <span />
+            </div>
+            {listedRisks.map((risk, index) => (
+              <RiskRow
                 key={risk.id}
-                onClick={() => handleSelectRisk(risk.id)}
-                className={`flex cursor-pointer items-center gap-4 px-5 py-4 transition-colors hover:bg-gray-50 ${
-                  index < listedRisks.length - 1 ? "border-b border-gray-100" : ""
-                }`}
-              >
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50">
-                  <AlertTriangle size={18} className="text-brand-500" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="truncate text-sm font-semibold text-slate-800">
-                      {risk.title}
-                    </span>
-                    {risk.airport_identifier && (
-                      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-mono font-bold text-slate-600">
-                        {risk.airport_identifier}
-                      </span>
-                    )}
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${levelCfg.bg} ${levelCfg.color}`}
-                    >
-                      {levelCfg.label}
-                    </span>
-                    {isSharePoint ? (
-                      <span className="flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">
-                        <ExternalLink size={10} />
-                        SharePoint
-                      </span>
-                    ) : (
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${statusCfg.className}`}
-                      >
-                        {statusCfg.label}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-3 text-[12px] text-slate-400">
-                    <span className="truncate max-w-[300px]">{risk.hazard}</span>
-                    {!isSharePoint && (
-                      <span className="flex items-center gap-1">
-                        <Clock size={10} />
-                        {new Date(risk.updated_at).toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        })}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                {!isSharePoint && (
-                  <button
-                    onClick={(e) => handleDelete(e, risk.id)}
-                    disabled={deleteMutation.isPending}
-                    className={`rounded-lg p-2 transition-colors ${
-                      deleteConfirm === risk.id
-                        ? "bg-red-50 text-red-500 hover:bg-red-100"
-                        : "text-gray-300 hover:bg-red-50 hover:text-red-500"
-                    }`}
-                    title={
-                      deleteConfirm === risk.id
-                        ? "Click again to confirm delete"
-                        : "Delete risk"
-                    }
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                )}
-              </div>
-            );
-          })
+                risk={risk}
+                isLast={index === listedRisks.length - 1}
+                canEdit={canEdit}
+                editingMitigations={editingMitigationsFor === risk.id}
+                onToggleMitigations={() =>
+                  setEditingMitigationsFor((current) =>
+                    current === risk.id ? null : risk.id,
+                  )
+                }
+                onSelect={() => handleSelectRisk(risk.id)}
+                deleteArmed={deleteConfirm === risk.id}
+                deleteDisabled={deleteMutation.isPending}
+                onDelete={(e) => handleDelete(e, risk.id)}
+              />
+            ))}
+          </>
         )}
       </div>
     </div>
@@ -455,6 +465,149 @@ export function RiskListView({ onSelectRisk, onCreateNew }: RiskListViewProps) {
 }
 
 // ---- Subcomponents ---------------------------------------------------------
+
+function RiskRow({
+  risk,
+  isLast,
+  canEdit,
+  editingMitigations,
+  onToggleMitigations,
+  onSelect,
+  deleteArmed,
+  deleteDisabled,
+  onDelete,
+}: {
+  risk: RiskEntryListItem;
+  isLast: boolean;
+  canEdit: boolean;
+  editingMitigations: boolean;
+  onToggleMitigations: () => void;
+  onSelect: () => void;
+  deleteArmed: boolean;
+  deleteDisabled: boolean;
+  onDelete: (e: React.MouseEvent) => void;
+}) {
+  const statusCfg = STATUS_LABELS[risk.status] ?? STATUS_LABELS.open;
+  const isImported = !risk.id.startsWith("sp:");
+  const isSrmd = risk.source === "sharepoint_srmd";
+  const canEditMitigations = canEdit && isImported;
+
+  return (
+    <div className={isLast ? "" : "border-b border-gray-100"}>
+      <div
+        onClick={onSelect}
+        className={`${ROW_GRID} cursor-pointer px-5 py-4 transition-colors hover:bg-gray-50`}
+      >
+        <div className="flex min-w-0 items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-50">
+            <AlertTriangle size={18} className="text-brand-500" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="truncate text-sm font-semibold text-slate-800">
+                {risk.title}
+              </span>
+              {risk.airport_identifier && (
+                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-mono font-bold text-slate-600">
+                  {risk.airport_identifier}
+                </span>
+              )}
+              {isSrmd && <SrmdTag url={risk.source_document_url} />}
+              {isImported && (
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${statusCfg.className}`}
+                >
+                  {statusCfg.label}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-3 text-[12px] text-slate-400">
+              <span className="max-w-[300px] truncate">{risk.hazard}</span>
+              {isImported && (
+                <span className="flex items-center gap-1">
+                  <Clock size={10} />
+                  {new Date(risk.updated_at).toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  })}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+        <div>
+          <ColumnLabel>Initial Risk</ColumnLabel>
+          <RiskCellBadge
+            likelihood={risk.likelihood}
+            severity={risk.severity}
+            level={risk.risk_level}
+          />
+        </div>
+        <div>
+          <ColumnLabel>Residual Risk</ColumnLabel>
+          <ResidualRiskCell risk={risk} canEdit={canEdit} isImported={isImported} />
+        </div>
+        <div className="min-w-0">
+          <ColumnLabel>Mitigations</ColumnLabel>
+          <MitigationsCell
+            mitigations={risk.mitigations}
+            onEdit={canEditMitigations ? onToggleMitigations : null}
+            editing={editingMitigations}
+            hint={canEdit && !isImported ? "Import SRMD hazards to edit" : null}
+          />
+        </div>
+        <div>
+          {isImported && (
+            <button
+              onClick={onDelete}
+              disabled={deleteDisabled}
+              className={`rounded-lg p-2 transition-colors ${
+                deleteArmed
+                  ? "bg-red-50 text-red-500 hover:bg-red-100"
+                  : "text-gray-300 hover:bg-red-50 hover:text-red-500"
+              }`}
+              title={deleteArmed ? "Click again to confirm delete" : "Delete risk"}
+            >
+              <Trash2 size={16} />
+            </button>
+          )}
+        </div>
+      </div>
+      {editingMitigations && <MitigationInlineEditor riskId={risk.id} />}
+    </div>
+  );
+}
+
+function ColumnLabel({ children }: { children: string }) {
+  return (
+    <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-slate-400 md:hidden">
+      {children}
+    </span>
+  );
+}
+
+function SrmdTag({ url }: { url: string | null }) {
+  // L-5: only link http(s) URLs — never a server-supplied javascript:/data: URI.
+  const safeUrl = url && /^https?:\/\//i.test(url) ? url : null;
+  const className =
+    "flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700";
+  if (!safeUrl) {
+    return <span className={className}>SharePoint</span>;
+  }
+  return (
+    <a
+      href={safeUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={(e) => e.stopPropagation()}
+      className={`${className} hover:bg-amber-100`}
+    >
+      <ExternalLink size={10} />
+      SharePoint
+    </a>
+  );
+}
 
 function ScanStatusBanner({
   status,

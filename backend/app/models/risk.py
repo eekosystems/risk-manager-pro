@@ -107,6 +107,7 @@ class RecordSource(enum.StrEnum):
     MANUAL_ENTRY = "manual_entry"
     FG_PUSH = "fg_push"
     CLIENT_PUSH = "client_push"
+    SHAREPOINT_SRMD = "sharepoint_srmd"
 
 
 class SyncStatus(enum.StrEnum):
@@ -189,6 +190,9 @@ class MitigationStatus(enum.StrEnum):
 
 class RiskEntry(Base):
     __tablename__ = "risk_entries"
+    __table_args__ = (
+        UniqueConstraint("organization_id", "srmd_ref", name="uq_risk_entries_org_srmd_ref"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), index=True)
@@ -237,6 +241,14 @@ class RiskEntry(Base):
         Enum(RiskLevel, values_callable=lambda e: [x.value for x in e]),
         default=None,
     )
+    # Residual cell on the FG 5x5, same storage convention as severity/likelihood.
+    residual_severity: Mapped[int | None] = mapped_column(default=None)
+    residual_likelihood: Mapped[str | None] = mapped_column(String(1), default=None)
+    # SharePoint SRMD provenance: a stable key per (airport, hazard) so a
+    # re-import never duplicates, plus the report the hazard came from.
+    srmd_ref: Mapped[str | None] = mapped_column(String(64), default=None)
+    source_document_name: Mapped[str | None] = mapped_column(String(500), default=None)
+    source_document_url: Mapped[str | None] = mapped_column(Text, default=None)
     record_status: Mapped[RecordStatus] = mapped_column(
         Enum(RecordStatus, values_callable=lambda e: [x.value for x in e]),
         default=RecordStatus.OPEN,

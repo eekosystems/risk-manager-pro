@@ -1,15 +1,18 @@
 import uuid
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import get_db
+from app.core.database import async_session_factory, get_db
 from app.core.deps import (
     get_audit_logger,
     get_current_organization,
+    get_openai_client,
+    get_rag_service,
     require_analyst_or_above,
     require_any_member,
 )
+from app.core.exceptions import ExternalServiceError
 from app.models.notification import NotificationType
 from app.models.organization import Organization
 from app.models.user import User
@@ -18,16 +21,23 @@ from app.schemas.risk import (
     CreateMitigationRequest,
     CreateRiskEntryRequest,
     MitigationResponse,
+    ResidualAssessmentResponse,
     RiskEntryDetailResponse,
     RiskEntryListItem,
     RiskEntryResponse,
+    SrmdImportResult,
     UpdateMitigationRequest,
     UpdateRiskEntryRequest,
 )
 from app.services.audit import AuditLogger
 from app.services.notification import NotificationDispatcher
+from app.services.openai_client import AzureOpenAIClient
+from app.services.rag import RAGService
+from app.services.residual_assessment import ResidualAssessmentRunner, ResidualAssessmentService
 from app.services.risk import RiskService
+from app.services.risk_outcome_importer import RiskOutcomeImporter
 from app.services.risk_threshold import RiskThresholdService
+from app.services.srmd_import import SrmdImportService
 
 _notification_dispatcher = NotificationDispatcher()
 
@@ -36,6 +46,49 @@ router = APIRouter(prefix="/risks", tags=["risks"])
 
 def _get_risk_service(db: AsyncSession = Depends(get_db)) -> RiskService:
     return RiskService(db=db)
+
+
+def _get_residual_assessment_service(
+    db: AsyncSession = Depends(get_db),
+    openai_client: AzureOpenAIClient = Depends(get_openai_client),
+    rag_service: RAGService = Depends(get_rag_service),
+) -> ResidualAssessmentService:
+    runner = ResidualAssessmentRunner(async_session_factory, openai_client, rag_service)
+    return ResidualAssessmentService(db=db, runner=runner)
+
+
+def _get_srmd_import_service(db: AsyncSession = Depends(get_db)) -> SrmdImportService:
+    return SrmdImportService(db=db)
+
+
+def _get_risk_outcome_importer(request: Request) -> RiskOutcomeImporter:
+    try:
+        importer: RiskOutcomeImporter = request.app.state.services.risk_outcome_importer
+    except RuntimeError as exc:
+        raise ExternalServiceError("SharePoint", "the risk-outcome scan is unavailable") from exc
+    return importer
+
+
+async def _request_reassessment(
+    risk_id: uuid.UUID,
+    trigger: str,
+    current_user: User,
+    organization: Organization,
+    residual_service: ResidualAssessmentService,
+    audit: AuditLogger,
+) -> ResidualAssessmentResponse:
+    assessment = await residual_service.request(
+        risk_id, organization.id, current_user.id, trigger=trigger
+    )
+    await audit.log(
+        action="risk.residual_assessment_requested",
+        user=current_user,
+        resource_type="risk_entry",
+        resource_id=str(risk_id),
+        organization_id=organization.id,
+        metadata={"assessment_id": str(assessment.id), "trigger": trigger},
+    )
+    return ResidualAssessmentResponse.model_validate(assessment)
 
 
 def _get_threshold_service(
@@ -92,6 +145,7 @@ async def list_risk_entries(
     current_user: User = Depends(require_any_member),
     organization: Organization = Depends(get_current_organization),
     service: RiskService = Depends(_get_risk_service),
+    residual_service: ResidualAssessmentService = Depends(_get_residual_assessment_service),
 ) -> PaginatedResponse[RiskEntryListItem]:
     entries, total = await service.list_risk_entries(
         organization_id=organization.id,
@@ -101,7 +155,19 @@ async def list_risk_entries(
         risk_level=risk_level,
         airport_identifier=airport_identifier,
     )
-    items = [RiskEntryListItem.model_validate(e) for e in entries]
+    latest = await residual_service.latest_for_entries([e.id for e in entries], organization.id)
+    items = [
+        RiskEntryListItem.model_validate(e).model_copy(
+            update={
+                "latest_assessment": (
+                    ResidualAssessmentResponse.model_validate(latest[e.id])
+                    if e.id in latest
+                    else None
+                )
+            }
+        )
+        for e in entries
+    ]
     total_pages = (total + limit - 1) // limit
     return PaginatedResponse(
         data=items,
@@ -113,6 +179,43 @@ async def list_risk_entries(
             total_pages=total_pages,
         ),
     )
+
+
+@router.post("/import-srmd", response_model=DataResponse[SrmdImportResult], status_code=201)
+async def import_srmd_hazards(
+    current_user: User = Depends(require_analyst_or_above),
+    organization: Organization = Depends(get_current_organization),
+    importer: RiskOutcomeImporter = Depends(_get_risk_outcome_importer),
+    service: SrmdImportService = Depends(_get_srmd_import_service),
+    audit: AuditLogger = Depends(get_audit_logger),
+) -> DataResponse[SrmdImportResult]:
+    summary = await importer.snapshot()
+    created, already_imported = await service.import_hazards(
+        summary.risks, organization, current_user.id
+    )
+    for entry in created:
+        await audit.log(
+            action="risk.created",
+            user=current_user,
+            resource_type="risk_entry",
+            resource_id=str(entry.id),
+            organization_id=organization.id,
+            metadata={"source": "sharepoint_srmd"},
+        )
+    await audit.log(
+        action="risk.srmd_imported",
+        user=current_user,
+        resource_type="risk_register",
+        resource_id=str(organization.id),
+        organization_id=organization.id,
+        metadata={"imported": len(created), "already_imported": already_imported},
+    )
+    result = SrmdImportResult(
+        imported=len(created),
+        already_imported=already_imported,
+        risk_ids=[e.id for e in created],
+    )
+    return DataResponse(data=result, meta=MetaResponse(request_id=str(organization.id)))
 
 
 @router.get("/{risk_id}", response_model=DataResponse[RiskEntryDetailResponse])
@@ -201,6 +304,7 @@ async def create_mitigation(
     current_user: User = Depends(require_analyst_or_above),
     organization: Organization = Depends(get_current_organization),
     service: RiskService = Depends(_get_risk_service),
+    residual_service: ResidualAssessmentService = Depends(_get_residual_assessment_service),
     audit: AuditLogger = Depends(get_audit_logger),
 ) -> DataResponse[MitigationResponse]:
     mitigation = await service.create_mitigation(risk_id, organization.id, payload)
@@ -210,6 +314,9 @@ async def create_mitigation(
         resource_type="mitigation",
         resource_id=str(mitigation.id),
         organization_id=organization.id,
+    )
+    await _request_reassessment(
+        risk_id, "mitigation.created", current_user, organization, residual_service, audit
     )
     _notification_dispatcher.dispatch(
         organization_id=organization.id,
@@ -253,6 +360,7 @@ async def update_mitigation(
     current_user: User = Depends(require_analyst_or_above),
     organization: Organization = Depends(get_current_organization),
     service: RiskService = Depends(_get_risk_service),
+    residual_service: ResidualAssessmentService = Depends(_get_residual_assessment_service),
     audit: AuditLogger = Depends(get_audit_logger),
 ) -> DataResponse[MitigationResponse]:
     mitigation = await service.update_mitigation(risk_id, mitigation_id, organization.id, payload)
@@ -262,6 +370,9 @@ async def update_mitigation(
         resource_type="mitigation",
         resource_id=str(mitigation_id),
         organization_id=organization.id,
+    )
+    await _request_reassessment(
+        risk_id, "mitigation.updated", current_user, organization, residual_service, audit
     )
     return DataResponse(
         data=MitigationResponse.model_validate(mitigation),
@@ -276,6 +387,7 @@ async def delete_mitigation(
     current_user: User = Depends(require_analyst_or_above),
     organization: Organization = Depends(get_current_organization),
     service: RiskService = Depends(_get_risk_service),
+    residual_service: ResidualAssessmentService = Depends(_get_residual_assessment_service),
     audit: AuditLogger = Depends(get_audit_logger),
 ) -> None:
     await service.delete_mitigation(risk_id, mitigation_id, organization.id)
@@ -285,4 +397,90 @@ async def delete_mitigation(
         resource_type="mitigation",
         resource_id=str(mitigation_id),
         organization_id=organization.id,
+    )
+    await _request_reassessment(
+        risk_id, "mitigation.deleted", current_user, organization, residual_service, audit
+    )
+
+
+# --- Residual Re-assessment Endpoints ---
+
+
+@router.post(
+    "/{risk_id}/residual-assessments",
+    response_model=DataResponse[ResidualAssessmentResponse],
+    status_code=202,
+)
+async def request_residual_assessment(
+    risk_id: uuid.UUID,
+    current_user: User = Depends(require_analyst_or_above),
+    organization: Organization = Depends(get_current_organization),
+    residual_service: ResidualAssessmentService = Depends(_get_residual_assessment_service),
+    audit: AuditLogger = Depends(get_audit_logger),
+) -> DataResponse[ResidualAssessmentResponse]:
+    assessment = await _request_reassessment(
+        risk_id, "manual", current_user, organization, residual_service, audit
+    )
+    return DataResponse(data=assessment, meta=MetaResponse(request_id=str(assessment.id)))
+
+
+@router.post(
+    "/{risk_id}/residual-assessments/{assessment_id}/confirm",
+    response_model=DataResponse[ResidualAssessmentResponse],
+)
+async def confirm_residual_assessment(
+    risk_id: uuid.UUID,
+    assessment_id: uuid.UUID,
+    current_user: User = Depends(require_analyst_or_above),
+    organization: Organization = Depends(get_current_organization),
+    residual_service: ResidualAssessmentService = Depends(_get_residual_assessment_service),
+    audit: AuditLogger = Depends(get_audit_logger),
+) -> DataResponse[ResidualAssessmentResponse]:
+    assessment = await residual_service.confirm(
+        risk_id, assessment_id, organization.id, current_user.id
+    )
+    await audit.log(
+        action="risk.residual_confirmed",
+        user=current_user,
+        resource_type="risk_entry",
+        resource_id=str(risk_id),
+        organization_id=organization.id,
+        metadata={
+            "assessment_id": str(assessment_id),
+            "residual_likelihood": assessment.residual_likelihood,
+            "residual_severity": assessment.residual_severity,
+        },
+    )
+    return DataResponse(
+        data=ResidualAssessmentResponse.model_validate(assessment),
+        meta=MetaResponse(request_id=str(assessment_id)),
+    )
+
+
+@router.post(
+    "/{risk_id}/residual-assessments/{assessment_id}/dismiss",
+    response_model=DataResponse[ResidualAssessmentResponse],
+)
+async def dismiss_residual_assessment(
+    risk_id: uuid.UUID,
+    assessment_id: uuid.UUID,
+    current_user: User = Depends(require_analyst_or_above),
+    organization: Organization = Depends(get_current_organization),
+    residual_service: ResidualAssessmentService = Depends(_get_residual_assessment_service),
+    audit: AuditLogger = Depends(get_audit_logger),
+) -> DataResponse[ResidualAssessmentResponse]:
+    assessment = await residual_service.dismiss(
+        risk_id, assessment_id, organization.id, current_user.id
+    )
+    await audit.log(
+        action="risk.residual_dismissed",
+        user=current_user,
+        resource_type="risk_entry",
+        resource_id=str(risk_id),
+        organization_id=organization.id,
+        metadata={"assessment_id": str(assessment_id)},
+    )
+    return DataResponse(
+        data=ResidualAssessmentResponse.model_validate(assessment),
+        meta=MetaResponse(request_id=str(assessment_id)),
     )

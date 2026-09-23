@@ -27,6 +27,7 @@ import {
 } from "@/types/risk-matrix";
 
 import { MitigationList } from "./mitigation-list";
+import { RiskCellBadge } from "./risk-cell-badge";
 
 const STATUS_LABELS: Record<RiskStatus, { label: string; className: string }> = {
   open: { label: "Open", className: "text-brand-600 bg-brand-50" },
@@ -81,6 +82,7 @@ const SOURCE_LABELS: Record<RecordSource, string> = {
   manual_entry: "Manual Entry",
   fg_push: "FG Push",
   client_push: "Client Push",
+  sharepoint_srmd: "SharePoint SRMD",
 };
 
 interface RiskDetailViewProps {
@@ -305,8 +307,12 @@ export function RiskDetailView({ riskId, onBack, onEdit }: RiskDetailViewProps) 
                 <div className="text-[11px] font-medium uppercase tracking-wider text-slate-400">
                   Residual Risk
                 </div>
-                <div className="mt-1 text-sm font-semibold capitalize text-slate-700">
-                  {risk.residual_risk_level}
+                <div className="mt-1">
+                  <RiskCellBadge
+                    likelihood={risk.residual_likelihood}
+                    severity={risk.residual_severity}
+                    level={risk.residual_risk_level}
+                  />
                 </div>
               </div>
             )}

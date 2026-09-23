@@ -13,6 +13,10 @@ export interface SharePointRiskRow {
   risk_level: string;
   source_file: string;
   source_url: string | null;
+  residual_severity: number | null;
+  residual_likelihood: string | null;
+  residual_risk_level: string | null;
+  mitigations: string[];
 }
 
 export interface SharePointParseNote {

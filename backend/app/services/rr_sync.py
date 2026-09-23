@@ -63,6 +63,8 @@ SYNCABLE_FIELDS: tuple[str, ...] = (
     "hazard_category_icao",
     "existing_controls",
     "residual_risk_level",
+    "residual_severity",
+    "residual_likelihood",
     "validation_status",
     "acm_cross_reference",
 )
@@ -346,6 +348,8 @@ class RRSyncService:
             risk_matrix_applied=snapshot.get("risk_matrix_applied", source.risk_matrix_applied),
             existing_controls=snapshot.get("existing_controls", source.existing_controls),
             residual_risk_level=snapshot.get("residual_risk_level", source.residual_risk_level),
+            residual_severity=snapshot.get("residual_severity", source.residual_severity),
+            residual_likelihood=snapshot.get("residual_likelihood", source.residual_likelihood),
             record_status=snapshot.get("record_status", source.record_status),
             validation_status=snapshot.get("validation_status", source.validation_status),
             source=(
