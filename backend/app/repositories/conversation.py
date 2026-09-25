@@ -22,6 +22,13 @@ def _strip_null_bytes(value: Any) -> Any:
     return value
 
 
+# Chronological order with a deterministic tie-break. Messages written before
+# the Python-side timestamp default share one `now()` per turn, so within a
+# tie the user message (which always precedes the reply) sorts first: the
+# `messagerole` enum declares user before assistant.
+_MESSAGE_ORDER = (Message.created_at, Message.role, Message.id)
+
+
 class ConversationRepository:
     def __init__(self, db: AsyncSession) -> None:
         self._db = db
@@ -119,6 +126,12 @@ class ConversationRepository:
         organization_id: uuid.UUID,
         limit: int = 100,
     ) -> list[Message]:
+        """The newest `limit` messages, oldest first.
+
+        The window keeps the most recent turns: the model's history must end
+        with the message it is replying to, so trimming has to drop the
+        oldest messages, not the newest.
+        """
         stmt = (
             select(Message)
             .join(Conversation, Message.conversation_id == Conversation.id)
@@ -126,11 +139,13 @@ class ConversationRepository:
                 Message.conversation_id == conversation_id,
                 Conversation.organization_id == organization_id,
             )
-            .order_by(Message.created_at.asc())
+            .order_by(*(column.desc() for column in _MESSAGE_ORDER))
             .limit(limit)
         )
         result = await self._db.execute(stmt)
-        return list(result.scalars().all())
+        newest_first = list(result.scalars().all())
+        newest_first.reverse()
+        return newest_first
 
     async def has_assistant_message_for(
         self,

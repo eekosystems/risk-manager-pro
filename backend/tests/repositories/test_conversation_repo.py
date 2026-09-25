@@ -1,12 +1,13 @@
 """Tests for conversation repository."""
 
 import uuid
+from datetime import datetime, timedelta
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.conversation import FunctionType
-from app.models.message import MessageRole
+from app.models.message import Message, MessageRole
 from app.models.organization import Organization, OrganizationStatus
 from app.models.user import User
 from app.repositories.conversation import ConversationRepository
@@ -138,6 +139,85 @@ async def test_add_message_and_ordering(db_session: AsyncSession) -> None:
     assert len(messages) == 2
     assert messages[0].content == "First message"
     assert messages[1].content == "Second message"
+
+
+@pytest.mark.asyncio
+async def test_turn_pair_with_one_timestamp_keeps_user_first(db_session: AsyncSession) -> None:
+    """Legacy rows: a turn's user message and reply share one transaction `now()`."""
+    user, org_id = await _seed(db_session)
+    repo = ConversationRepository(db_session)
+    conversation = await repo.create(user_id=user.id, organization_id=org_id)
+
+    stamp = datetime(2026, 9, 25, 12, 0, 0)
+    turns = [
+        ("Why #1?", "Because the NOTAM was late."),
+        ("Why #2?", "Because the dispatcher had no checklist step."),
+        ("Why #3?", "Because the procedure was never updated."),
+        ("Why #4?", "Because nobody owns the procedure."),
+    ]
+    for offset, (question, answer) in enumerate(turns):
+        turn_time = stamp + timedelta(minutes=offset)
+        # Add the reply first so physical order cannot mask a missing tie-break.
+        db_session.add(
+            Message(
+                conversation_id=conversation.id,
+                role=MessageRole.ASSISTANT,
+                content=question,
+                created_at=turn_time,
+            )
+        )
+        db_session.add(
+            Message(
+                conversation_id=conversation.id,
+                role=MessageRole.USER,
+                content=answer,
+                created_at=turn_time,
+            )
+        )
+    await db_session.flush()
+
+    messages = await repo.get_messages(conversation.id, org_id)
+    assert [m.role for m in messages] == [MessageRole.USER, MessageRole.ASSISTANT] * len(turns)
+    assert [m.content for m in messages][:2] == ["Because the NOTAM was late.", "Why #1?"]
+
+
+@pytest.mark.asyncio
+async def test_get_messages_window_keeps_the_newest(db_session: AsyncSession) -> None:
+    user, org_id = await _seed(db_session)
+    repo = ConversationRepository(db_session)
+    conversation = await repo.create(user_id=user.id, organization_id=org_id)
+
+    for i in range(5):
+        await repo.add_message(
+            conversation_id=conversation.id,
+            organization_id=org_id,
+            role=MessageRole.USER if i % 2 == 0 else MessageRole.ASSISTANT,
+            content=f"message {i}",
+        )
+
+    messages = await repo.get_messages(conversation.id, org_id, limit=3)
+    assert [m.content for m in messages] == ["message 2", "message 3", "message 4"]
+
+
+@pytest.mark.asyncio
+async def test_messages_in_one_turn_get_distinct_timestamps(db_session: AsyncSession) -> None:
+    user, org_id = await _seed(db_session)
+    repo = ConversationRepository(db_session)
+    conversation = await repo.create(user_id=user.id, organization_id=org_id)
+
+    first = await repo.add_message(
+        conversation_id=conversation.id,
+        organization_id=org_id,
+        role=MessageRole.USER,
+        content="answer",
+    )
+    second = await repo.add_message(
+        conversation_id=conversation.id,
+        organization_id=org_id,
+        role=MessageRole.ASSISTANT,
+        content="next question",
+    )
+    assert first.created_at < second.created_at
 
 
 @pytest.mark.asyncio

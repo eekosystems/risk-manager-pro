@@ -47,4 +47,10 @@ class Conversation(Base):
     created_at: Mapped[datetime] = mapped_column(default=func.now())
     updated_at: Mapped[datetime] = mapped_column(default=func.now(), onupdate=func.now())
 
-    messages: Mapped[list["Message"]] = relationship(back_populates="conversation")
+    # Same order the model sees history in (see ConversationRepository):
+    # timestamp, then user before assistant for legacy rows whose turn pair
+    # shares one timestamp, then id so the order is fully deterministic.
+    messages: Mapped[list["Message"]] = relationship(
+        back_populates="conversation",
+        order_by="[Message.created_at, Message.role, Message.id]",
+    )
