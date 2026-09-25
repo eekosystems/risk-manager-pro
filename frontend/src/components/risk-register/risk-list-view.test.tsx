@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { RiskOutcomeSummary, SharePointRiskRow } from "@/api/sharepoint";
 import type {
@@ -116,6 +116,8 @@ const editorMitigation: MitigationItem = {
 const mocks = vi.hoisted(() => ({
   dbRisks: [] as RiskEntryListItem[],
   canEdit: true,
+  addToast: vi.fn(),
+  deleteMutate: vi.fn(),
   importMutate: vi.fn(),
   confirmMutate: vi.fn(),
   updateMutate: vi.fn(),
@@ -127,7 +129,7 @@ function mutation(mutate = vi.fn()) {
 
 vi.mock("@/hooks/use-risks", () => ({
   useRisks: () => ({ data: { data: mocks.dbRisks }, isLoading: false }),
-  useDeleteRisk: () => mutation(),
+  useDeleteRisk: () => mutation(mocks.deleteMutate),
   useImportSrmdHazards: () => mutation(mocks.importMutate),
   useConfirmResidualAssessment: () => mutation(mocks.confirmMutate),
   useDismissResidualAssessment: () => mutation(),
@@ -143,7 +145,7 @@ vi.mock("@/hooks/use-user-role", () => ({
 }));
 
 vi.mock("@/hooks/use-toast", () => ({
-  useToast: () => ({ addToast: vi.fn() }),
+  useToast: () => ({ addToast: mocks.addToast }),
 }));
 
 vi.mock("@/api/sharepoint", () => ({
@@ -182,6 +184,10 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.dbRisks = [dbRisk];
   mocks.canEdit = true;
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe("RiskListView filters", () => {
@@ -309,5 +315,49 @@ describe("RiskListView initial risk, residual risk and mitigations", () => {
     expect(
       screen.queryByRole("button", { name: /Import/ }),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe("RiskListView delete", () => {
+  const secondDbRisk: RiskEntryListItem = {
+    ...dbRisk,
+    id: "db-2",
+    title: "Wildlife strike on approach",
+    hazard: "Wildlife strike on approach",
+  };
+
+  function deleteButton(title: string): HTMLElement {
+    return within(rowFor(title)).getByTitle(/delete/i);
+  }
+
+  it("keeps a second row armed after the first row's arm window expires", async () => {
+    mocks.dbRisks = [dbRisk, secondDbRisk];
+    renderView();
+    await screen.findAllByText("Wildlife strike on approach");
+    vi.useFakeTimers();
+
+    fireEvent.click(deleteButton("Runway incursion at hold short line"));
+    act(() => vi.advanceTimersByTime(2000));
+    fireEvent.click(deleteButton("Wildlife strike on approach"));
+    act(() => vi.advanceTimersByTime(1500));
+    fireEvent.click(deleteButton("Wildlife strike on approach"));
+
+    expect(mocks.deleteMutate).toHaveBeenCalledTimes(1);
+    expect(mocks.deleteMutate.mock.calls[0]?.[0]).toBe("db-2");
+  });
+
+  it("shows an error toast when the delete request fails", async () => {
+    renderView();
+    await screen.findAllByText("Runway incursion at hold short line");
+
+    await userEvent.click(deleteButton("Runway incursion at hold short line"));
+    await userEvent.click(deleteButton("Runway incursion at hold short line"));
+
+    const options = mocks.deleteMutate.mock.calls[0]?.[1] as {
+      onError: () => void;
+    };
+    options.onError();
+
+    expect(mocks.addToast).toHaveBeenCalledWith("Could not delete the hazard", "error");
   });
 });

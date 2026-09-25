@@ -24,6 +24,7 @@ import {
 import type {
   CreateMitigationRequest,
   CreateRiskEntryRequest,
+  RiskEntryListItem,
   UpdateMitigationRequest,
   UpdateRiskEntryRequest,
 } from "@/types/api";
@@ -82,11 +83,33 @@ export function useUpdateRisk() {
   });
 }
 
+type RiskListData = { data: RiskEntryListItem[]; total: number };
+
 export function useDeleteRisk() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (riskId: string) => deleteRisk(riskId),
-    onSuccess: () => {
+    // Drop the row from every cached list immediately so the delete is
+    // visible on click; a failed request restores the snapshot.
+    onMutate: async (riskId) => {
+      await queryClient.cancelQueries({ queryKey: ["risks"] });
+      const previous = queryClient.getQueriesData<RiskListData>({ queryKey: ["risks"] });
+      queryClient.setQueriesData<RiskListData>({ queryKey: ["risks"] }, (current) =>
+        current
+          ? {
+              data: current.data.filter((risk) => risk.id !== riskId),
+              total: Math.max(0, current.total - 1),
+            }
+          : current,
+      );
+      return { previous };
+    },
+    onError: (_error, _riskId, context) => {
+      for (const [key, data] of context?.previous ?? []) {
+        queryClient.setQueryData(key, data);
+      }
+    },
+    onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: ["risks"] });
     },
   });

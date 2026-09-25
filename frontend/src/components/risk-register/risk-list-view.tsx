@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   Clock,
@@ -51,6 +51,7 @@ const STATUS_LABELS: Record<RiskStatus, { label: string; className: string }> = 
 };
 
 const ALL_AIRPORTS = "__all__";
+const DELETE_ARM_MS = 3000;
 
 /**
  * Adapt a SharePoint-extracted risk to the same shape `RiskEntryListItem`
@@ -107,6 +108,7 @@ export function RiskListView({ onSelectRisk, onCreateNew }: RiskListViewProps) {
   const [airportFilter, setAirportFilter] = useState<string>(ALL_AIRPORTS);
   const [selectedCell, setSelectedCell] = useState<RiskMatrixSelection | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const disarmTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [editingMitigationsFor, setEditingMitigationsFor] = useState<string | null>(null);
   const { canEdit } = useUserRole();
   const { addToast } = useToast();
@@ -262,15 +264,42 @@ export function RiskListView({ onSelectRisk, onCreateNew }: RiskListViewProps) {
     });
   }, [risks]);
 
+  function clearDisarmTimer() {
+    if (disarmTimer.current !== null) {
+      clearTimeout(disarmTimer.current);
+      disarmTimer.current = null;
+    }
+  }
+
+  useEffect(() => clearDisarmTimer, []);
+
+  // Two-click delete: the first click arms the row for a few seconds, the
+  // second confirms. Only one timer is live at a time so arming a second
+  // row cannot be disarmed by the first row's expiry.
   function handleDelete(e: React.MouseEvent, riskId: string) {
     e.stopPropagation();
-    if (deleteConfirm === riskId) {
-      deleteMutation.mutate(riskId);
-      setDeleteConfirm(null);
-    } else {
+    clearDisarmTimer();
+    if (deleteConfirm !== riskId) {
       setDeleteConfirm(riskId);
-      setTimeout(() => setDeleteConfirm(null), 3000);
+      disarmTimer.current = setTimeout(() => {
+        disarmTimer.current = null;
+        setDeleteConfirm(null);
+      }, DELETE_ARM_MS);
+      return;
     }
+    setDeleteConfirm(null);
+    const isSrmd = dbRisks.find((r) => r.id === riskId)?.source === "sharepoint_srmd";
+    deleteMutation.mutate(riskId, {
+      onSuccess: () => {
+        if (isSrmd) {
+          addToast(
+            "Hazard removed from the register. It still exists in the SharePoint SRMD, so it stays listed as a SharePoint row.",
+            "info",
+          );
+        }
+      },
+      onError: () => addToast("Could not delete the hazard", "error"),
+    });
   }
 
   function handleCellSelect(sel: RiskMatrixSelection) {
