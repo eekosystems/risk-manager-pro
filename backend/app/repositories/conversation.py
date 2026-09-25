@@ -1,4 +1,5 @@
 import uuid
+from collections.abc import Iterable
 from typing import Any
 
 from sqlalchemy import select
@@ -130,6 +131,32 @@ class ConversationRepository:
         )
         result = await self._db.execute(stmt)
         return list(result.scalars().all())
+
+    async def has_assistant_message_for(
+        self,
+        conversation_id: uuid.UUID,
+        organization_id: uuid.UUID,
+        function_types: Iterable[FunctionType],
+    ) -> bool:
+        """True when an assistant reply tagged with one of `function_types` exists.
+
+        Assistant messages carry the function that produced them in
+        `metadata_json["function_type"]`.
+        """
+        values = [ft.value for ft in function_types]
+        stmt = (
+            select(Message.id)
+            .join(Conversation, Message.conversation_id == Conversation.id)
+            .where(
+                Message.conversation_id == conversation_id,
+                Conversation.organization_id == organization_id,
+                Message.role == MessageRole.ASSISTANT,
+                Message.metadata_json["function_type"].astext.in_(values),
+            )
+            .limit(1)
+        )
+        result = await self._db.execute(stmt)
+        return result.scalar_one_or_none() is not None
 
     async def set_function_type(
         self,

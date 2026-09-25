@@ -2543,3 +2543,33 @@ SRA_PROMPT = SRA_PROMPT + _FOLLOWUPS_INSTRUCTION + _SRA_FOLLOWUPS_ADDENDUM
 RISK_REGISTER_PROMPT = (
     RISK_REGISTER_PROMPT + _FOLLOWUPS_INSTRUCTION + _RISK_REGISTER_FOLLOWUPS_ADDENDUM
 )
+
+
+# Sub-Prompt 1 is written as an autonomous single pass ("do not pause to
+# prompt the user"). Guided mode keeps every other rule of that prompt and
+# overrides only the root-cause stage: the model asks one "why" per turn and
+# the user supplies the answer. The full report is produced on the turn the
+# user finishes the chain, which hops the conversation back to the automated
+# System Analysis function.
+GUIDED_ROOT_CAUSE_ADDENDUM = """
+
+--- Guided Root-Cause Mode (overrides the execution mode above) ---
+The user has chosen to work through the 5 Whys with you rather than have you answer them. For this conversation the "autonomous, single-pass" execution mode does NOT apply to Step 2, Stage 1. Follow these rules instead:
+
+1. One question per turn. Ask exactly one "why" question, then stop and wait for the user's answer. Never answer a "why" yourself, never ask two at once, and never produce the report while questions remain.
+2. First turn: restate the event in one or two sentences, state the minimum iteration depth you expect from the severity and context (using the depth guidance above) and why, then ask Why #1 about the immediate cause.
+3. Each later turn: acknowledge the user's answer in one sentence. If it is vague, circular, or restates the previous answer, ask one probing follow-up before moving on. Otherwise ask the next "why", numbered, building on the answer just given. Keep each turn short: no headings, no report sections.
+4. Do not cite regulations, score risk, classify HFACS, or propose mitigations during the questioning. Those belong to the final report.
+5. When the chain reaches an actionable root cause (a systemic, organizational or design condition that, if corrected, would prevent recurrence), or the user says they are done, say so in one sentence and tell the user they can finish the report with the "Finish The Report" chip. Do not write the report in that turn.
+6. If the user asks you to answer a "why" for them, answer that one from the event details and indexed evidence, label it as system-derived, and continue.
+
+Chips for every turn in this mode:
+<followups>
+forward | system | Finish The Report | Produce the full system analysis report using the 5 Whys chain we built in this conversation. Render each question and my answer in the causal-chain sub-section exactly as agreed.
+confirm | system_guided | Answer This One For Me | Answer this "why" for me from the event details and evidence, label it as system-derived, then ask the next one.
+revise | system_guided | Go Back One Step | Let's go back and revise the previous "why" answer.
+explore | system_guided | Explain What You Are Looking For | Explain what kind of answer you are looking for at this step and why it matters.
+</followups>
+Use these four chips verbatim on every questioning turn. On the turn where you announce the root cause is reached, keep the same set."""
+
+SYSTEM_GUIDED_PROMPT = SYSTEM_ANALYSIS_PROMPT + GUIDED_ROOT_CAUSE_ADDENDUM

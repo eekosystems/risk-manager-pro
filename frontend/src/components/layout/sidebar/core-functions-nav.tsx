@@ -1,7 +1,7 @@
 import { clsx } from "clsx";
 import { Zap } from "lucide-react";
 
-import { FUNCTIONS } from "@/constants/functions";
+import { FUNCTIONS, FUNCTION_FAMILY } from "@/constants/functions";
 import type { FunctionType } from "@/types/api";
 
 interface CoreFunctionsNavProps {
@@ -13,6 +13,7 @@ export function CoreFunctionsNav({
   activeFunction,
   onFunctionSelect,
 }: CoreFunctionsNavProps) {
+  const activeFamily = FUNCTION_FAMILY[activeFunction];
   return (
     <>
       <div className="mb-1 flex items-center px-2 text-[11px] font-bold uppercase tracking-wider text-gray-400">
@@ -23,16 +24,16 @@ export function CoreFunctionsNav({
         <button
           key={fn.id}
           onClick={() => onFunctionSelect(fn.id)}
-          aria-current={activeFunction === fn.id ? "page" : undefined}
+          aria-current={activeFamily === fn.id ? "page" : undefined}
           className={clsx(
             "nav-item-hover mb-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left",
-            activeFunction === fn.id && "bg-brand-50",
+            activeFamily === fn.id && "bg-brand-50",
           )}
         >
           <div
             className={clsx(
               "flex h-9 w-9 items-center justify-center rounded-lg transition-all",
-              activeFunction === fn.id
+              activeFamily === fn.id
                 ? "gradient-brand text-white shadow-md shadow-brand-500/30"
                 : "bg-gray-100 text-brand-500",
             )}
@@ -43,7 +44,7 @@ export function CoreFunctionsNav({
             <span
               className={clsx(
                 "text-sm font-semibold",
-                activeFunction === fn.id
+                activeFamily === fn.id
                   ? "text-brand-600"
                   : "text-gray-800",
               )}

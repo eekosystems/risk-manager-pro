@@ -8,7 +8,7 @@ import {
 
 import { AiStatusCard } from "@/components/layout/panel/ai-status-card";
 import { CoreFunctionsNav } from "@/components/layout/sidebar/core-functions-nav";
-import { FUNCTIONS } from "@/constants/functions";
+import { FUNCTIONS, FUNCTION_FAMILY } from "@/constants/functions";
 import type { FunctionType } from "@/types/api";
 
 import type { AppView } from "./app-layout";
@@ -105,7 +105,7 @@ export function RightPanel({
                 title={fn.name}
                 className={clsx(
                   "flex h-10 w-10 items-center justify-center rounded-lg transition-all",
-                  activeFunction === fn.id && currentView === "chat"
+                  FUNCTION_FAMILY[activeFunction] === fn.id && currentView === "chat"
                     ? "gradient-brand text-white shadow-md shadow-brand-500/30"
                     : "text-gray-400 hover:bg-brand-50 hover:text-brand-500",
                 )}

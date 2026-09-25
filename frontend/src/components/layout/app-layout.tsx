@@ -30,6 +30,7 @@ const VALID_FUNCTIONS: ReadonlySet<FunctionType> = new Set([
   "phl",
   "sra",
   "system",
+  "system_guided",
   "general",
   "risk_register",
 ]);

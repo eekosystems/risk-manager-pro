@@ -3,7 +3,7 @@ import { ArrowRight, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { getDocumentById } from "@/api/documents";
-import { FUNCTIONS } from "@/constants/functions";
+import { FUNCTION_DISPLAY_NAMES } from "@/constants/functions";
 import { useConversation, useEmailChatMessage, useStreamMessage } from "@/hooks/use-chat";
 import { useUploadDocument } from "@/hooks/use-documents";
 import { useOrganizationContext } from "@/hooks/use-organization-context";
@@ -79,6 +79,15 @@ const WELCOME_MESSAGES: Record<FunctionType, string> = {
     "- Analyzing a proposed system change and its safety impacts\n" +
     "- Evaluating negative safety outcomes, lagging-indicator spikes, or adverse trends\n" +
     "- Identifying system dependencies and potential failure points\n\n" +
+    "All outputs are decision-support tools and require Safety Manager/SMS Manager " +
+    "or Accountable Executive review before implementation.",
+  system_guided:
+    "You're now in **Guided Root-Cause Analysis** mode. I'll take you through the " +
+    "5 Whys one question at a time: I ask each \"why\", you answer from your " +
+    "knowledge of the event, and I keep the causal chain on track. When we reach " +
+    "the root cause, choose **Finish The Report** and I'll produce the full system " +
+    "analysis, HFACS classification, and corrective actions from your answers.\n\n" +
+    "Describe the negative safety outcome, incident, or adverse trend to begin.\n\n" +
     "All outputs are decision-support tools and require Safety Manager/SMS Manager " +
     "or Accountable Executive review before implementation.",
   general:
@@ -330,9 +339,8 @@ export function ChatPage({
             });
             if (meta.routedFunction && meta.routedFunction !== activeFunction) {
               onFunctionRouted(meta.routedFunction);
-              const target = FUNCTIONS.find((f) => f.id === meta.routedFunction);
               addToast(
-                `Switched to ${target?.name ?? meta.routedFunction}`,
+                `Switched to ${FUNCTION_DISPLAY_NAMES[meta.routedFunction]}`,
                 "info",
               );
             }

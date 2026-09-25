@@ -1,4 +1,10 @@
-export type FunctionType = "phl" | "sra" | "system" | "general" | "risk_register";
+export type FunctionType =
+  | "phl"
+  | "sra"
+  | "system"
+  | "system_guided"
+  | "general"
+  | "risk_register";
 
 export interface ConversationHit {
   id: string;

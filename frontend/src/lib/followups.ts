@@ -27,6 +27,7 @@ const MODE_MAP: Record<string, FunctionType> = {
   general: "general",
   system: "system",
   system_analysis: "system",
+  system_guided: "system_guided",
   phl: "phl",
   sra: "sra",
   risk_register: "risk_register",

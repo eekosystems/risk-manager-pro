@@ -42,6 +42,7 @@ const FUNCTION_LABELS: Record<FunctionType, string> = {
   phl: "PHL",
   sra: "SRA",
   system: "System Analysis",
+  system_guided: "System Analysis (Guided 5 Whys)",
   general: "General",
   risk_register: "Risk Register",
 };
@@ -51,6 +52,7 @@ const FUNCTION_OPTIONS: FunctionType[] = [
   "phl",
   "sra",
   "system",
+  "system_guided",
   "risk_register",
 ];
 

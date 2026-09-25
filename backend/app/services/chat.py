@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings as app_settings
 from app.models.conversation import Conversation, FunctionType
 from app.models.document import Document, DocumentStatus
-from app.models.message import MessageRole
+from app.models.message import Message, MessageRole
 from app.models.user import User
 from app.repositories.conversation import ConversationRepository
 from app.repositories.document import DocumentRepository
@@ -27,10 +27,12 @@ from app.services.output_compliance import (
 )
 from app.services.prompts import (
     GENERAL_PROMPT,
+    GUIDED_ROOT_CAUSE_ADDENDUM,
     PHL_PROMPT,
     RISK_REGISTER_PROMPT,
     SRA_PROMPT,
     SYSTEM_ANALYSIS_PROMPT,
+    SYSTEM_GUIDED_PROMPT,
 )
 from app.services.rag import RAGService, SearchResult
 from app.services.risk import RiskService
@@ -49,6 +51,7 @@ SYSTEM_PROMPTS: dict[FunctionType, str] = {
     FunctionType.PHL: PHL_PROMPT,
     FunctionType.SRA: SRA_PROMPT,
     FunctionType.SYSTEM_ANALYSIS: SYSTEM_ANALYSIS_PROMPT,
+    FunctionType.SYSTEM_GUIDED: SYSTEM_GUIDED_PROMPT,
     FunctionType.GENERAL: GENERAL_PROMPT,
     FunctionType.RISK_REGISTER: RISK_REGISTER_PROMPT,
 }
@@ -63,6 +66,10 @@ def _resolve_prompt(function_type: FunctionType, prompts: PromptsPayload | None)
         FunctionType.PHL: prompts.phl_prompt,
         FunctionType.SRA: prompts.sra_prompt,
         FunctionType.SYSTEM_ANALYSIS: prompts.system_analysis_prompt,
+        # Guided mode rides on the organization's own System Analysis prompt so
+        # a customised prompt still governs the report; only the root-cause
+        # stage is overridden.
+        FunctionType.SYSTEM_GUIDED: prompts.system_analysis_prompt + GUIDED_ROOT_CAUSE_ADDENDUM,
         FunctionType.GENERAL: prompts.system_prompt,
         FunctionType.RISK_REGISTER: prompts.risk_register_prompt,
     }
@@ -656,6 +663,12 @@ _DEFAULT_FOLLOWUPS_BY_FUNCTION: dict[FunctionType, str] = {
         "clarify | system | Examine Other System Interfaces | What other systems or interfaces should we consider in this analysis?\n"
         "explore | sra | Run SRA On A Hazard | Run a Safety Risk Assessment on a hazard from this system."
     ),
+    FunctionType.SYSTEM_GUIDED: (
+        "forward | system | Finish The Report | Produce the full system analysis report using the 5 Whys chain we built in this conversation. Render each question and my answer in the causal-chain sub-section exactly as agreed.\n"
+        'confirm | system_guided | Answer This One For Me | Answer this "why" for me from the event details and evidence, label it as system-derived, then ask the next one.\n'
+        'revise | system_guided | Go Back One Step | Let\'s go back and revise the previous "why" answer.\n'
+        "explore | system_guided | Explain What You Are Looking For | Explain what kind of answer you are looking for at this step and why it matters."
+    ),
     FunctionType.PHL: (
         "forward | sra | Determine Full Risk For Top Hazard | Determine the full risk score for the highest-risk hazard from this PHL, including likelihood, severity, initial and residual risk.\n"
         "confirm | general | Confirm PHL Accuracy | Confirm the hazards identified above are accurate and complete before we proceed.\n"
@@ -707,6 +720,37 @@ def _build_default_followups_block(function_type: FunctionType) -> str:
         function_type, _DEFAULT_FOLLOWUPS_BY_FUNCTION[FunctionType.GENERAL]
     )
     return f"<followups>\n{body}\n</followups>"
+
+
+# Offered once per conversation, on the first System Analysis turn that did not
+# arrive from a chip. Sub-Prompt 1 runs the 5 Whys autonomously; the guided
+# alternative asks each "why" and waits for the user's answer. The reply is
+# canned rather than model-generated so the two chips are always present and
+# always carry the right modes: the guided chip pins the conversation to
+# SYSTEM_GUIDED, the automated chip runs the report immediately.
+_ROOT_CAUSE_MODE_CHOICE = (
+    "Before I start, choose how you want the root-cause analysis (5 Whys) to run:\n\n"
+    '- **Guided**: I ask each "why" question one at a time and you answer from your '
+    "knowledge of the event. I keep the chain on track and build the report from "
+    "your answers.\n"
+    '- **Automated**: I ask and answer every "why" myself from the event details and '
+    "the indexed safety documentation, then deliver the complete report in one pass.\n\n"
+    "Pick one below. Either way, the human remains the final control on the output.\n\n"
+    "<followups>\n"
+    "forward | system_guided | Guide Me Through The 5 Whys | Guide me through the 5 Whys "
+    "one question at a time. I will answer each one.\n"
+    "explore | system | Run The Automated Analysis | Run the full automated system "
+    "analysis and root-cause report now.\n"
+    "</followups>"
+)
+_ROOT_CAUSE_MODE_CHOICE_METADATA: dict[str, object] = {
+    "function_type": FunctionType.SYSTEM_ANALYSIS.value,
+    "root_cause_mode_choice": True,
+}
+_ROOT_CAUSE_FUNCTIONS: tuple[FunctionType, ...] = (
+    FunctionType.SYSTEM_ANALYSIS,
+    FunctionType.SYSTEM_GUIDED,
+)
 
 
 def _ensure_followups_block(content: str, function_type: FunctionType) -> tuple[str, str | None]:
@@ -895,8 +939,19 @@ def _detect_missing_mandatory_elements(
 # weighting is part of the output contract. Conversational turns (GENERAL) and
 # the Risk Register wizard are excluded — a precedent banner on "which airport?"
 # is noise.
+# SYSTEM_GUIDED is deliberately absent: its turns are single questions and
+# one-line answers, so whole-document retrieval and the precedent banner would
+# be noise on every turn. The report turn hops back to SYSTEM_ANALYSIS and gets
+# the full analysis treatment there.
 _ANALYSIS_FUNCTIONS: frozenset[FunctionType] = frozenset(
     {FunctionType.PHL, FunctionType.SRA, FunctionType.SYSTEM_ANALYSIS}
+)
+
+# Flows that span several turns and must survive the classifier: once a
+# conversation is in one of these, short replies ("KSFO", "because the crew
+# skipped the checklist") stay in the flow instead of being re-routed.
+_STICKY_FUNCTIONS: frozenset[FunctionType] = frozenset(
+    {FunctionType.RISK_REGISTER, FunctionType.SYSTEM_GUIDED}
 )
 
 # Verbatim from the Core Logic Prompt's No-Match Scenario. The spec places this
@@ -1425,8 +1480,17 @@ class ChatService:
         # Guidance refines an answer rather than producing one, so a failure here
         # degrades quality instead of denying the user a response — the same
         # posture the document-context lookups above take.
+        # Guided mode is System Analysis with a different root-cause stage, so
+        # reviewers' System Analysis guidance applies to it as well.
+        guidance_function = (
+            FunctionType.SYSTEM_ANALYSIS
+            if function_type == FunctionType.SYSTEM_GUIDED
+            else function_type
+        )
         try:
-            guidance_block = await self._guidance.build_prompt_block(organization_id, function_type)
+            guidance_block = await self._guidance.build_prompt_block(
+                organization_id, guidance_function
+            )
         except Exception:
             logger.error(
                 "guidance_fetch_failed",
@@ -1542,66 +1606,125 @@ class ChatService:
         """Pick the prompt for this turn. Falls back to request.function_type.
 
         Guards (in order):
-          1. Tool flow in progress on the conversation (RISK_REGISTER) and
-             the turn is not an explicit hop into another analysis function
-             → stay in Risk Register. The entry flow spans several turns
-             (present the record, confirm, save), and the confirmation turn
-             is the one that calls `save_risk_register_record`. A chip that
-             locks routing to GENERAL — the default mode for confirm and
-             clarify chips — must not strip the tools on that turn, or the
-             model confirms the entry in prose and nothing is saved.
+          1. Sticky flow in progress on the conversation (RISK_REGISTER or
+             SYSTEM_GUIDED) and the turn is not an explicit hop into another
+             analysis function → stay in that flow. Risk Register entry spans
+             several turns (present the record, confirm, save), and the
+             confirmation turn is the one that calls
+             `save_risk_register_record`. A chip that locks routing to
+             GENERAL — the default mode for confirm and clarify chips — must
+             not strip the tools on that turn, or the model confirms the
+             entry in prose and nothing is saved. Guided root-cause
+             questioning has the same shape: the user's answers must keep
+             reaching the guided prompt.
           2. routing_locked → user clicked a follow-up chip; trust the mode
              they confirmed and skip classification entirely.
           3. Killswitch off → keep request.function_type.
           4. Otherwise classify every turn so the UI can live-switch.
         """
-        in_register_flow = conversation.function_type == FunctionType.RISK_REGISTER
-        if in_register_flow and request.function_type == FunctionType.GENERAL:
-            return FunctionType.RISK_REGISTER
+        sticky = (
+            conversation.function_type if conversation.function_type in _STICKY_FUNCTIONS else None
+        )
+        if sticky is not None and request.function_type == FunctionType.GENERAL:
+            return sticky
         if request.routing_locked:
             return request.function_type
         if not app_settings.chat_smart_routing:
             return request.function_type
-        if in_register_flow:
-            return FunctionType.RISK_REGISTER
+        if sticky is not None:
+            return sticky
         return await classify_function(
             request.message, self._openai, fallback=request.function_type
         )
 
-    async def _pin_risk_register_if_routed(
+    async def _pin_sticky_function(
         self,
         conversation: Conversation,
         routed_function: FunctionType,
         organization_id: uuid.UUID,
     ) -> None:
-        """Persist a flip into Risk Register on the conversation row.
+        """Persist sticky-flow transitions on the conversation row.
 
-        When a chip click routes a non-Risk-Register conversation into
-        Risk Register, the first turn rides on `routing_locked=true` and
-        works fine. But the user's follow-up replies ("KSFO", "Severity 3")
-        come back with `routing_locked=false`, and the smart-routing
-        classifier won't recognize a one-word reply as Risk Register —
-        so the model loses RR_TOOLS and `save_risk_register_record` is
-        never called. Pinning the conversation's `function_type` here
-        means guard 3 in `_route_function_type` keeps every subsequent
-        turn in Risk Register until the chat ends.
+        Entering a flow: when a chip click routes a conversation into Risk
+        Register or guided root-cause mode, the first turn rides on
+        `routing_locked=true` and works fine. But the user's follow-up
+        replies ("KSFO", "Severity 3", "because the NOTAM was late") come
+        back with `routing_locked=false`, and the smart-routing classifier
+        won't recognize a short reply as part of the flow — so the model
+        loses its tools or its questioning prompt. Pinning the
+        conversation's `function_type` here means guard 1 in
+        `_route_function_type` keeps every subsequent turn in the flow.
+
+        Leaving guided mode: the "Finish The Report" chip hops to
+        SYSTEM_ANALYSIS with routing locked. The pin is released on that
+        hop, otherwise every later unlocked reply would be pulled back into
+        questioning. Risk Register keeps its pin until the chat ends, as
+        before, because its save turn can arrive several turns after a hop.
         """
-        if routed_function != FunctionType.RISK_REGISTER:
+        current = conversation.function_type
+        entering_flow = routed_function in _STICKY_FUNCTIONS
+        leaving_guided = current == FunctionType.SYSTEM_GUIDED
+        if not (entering_flow or leaving_guided) or current == routed_function:
             return
-        if conversation.function_type == FunctionType.RISK_REGISTER:
-            return
+        target = routed_function
         await self._repo.set_function_type(
             conversation_id=conversation.id,
             organization_id=organization_id,
-            function_type=FunctionType.RISK_REGISTER,
+            function_type=target,
         )
+        conversation.function_type = target
+        logger.info(
+            "conversation_function_pinned",
+            conversation_id=str(conversation.id),
+            previous=current.value,
+            function_type=target.value,
+        )
+
+    async def _should_offer_root_cause_mode_choice(
+        self,
+        request: ChatRequest,
+        conversation: Conversation,
+        routed_function: FunctionType,
+        organization_id: uuid.UUID,
+    ) -> bool:
+        """Offer the guided/automated choice on a conversation's first analysis turn.
+
+        A chip click (`routing_locked`) is the user's answer to the choice,
+        so it never re-asks. Once any System Analysis or guided reply exists
+        in the conversation the choice has been made, and later system-routed
+        turns (follow-up questions about the report) run straight through.
+        """
+        if routed_function != FunctionType.SYSTEM_ANALYSIS or request.routing_locked:
+            return False
+        already_asked = await self._repo.has_assistant_message_for(
+            conversation_id=conversation.id,
+            organization_id=organization_id,
+            function_types=_ROOT_CAUSE_FUNCTIONS,
+        )
+        return not already_asked
+
+    async def _offer_root_cause_mode_choice(
+        self, conversation: Conversation, organization_id: uuid.UUID
+    ) -> Message:
+        assistant_msg = await self._repo.add_message(
+            conversation_id=conversation.id,
+            organization_id=organization_id,
+            role=MessageRole.ASSISTANT,
+            content=_ROOT_CAUSE_MODE_CHOICE,
+            metadata=dict(_ROOT_CAUSE_MODE_CHOICE_METADATA),
+        )
+        logger.info(
+            "root_cause_mode_choice_offered",
+            conversation_id=str(conversation.id),
+        )
+        return assistant_msg
 
     async def process_message(
         self, request: ChatRequest, user: User, organization_id: uuid.UUID
     ) -> ChatResponse:
         conversation = await self._resolve_conversation(request, user, organization_id)
         routed_function = await self._route_function_type(request, conversation)
-        await self._pin_risk_register_if_routed(conversation, routed_function, organization_id)
+        await self._pin_sticky_function(conversation, routed_function, organization_id)
 
         await self._repo.add_message(
             conversation_id=conversation.id,
@@ -1609,6 +1732,17 @@ class ChatService:
             role=MessageRole.USER,
             content=request.message,
         )
+
+        if await self._should_offer_root_cause_mode_choice(
+            request, conversation, routed_function, organization_id
+        ):
+            choice_msg = await self._offer_root_cause_mode_choice(conversation, organization_id)
+            return ChatResponse(
+                conversation_id=conversation.id,
+                message=MessageResponse.model_validate(choice_msg),
+                title=conversation.title,
+                routed_function_type=routed_function,
+            )
 
         # Load org-level settings
         rag_config = await self._settings.get_effective_rag_config(organization_id)
@@ -1743,7 +1877,7 @@ class ChatService:
         """
         conversation = await self._resolve_conversation(request, user, organization_id)
         routed_function = await self._route_function_type(request, conversation)
-        await self._pin_risk_register_if_routed(conversation, routed_function, organization_id)
+        await self._pin_sticky_function(conversation, routed_function, organization_id)
 
         await self._repo.add_message(
             conversation_id=conversation.id,
@@ -1751,6 +1885,20 @@ class ChatService:
             role=MessageRole.USER,
             content=request.message,
         )
+
+        if await self._should_offer_root_cause_mode_choice(
+            request, conversation, routed_function, organization_id
+        ):
+            yield {
+                "event": "metadata",
+                "conversation_id": str(conversation.id),
+                "title": conversation.title,
+                "routed_function_type": routed_function.value,
+            }
+            choice_msg = await self._offer_root_cause_mode_choice(conversation, organization_id)
+            yield {"event": "delta", "content": choice_msg.content}
+            yield {"event": "done", "message_id": str(choice_msg.id), "citations": None}
+            return
 
         rag_config = await self._settings.get_effective_rag_config(organization_id)
         model_config = await self._settings.get_effective_model_config(organization_id)

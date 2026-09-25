@@ -16,6 +16,10 @@ class FunctionType(enum.StrEnum):
     PHL = "phl"
     SRA = "sra"
     SYSTEM_ANALYSIS = "system"
+    # System Analysis with the 5 Whys run as a dialogue: the model asks one
+    # "why" per turn and the user supplies each answer. Sticky on the
+    # conversation, like RISK_REGISTER, so short replies are not re-routed.
+    SYSTEM_GUIDED = "system_guided"
     GENERAL = "general"
     RISK_REGISTER = "risk_register"
 

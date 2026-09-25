@@ -22,6 +22,17 @@ logger = structlog.get_logger(__name__)
 
 
 _RULES: list[tuple[re.Pattern[str], FunctionType]] = [
+    # A user asking to be walked through the 5 Whys wants the guided flow
+    # directly, without the guided/automated choice turn.
+    (
+        re.compile(
+            r"\b(?:guide|walk)\s+me\s+through\s+(?:the\s+)?(?:5|five)\s*whys\b|"
+            r"\b(?:co-?guided|interactive)\s+(?:5|five)\s*whys\b|"
+            r"\b(?:5|five)\s*whys\b.{0,40}\bone\s+(?:question|why)\s+at\s+a\s+time\b",
+            re.IGNORECASE,
+        ),
+        FunctionType.SYSTEM_GUIDED,
+    ),
     (
         re.compile(
             r"\b(add|log|save|record|enter|put)\s+(?:this|the|a|that)?\s*hazard\b",
