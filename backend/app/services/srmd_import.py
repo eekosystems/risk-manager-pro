@@ -8,7 +8,9 @@ can drive an SP3 residual re-assessment.
 
 Import only ever creates: an (airport, hazard) that is already on the
 register is left untouched, so later edits are never overwritten by a
-re-scan of the source report.
+re-scan of the source report. The Risk Register runs the import on its own
+whenever the scan holds hazards that are not on the register yet, so a
+hazard the organization deleted is recorded as dismissed and skipped.
 """
 
 from __future__ import annotations
@@ -83,9 +85,10 @@ class SrmdImportService:
             by_ref.setdefault(srmd_ref(hazard.airport_identifier, hazard.hazard), hazard)
 
         existing = await self._repo.existing_srmd_refs(organization.id, list(by_ref))
+        dismissed = await self._repo.dismissed_srmd_refs(organization.id)
         created: list[RiskEntry] = []
         for ref, hazard in by_ref.items():
-            if ref in existing:
+            if ref in existing or ref in dismissed:
                 continue
             created.append(await self._create_entry(ref, hazard, organization.id, user_id))
 
@@ -96,6 +99,15 @@ class SrmdImportService:
             already_imported=len(existing),
         )
         return created, len(existing)
+
+    async def without_dismissed(
+        self, hazards: list[SharePointRisk], organization: Organization
+    ) -> list[SharePointRisk]:
+        """Drop the hazards the organization deleted from its Risk Register."""
+        dismissed = await self._repo.dismissed_srmd_refs(organization.id)
+        if not dismissed:
+            return hazards
+        return [h for h in hazards if srmd_ref(h.airport_identifier, h.hazard) not in dismissed]
 
     async def _create_entry(
         self,

@@ -3,7 +3,8 @@
 Import creates one RMP-validated entry per (airport, hazard) with the
 report's initial cell, residual cell and verbatim mitigations. It never
 duplicates and never touches an entry already on the register, and a client
-organization only ever receives its own airport's hazards.
+organization only ever receives its own airport's hazards. A hazard the
+organization deleted stays off its register and out of its scan summary.
 """
 
 import uuid
@@ -21,6 +22,7 @@ from app.models.risk import (
     ValidationStatus,
 )
 from app.models.user import User
+from app.services.risk import RiskService
 from app.services.risk_outcome_importer import SharePointRisk
 from app.services.srmd_import import SrmdImportService, srmd_ref
 from tests.conftest import make_test_organization, make_test_user
@@ -123,3 +125,58 @@ async def test_client_org_receives_only_its_airport(db_session: AsyncSession) ->
     )
 
     assert [c.airport_identifier for c in created] == ["DEN"]
+
+
+async def test_deleted_srmd_hazard_is_not_imported_again(db_session: AsyncSession) -> None:
+    org, user = await _seed(db_session)
+    service = SrmdImportService(db_session)
+    kept = _hazard(hazard="Construction site entry")
+    [entry], _ = await service.import_hazards([_hazard()], org, user.id)
+
+    await RiskService(db_session).delete_risk_entry(entry.id, org.id, user.id)
+    created, already = await service.import_hazards([_hazard(), kept], org, user.id)
+
+    assert already == 0
+    assert [c.hazard for c in created] == ["Construction site entry"]
+    assert await service.without_dismissed([_hazard(), kept], org) == [kept]
+
+
+async def test_dismissal_applies_only_to_the_organization_that_deleted(
+    db_session: AsyncSession,
+) -> None:
+    org, user = await _seed(db_session)
+    other_org = make_test_organization(org_id=uuid.uuid4(), slug="fg-two", is_platform=True)
+    db_session.add(other_org)
+    await db_session.flush()
+    service = SrmdImportService(db_session)
+    [entry], _ = await service.import_hazards([_hazard()], org, user.id)
+
+    await RiskService(db_session).delete_risk_entry(entry.id, org.id, user.id)
+    created, _ = await service.import_hazards([_hazard()], other_org, user.id)
+
+    assert len(created) == 1
+    assert await service.without_dismissed([_hazard()], other_org) == [_hazard()]
+
+
+async def test_deleting_a_manual_entry_records_no_dismissal(db_session: AsyncSession) -> None:
+    org, user = await _seed(db_session)
+    entry = RiskEntry(
+        organization_id=org.id,
+        created_by=user.id,
+        title="Haul route crossing",
+        description="Entered by hand",
+        hazard="Haul route crossing",
+        severity=4,
+        likelihood="C",
+        risk_level=RiskLevel.HIGH,
+        airport_identifier="DEN",
+    )
+    db_session.add(entry)
+    await db_session.flush()
+
+    await RiskService(db_session).delete_risk_entry(entry.id, org.id, user.id)
+
+    same_hazard = _hazard(hazard="Haul route crossing")
+    assert await SrmdImportService(db_session).without_dismissed([same_hazard], org) == [
+        same_hazard
+    ]

@@ -302,6 +302,26 @@ class Mitigation(Base):
     risk_entry: Mapped["RiskEntry"] = relationship(back_populates="mitigations")
 
 
+class SrmdDismissal(Base):
+    """A SharePoint SRMD hazard an organization deleted from its Risk Register.
+
+    SRMD hazards are imported automatically, so deleting the entry alone would
+    bring it back on the next import. The dismissal keeps the entry's
+    `srmd_ref` so the import and the scan summary both skip the hazard.
+    """
+
+    __tablename__ = "srmd_dismissals"
+    __table_args__ = (
+        UniqueConstraint("organization_id", "srmd_ref", name="uq_srmd_dismissals_org_srmd_ref"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), index=True)
+    srmd_ref: Mapped[str] = mapped_column(String(64))
+    dismissed_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(default=func.now())
+
+
 class AirportSubLocation(Base):
     """Airport-specific sub-location library (per Sub-Prompt 4 §Step 3a).
 

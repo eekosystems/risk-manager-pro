@@ -111,6 +111,8 @@ export function useDeleteRisk() {
     },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: ["risks"] });
+      // A deleted SRMD hazard also drops out of the SharePoint scan summary.
+      void queryClient.invalidateQueries({ queryKey: ["sharepoint-risk-outcome-summary"] });
     },
   });
 }

@@ -10,7 +10,7 @@ from app.models.notification import Notification
 from app.models.organization import Organization
 from app.models.organization_membership import OrganizationMembership
 from app.models.residual_assessment import ResidualAssessment
-from app.models.risk import AirportSubLocation, Mitigation, RiskEntry
+from app.models.risk import AirportSubLocation, Mitigation, RiskEntry, SrmdDismissal
 from app.models.risk_outcome_cache import RiskOutcomeCache
 from app.models.risk_threshold import RiskAlertThreshold
 from app.models.rr_sync import (
@@ -51,6 +51,7 @@ __all__ = [
     "RiskEntry",
     "RiskOutcomeCache",
     "RiskRecordLink",
+    "SrmdDismissal",
     "User",
     "Workflow",
 ]

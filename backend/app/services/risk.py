@@ -183,11 +183,21 @@ class RiskService:
         )
         return entry
 
-    async def delete_risk_entry(self, risk_id: uuid.UUID, organization_id: uuid.UUID) -> None:
-        deleted = await self._repo.delete(risk_id, organization_id)
-        if not deleted:
+    async def delete_risk_entry(
+        self, risk_id: uuid.UUID, organization_id: uuid.UUID, user_id: uuid.UUID
+    ) -> None:
+        entry = await self._repo.get_by_id(risk_id, organization_id)
+        if not entry:
             raise NotFoundError("RiskEntry", str(risk_id))
-        logger.info("risk_entry_deleted", risk_id=str(risk_id))
+
+        # SRMD hazards are imported automatically; remember the deletion so
+        # the next import does not bring the hazard back.
+        srmd_dismissed = entry.srmd_ref is not None
+        if entry.srmd_ref is not None:
+            await self._repo.add_srmd_dismissal(organization_id, entry.srmd_ref, user_id)
+
+        await self._repo.delete(risk_id, organization_id)
+        logger.info("risk_entry_deleted", risk_id=str(risk_id), srmd_dismissed=srmd_dismissed)
 
     # --- Mitigations ---
 

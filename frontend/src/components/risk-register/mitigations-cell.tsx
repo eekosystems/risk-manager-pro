@@ -6,7 +6,7 @@ const VISIBLE_MITIGATIONS = 3;
 
 interface MitigationsCellProps {
   mitigations: MitigationSummary[];
-  /** Null when the row cannot be edited (viewer, or not yet imported). */
+  /** Null when the row cannot be edited (viewer, or not on the register yet). */
   onEdit: (() => void) | null;
   editing: boolean;
   hint: string | null;

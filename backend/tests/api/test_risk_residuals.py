@@ -19,7 +19,7 @@ from app.models.residual_assessment import ResidualAssessment, ResidualAssessmen
 from app.models.risk import RiskEntry, RiskLevel, compute_risk_level
 from app.models.user import User
 from app.services.residual_assessment import ResidualAssessmentRunner, ResidualAssessmentService
-from app.services.risk_outcome_importer import SharePointRisk
+from app.services.risk_outcome_importer import SharePointRisk, SharePointRiskSummary
 
 
 class _QueuedRuns(ResidualAssessmentRunner):
@@ -163,3 +163,62 @@ async def test_import_srmd_creates_entries_once(
     assert [m["title"] for m in row["mitigations"]] == ["Sweep haul route daily"]
     assert _actions(mock_audit_logger).count("risk.created") == 1
     assert _actions(mock_audit_logger).count("risk.srmd_imported") == 2
+
+
+async def test_deleted_srmd_hazard_stays_off_the_register_and_the_summary(
+    client: AsyncClient,
+    test_app: FastAPI,
+    mock_audit_logger: AsyncMock,
+) -> None:
+    deleted = SharePointRisk(
+        airport_identifier="DEN",
+        hazard="FOD - Clean Soil hauled into site.",
+        severity=2,
+        likelihood="D",
+        risk_level="low",
+        source_file="DEN SRMD.pdf",
+        source_url=None,
+    )
+    kept = SharePointRisk(
+        airport_identifier="DEN",
+        hazard="Construction site entry",
+        severity=3,
+        likelihood="C",
+        risk_level="medium",
+        source_file="DEN SRMD.pdf",
+        source_url=None,
+    )
+    summary = SharePointRiskSummary(
+        airports=["DEN"],
+        risks=[deleted, kept],
+        notes=[],
+        generated_at=1.0,
+        status="ready",
+        scanned=1,
+        total=1,
+        last_scan_completed_at=1.0,
+    )
+    importer = AsyncMock()
+    importer.snapshot.return_value = summary
+    importer.scan_all.return_value = summary
+    test_app.state.services.risk_outcome_importer = importer
+
+    first = await client.post("/api/v1/risks/import-srmd")
+    [deleted_id] = [
+        r["id"]
+        for r in (await client.get("/api/v1/risks")).json()["data"]
+        if r["hazard"] == deleted.hazard
+    ]
+    removal = await client.delete(f"/api/v1/risks/{deleted_id}")
+    second = await client.post("/api/v1/risks/import-srmd")
+
+    assert first.json()["data"]["imported"] == 2
+    assert removal.status_code == 204
+    assert (second.json()["data"]["imported"], second.json()["data"]["already_imported"]) == (0, 1)
+    listed = (await client.get("/api/v1/risks")).json()["data"]
+    assert [r["hazard"] for r in listed] == [kept.hazard]
+    scan = (await client.get("/api/v1/sharepoint/risk-outcome-summary")).json()["data"]
+    assert [r["hazard"] for r in scan["risks"]] == [kept.hazard]
+    assert (scan["status"], scan["scanned"], scan["total"]) == ("ready", 1, 1)
+    assert scan["last_scan_completed_at"] == 1.0
+    assert "risk.deleted" in _actions(mock_audit_logger)

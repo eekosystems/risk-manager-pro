@@ -280,7 +280,7 @@ async def delete_risk_entry(
     service: RiskService = Depends(_get_risk_service),
     audit: AuditLogger = Depends(get_audit_logger),
 ) -> None:
-    await service.delete_risk_entry(risk_id, organization.id)
+    await service.delete_risk_entry(risk_id, organization.id, current_user.id)
     await audit.log(
         action="risk.deleted",
         user=current_user,

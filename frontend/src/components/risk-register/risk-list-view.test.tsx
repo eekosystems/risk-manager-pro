@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -115,6 +115,7 @@ const editorMitigation: MitigationItem = {
 
 const mocks = vi.hoisted(() => ({
   dbRisks: [] as RiskEntryListItem[],
+  summary: null as RiskOutcomeSummary | null,
   canEdit: true,
   addToast: vi.fn(),
   deleteMutate: vi.fn(),
@@ -149,7 +150,7 @@ vi.mock("@/hooks/use-toast", () => ({
 }));
 
 vi.mock("@/api/sharepoint", () => ({
-  getRiskOutcomeSummary: () => Promise.resolve(summary),
+  getRiskOutcomeSummary: () => Promise.resolve(mocks.summary),
 }));
 
 function renderView() {
@@ -183,6 +184,7 @@ function rowFor(title: string): HTMLElement {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.dbRisks = [dbRisk];
+  mocks.summary = summary;
   mocks.canEdit = true;
 });
 
@@ -238,19 +240,52 @@ describe("RiskListView initial risk, residual risk and mitigations", () => {
     expect(row.getByText("D4")).toBeInTheDocument();
     expect(row.getByText("• Cover loads in transit")).toBeInTheDocument();
     expect(row.getByText("• Sweep haul route daily")).toBeInTheDocument();
-    expect(row.getByText("Import SRMD hazards to edit")).toBeInTheDocument();
     expect(row.queryByText("Edit mitigations")).not.toBeInTheDocument();
   });
 
-  it("imports the SRMD hazards still read from the scan", async () => {
+  it("adds the SRMD hazards still read from the scan to the register by itself", async () => {
     renderView();
     await screen.findAllByText("FOD - Clean Soil hauled");
 
-    await userEvent.click(
-      screen.getByRole("button", { name: /Import 2 SRMD hazards/ }),
-    );
-
     expect(mocks.importMutate).toHaveBeenCalledTimes(1);
+    expect(
+      screen.queryByRole("button", { name: /Import/ }),
+    ).not.toBeInTheDocument();
+
+    const options = mocks.importMutate.mock.calls[0]?.[1] as {
+      onSuccess: (result: { imported: number }) => void;
+    };
+    options.onSuccess({ imported: 2 });
+
+    expect(mocks.addToast).toHaveBeenCalledWith(
+      "Added 2 SRMD hazards to the register",
+      "info",
+    );
+  });
+
+  it("does not import while the SharePoint scan is still running", async () => {
+    mocks.summary = { ...summary, status: "scanning" };
+    renderView();
+    await screen.findAllByText("FOD - Clean Soil hauled");
+
+    expect(mocks.importMutate).not.toHaveBeenCalled();
+  });
+
+  it("does not import again when every scan hazard is already on the register", async () => {
+    mocks.dbRisks = [
+      dbRisk,
+      ...summary.risks.map((r, i) => ({
+        ...dbRisk,
+        id: `db-srmd-${i}`,
+        title: r.hazard,
+        hazard: r.hazard,
+        source: "sharepoint_srmd" as const,
+      })),
+    ];
+    renderView();
+    await screen.findAllByText("FOD - Clean Soil hauled");
+
+    expect(mocks.importMutate).not.toHaveBeenCalled();
   });
 
   it("confirms a proposed residual", async () => {
@@ -308,9 +343,7 @@ describe("RiskListView initial risk, residual risk and mitigations", () => {
       screen.queryByRole("button", { name: "Confirm" }),
     ).not.toBeInTheDocument();
     expect(screen.queryByText("Edit mitigations")).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: /Import/ }),
-    ).not.toBeInTheDocument();
+    expect(mocks.importMutate).not.toHaveBeenCalled();
   });
 });
 
@@ -366,6 +399,41 @@ describe("RiskListView delete", () => {
 
     expect(mocks.deleteMutate).not.toHaveBeenCalled();
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+  });
+
+  it("hides a deleted SRMD hazard's SharePoint row and restores it if the delete fails", async () => {
+    const [scanRow] = summary.risks;
+    if (!scanRow) throw new Error("no scan row");
+    mocks.dbRisks = [
+      {
+        ...dbRisk,
+        id: "db-srmd",
+        title: scanRow.hazard,
+        hazard: scanRow.hazard,
+        source: "sharepoint_srmd",
+      },
+    ];
+    renderView();
+    await screen.findAllByText("FOD - Clean Soil hauled");
+
+    await userEvent.click(deleteButton(scanRow.hazard));
+    // The delete hook drops the register row at once; the scan still lists the hazard.
+    mocks.dbRisks = [];
+    await userEvent.click(
+      within(screen.getByRole("alertdialog")).getByRole("button", { name: "Delete" }),
+    );
+
+    expect(mocks.deleteMutate.mock.calls[0]?.[0]).toBe("db-srmd");
+    expect(screen.queryAllByText(scanRow.hazard)).toHaveLength(0);
+    expect(mocks.addToast).not.toHaveBeenCalled();
+
+    const options = mocks.deleteMutate.mock.calls[0]?.[1] as {
+      onError: () => void;
+    };
+    act(() => options.onError());
+
+    expect(screen.queryAllByText(scanRow.hazard)).not.toHaveLength(0);
+    expect(mocks.addToast).toHaveBeenCalledWith("Could not delete the hazard", "error");
   });
 
   it("shows an error toast when the delete request fails", async () => {

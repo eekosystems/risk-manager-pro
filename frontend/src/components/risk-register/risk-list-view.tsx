@@ -3,7 +3,6 @@ import { useMemo, useState } from "react";
 import {
   AlertTriangle,
   Clock,
-  Download,
   ExternalLink,
   Loader2,
   Plus,
@@ -21,7 +20,8 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { RiskMatrix } from "@/components/ui/risk-matrix";
-import { useDeleteRisk, useImportSrmdHazards, useRisks } from "@/hooks/use-risks";
+import { useAutoImportSrmdHazards } from "@/hooks/use-auto-import-srmd-hazards";
+import { useDeleteRisk, useRisks } from "@/hooks/use-risks";
 import { useToast } from "@/hooks/use-toast";
 import { useUserRole } from "@/hooks/use-user-role";
 import type { RiskEntryListItem, RiskStatus } from "@/types/api";
@@ -52,6 +52,12 @@ const STATUS_LABELS: Record<RiskStatus, { label: string; className: string }> = 
 };
 
 const ALL_AIRPORTS = "__all__";
+
+// One key per (airport, hazard): how a register entry is matched to the
+// SharePoint scan row it was imported from.
+function hazardKey(r: RiskEntryListItem): string {
+  return `${r.airport_identifier ?? ""}::${(r.hazard ?? r.title ?? "").toLowerCase().trim().slice(0, 120)}`;
+}
 
 /**
  * Adapt a SharePoint-extracted risk to the same shape `RiskEntryListItem`
@@ -111,9 +117,11 @@ export function RiskListView({ onSelectRisk, onCreateNew }: RiskListViewProps) {
     null,
   );
   const [editingMitigationsFor, setEditingMitigationsFor] = useState<string | null>(null);
+  // SRMD hazards deleted in this session. The scan keeps listing them until
+  // its next fetch, so they are hidden here straight away.
+  const [dismissedKeys, setDismissedKeys] = useState<ReadonlySet<string>>(new Set());
   const { canEdit } = useUserRole();
   const { addToast } = useToast();
-  const importMutation = useImportSrmdHazards();
 
   // Single wide fetch — we filter client-side so the airport-pill bar stays
   // populated even when a specific airport is selected, and so the status and
@@ -151,22 +159,20 @@ export function RiskListView({ onSelectRisk, onCreateNew }: RiskListViewProps) {
   const allRisks: RiskEntryListItem[] = useMemo(() => {
     const seen = new Set<string>();
     const merged: RiskEntryListItem[] = [];
-    const keyFor = (r: RiskEntryListItem) =>
-      `${r.airport_identifier ?? ""}::${(r.hazard ?? r.title ?? "").toLowerCase().trim().slice(0, 120)}`;
     for (const r of dbRisks) {
-      const k = keyFor(r);
+      const k = hazardKey(r);
       if (seen.has(k)) continue;
       seen.add(k);
       merged.push(r);
     }
     for (const r of (spSummary?.risks ?? []).map(spToListItem)) {
-      const k = keyFor(r);
-      if (seen.has(k)) continue;
+      const k = hazardKey(r);
+      if (seen.has(k) || dismissedKeys.has(k)) continue;
       seen.add(k);
       merged.push(r);
     }
     return merged;
-  }, [dbRisks, spSummary?.risks]);
+  }, [dbRisks, spSummary?.risks, dismissedKeys]);
 
   // Side table: synthetic id → SharePoint URL, so clicking an SP-sourced
   // row opens the PDF in a new tab instead of hitting the detail endpoint
@@ -180,23 +186,17 @@ export function RiskListView({ onSelectRisk, onCreateNew }: RiskListViewProps) {
     return m;
   }, [spSummary?.risks]);
 
-  // SRMD hazards still read straight from the scan; importing them makes
-  // their mitigations editable.
+  // SRMD hazards still read straight from the scan. They are saved to the
+  // register automatically, which makes their mitigations editable.
   const unimportedCount = useMemo(
     () => allRisks.filter((r) => r.id.startsWith("sp:")).length,
     [allRisks],
   );
-
-  function handleImport() {
-    importMutation.mutate(undefined, {
-      onSuccess: (result) =>
-        addToast(
-          `Imported ${result.imported} SRMD ${result.imported === 1 ? "hazard" : "hazards"}`,
-          "success",
-        ),
-      onError: () => addToast("Could not import the SRMD hazards", "error"),
-    });
-  }
+  const { isImporting } = useAutoImportSrmdHazards({
+    enabled: canEdit && data !== undefined && spSummary?.status === "ready",
+    unimportedCount,
+    lastScanCompletedAt: spSummary?.last_scan_completed_at ?? null,
+  });
 
   function handleSelectRisk(riskId: string) {
     if (riskId.startsWith("sp:")) {
@@ -276,17 +276,22 @@ export function RiskListView({ onSelectRisk, onCreateNew }: RiskListViewProps) {
     if (!pendingDelete) return;
     const riskId = pendingDelete.id;
     setPendingDelete(null);
-    const isSrmd = dbRisks.find((r) => r.id === riskId)?.source === "sharepoint_srmd";
+    const risk = dbRisks.find((r) => r.id === riskId);
+    const srmdKey = risk?.source === "sharepoint_srmd" ? hazardKey(risk) : null;
+    if (srmdKey) {
+      setDismissedKeys((keys) => new Set(keys).add(srmdKey));
+    }
     deleteMutation.mutate(riskId, {
-      onSuccess: () => {
-        if (isSrmd) {
-          addToast(
-            "Hazard removed from the register. It still exists in the SharePoint SRMD, so it stays listed as a SharePoint row.",
-            "info",
-          );
+      onError: () => {
+        if (srmdKey) {
+          setDismissedKeys((keys) => {
+            const restored = new Set(keys);
+            restored.delete(srmdKey);
+            return restored;
+          });
         }
+        addToast("Could not delete the hazard", "error");
       },
-      onError: () => addToast("Could not delete the hazard", "error"),
     });
   }
 
@@ -410,21 +415,6 @@ export function RiskListView({ onSelectRisk, onCreateNew }: RiskListViewProps) {
           <option value="medium">Medium</option>
           <option value="low">Low</option>
         </select>
-        {canEdit && unimportedCount > 0 && (
-          <Button
-            variant="secondary"
-            className="ml-auto"
-            onClick={handleImport}
-            disabled={importMutation.isPending}
-          >
-            {importMutation.isPending ? (
-              <Loader2 size={16} className="mr-2 animate-spin" />
-            ) : (
-              <Download size={16} className="mr-2" />
-            )}
-            Import {unimportedCount} SRMD {unimportedCount === 1 ? "hazard" : "hazards"}
-          </Button>
-        )}
       </div>
 
       {/* Risk table */}
@@ -462,6 +452,7 @@ export function RiskListView({ onSelectRisk, onCreateNew }: RiskListViewProps) {
                 risk={risk}
                 isLast={index === listedRisks.length - 1}
                 canEdit={canEdit}
+                importing={isImporting}
                 editingMitigations={editingMitigationsFor === risk.id}
                 onToggleMitigations={() =>
                   setEditingMitigationsFor((current) =>
@@ -496,6 +487,7 @@ function RiskRow({
   risk,
   isLast,
   canEdit,
+  importing,
   editingMitigations,
   onToggleMitigations,
   onSelect,
@@ -505,6 +497,7 @@ function RiskRow({
   risk: RiskEntryListItem;
   isLast: boolean;
   canEdit: boolean;
+  importing: boolean;
   editingMitigations: boolean;
   onToggleMitigations: () => void;
   onSelect: () => void;
@@ -578,7 +571,7 @@ function RiskRow({
             mitigations={risk.mitigations}
             onEdit={canEditMitigations ? onToggleMitigations : null}
             editing={editingMitigations}
-            hint={canEdit && !isImported ? "Import SRMD hazards to edit" : null}
+            hint={canEdit && !isImported && importing ? "Adding to the register…" : null}
           />
         </div>
         <div>

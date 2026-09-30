@@ -28,6 +28,7 @@ from app.repositories.document import DocumentRepository
 from app.schemas.common import DataResponse, MetaResponse
 from app.services.document_processor import DocumentProcessor
 from app.services.folder_scope import FolderScopeService
+from app.services.srmd_import import SrmdImportService
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -98,6 +99,10 @@ class RiskOutcomeSummary(BaseModel):
     risks: list[SharePointRiskRow]
     notes: list[SharePointParseNoteOut]
     generated_at: float
+    status: str = "idle"
+    scanned: int = 0
+    total: int = 0
+    last_scan_completed_at: float | None = None
     risks_flagged_for_review: list[SharePointRiskRow] = []
 
 
@@ -136,11 +141,13 @@ async def risk_outcome_summary(
     refresh: bool = Query(default=False),
     current_user: User = Depends(get_current_user),
     organization: Organization = Depends(get_current_organization),
+    db: AsyncSession = Depends(get_db),
 ) -> DataResponse[RiskOutcomeSummary]:
     """Parse every airport's `/risk-outcome/` folder and return aggregated risks.
 
     Result is cached in-memory for 5 minutes to keep the Risk Register page
-    responsive — pass `?refresh=true` to force a re-scan.
+    responsive — pass `?refresh=true` to force a re-scan. Hazards the
+    organization deleted from its Risk Register are left out.
     """
     importer = request.app.state.services.risk_outcome_importer
     try:
@@ -151,12 +158,17 @@ async def risk_outcome_summary(
             data=RiskOutcomeSummary(airports=[], risks=[], notes=[], generated_at=0.0),
             meta=MetaResponse(request_id=""),
         )
+    risks = await SrmdImportService(db).without_dismissed(summary.risks, organization)
     return DataResponse(
         data=RiskOutcomeSummary(
             airports=summary.airports,
-            risks=[SharePointRiskRow(**r.__dict__) for r in summary.risks],
+            risks=[SharePointRiskRow(**r.__dict__) for r in risks],
             notes=[SharePointParseNoteOut(**n.__dict__) for n in summary.notes],
             generated_at=summary.generated_at,
+            status=summary.status,
+            scanned=summary.scanned,
+            total=summary.total,
+            last_scan_completed_at=summary.last_scan_completed_at,
             risks_flagged_for_review=[
                 SharePointRiskRow(**r.__dict__) for r in summary.risks_flagged_for_review
             ],

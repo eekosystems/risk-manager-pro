@@ -1,10 +1,11 @@
 import uuid
 
 from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models.risk import Mitigation, MitigationStatus, RiskEntry
+from app.models.risk import Mitigation, MitigationStatus, RiskEntry, SrmdDismissal
 
 
 class RiskRepository:
@@ -77,6 +78,23 @@ class RiskRepository:
         )
         result = await self._db.execute(stmt)
         return {ref for ref in result.scalars().all() if ref is not None}
+
+    async def dismissed_srmd_refs(self, organization_id: uuid.UUID) -> set[str]:
+        stmt = select(SrmdDismissal.srmd_ref).where(
+            SrmdDismissal.organization_id == organization_id
+        )
+        result = await self._db.execute(stmt)
+        return set(result.scalars().all())
+
+    async def add_srmd_dismissal(
+        self, organization_id: uuid.UUID, srmd_ref: str, user_id: uuid.UUID
+    ) -> None:
+        stmt = (
+            pg_insert(SrmdDismissal)
+            .values(organization_id=organization_id, srmd_ref=srmd_ref, dismissed_by=user_id)
+            .on_conflict_do_nothing(constraint="uq_srmd_dismissals_org_srmd_ref")
+        )
+        await self._db.execute(stmt)
 
     async def update(self, entry: RiskEntry) -> RiskEntry:
         await self._db.flush()
