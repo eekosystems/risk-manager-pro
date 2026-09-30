@@ -56,7 +56,19 @@ class ExternalServiceError(AppError):
         )
 
 
-async def app_error_handler(_request: Request, exc: AppError) -> JSONResponse:
+async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
+    # A refused request is otherwise invisible server-side: only the caller
+    # sees the status code. Record what was refused and why (the error code,
+    # never the message, which can carry caller-supplied identifiers) so an
+    # authorization or lookup failure can be traced by correlation id (CC6.1).
+    logger.warning(
+        "request_refused",
+        code=exc.code,
+        status_code=exc.status_code,
+        method=request.method,
+        path=request.url.path,
+        correlation_id=getattr(request.state, "correlation_id", "unknown"),
+    )
     return JSONResponse(
         status_code=exc.status_code,
         content={"error": {"code": exc.code, "message": exc.message}},

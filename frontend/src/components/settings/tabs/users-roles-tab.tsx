@@ -23,6 +23,7 @@ import {
   updateMemberRole,
 } from "@/api/organizations";
 import { useOrganizationContext } from "@/hooks/use-organization-context";
+import { useToast } from "@/hooks/use-toast";
 import type { MembershipRole, OrganizationMember } from "@/types/api";
 
 const ROLE_CONFIG: Record<
@@ -58,6 +59,14 @@ const ROLE_CONFIG: Record<
   },
 };
 
+// The API's error envelope carries the reason a request was refused (for
+// example the role the caller lacks); fall back to a generic message otherwise.
+function readError(error: unknown, fallback: string): string {
+  const detail = (error as { response?: { data?: { error?: { message?: string } } } })
+    ?.response?.data?.error?.message;
+  return detail ?? fallback;
+}
+
 function formatDate(iso: string | null): string {
   if (!iso) return "Never";
   return new Date(iso).toLocaleDateString("en-US", {
@@ -70,6 +79,7 @@ function formatDate(iso: string | null): string {
 export function UsersRolesTab() {
   const queryClient = useQueryClient();
   const { activeOrganization } = useOrganizationContext();
+  const { addToast } = useToast();
   const orgId = activeOrganization?.id ?? "";
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -94,6 +104,9 @@ export function UsersRolesTab() {
       setInviteEmail("");
       setShowInvite(false);
     },
+    onError: (error) => {
+      addToast(readError(error, "Could not add the member"), "error");
+    },
   });
 
   const roleMutation = useMutation({
@@ -108,6 +121,9 @@ export function UsersRolesTab() {
       void queryClient.invalidateQueries({ queryKey: ["org-members", orgId] });
       setMenuOpen(null);
     },
+    onError: (error) => {
+      addToast(readError(error, "Could not change the member's role"), "error");
+    },
   });
 
   const removeMutation = useMutation({
@@ -116,6 +132,9 @@ export function UsersRolesTab() {
       void queryClient.invalidateQueries({ queryKey: ["org-members", orgId] });
       setDeleteConfirm(null);
       setMenuOpen(null);
+    },
+    onError: (error) => {
+      addToast(readError(error, "Could not remove the member"), "error");
     },
   });
 
