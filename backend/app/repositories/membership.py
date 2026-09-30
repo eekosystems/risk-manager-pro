@@ -27,14 +27,21 @@ class MembershipRepository:
         )
         self._db.add(membership)
         await self._db.flush()
+        # Load the user now: the membership is serialized with the user's
+        # email and name, and a lazy load is not possible on an async session.
+        await self._db.refresh(membership, attribute_names=["user"])
         return membership
 
     async def get_membership(
         self, user_id: uuid.UUID, organization_id: uuid.UUID
     ) -> OrganizationMembership | None:
-        stmt = select(OrganizationMembership).where(
-            OrganizationMembership.user_id == user_id,
-            OrganizationMembership.organization_id == organization_id,
+        stmt = (
+            select(OrganizationMembership)
+            .where(
+                OrganizationMembership.user_id == user_id,
+                OrganizationMembership.organization_id == organization_id,
+            )
+            .options(selectinload(OrganizationMembership.user))
         )
         result = await self._db.execute(stmt)
         return result.scalar_one_or_none()
