@@ -444,6 +444,8 @@ export interface UpdateRiskEntryRequest {
   risk_matrix_applied?: RiskMatrixApplied | null;
   existing_controls?: string | null;
   residual_risk_level?: string | null;
+  residual_severity?: number | null;
+  residual_likelihood?: string | null;
   record_status?: RecordStatus | null;
   validation_status?: ValidationStatus | null;
   acm_cross_reference?: string | null;

@@ -147,6 +147,14 @@ class RiskService:
         if "severity" in updates or "likelihood" in updates:
             entry.risk_level = compute_risk_level(entry.severity, entry.likelihood)
 
+        # The residual band always follows the residual cell on the FG 5x5.
+        if "residual_severity" in updates or "residual_likelihood" in updates:
+            entry.residual_risk_level = (
+                compute_risk_level(entry.residual_severity, entry.residual_likelihood)
+                if entry.residual_severity is not None and entry.residual_likelihood is not None
+                else None
+            )
+
         # Fill in ICAO mapping from 5M when 5M was set without ICAO.
         if (
             "hazard_category_5m" in updates

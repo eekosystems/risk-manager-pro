@@ -122,6 +122,7 @@ const mocks = vi.hoisted(() => ({
   importMutate: vi.fn(),
   confirmMutate: vi.fn(),
   updateMutate: vi.fn(),
+  updateRiskMutate: vi.fn(),
 }));
 
 function mutation(mutate = vi.fn()) {
@@ -131,6 +132,7 @@ function mutation(mutate = vi.fn()) {
 vi.mock("@/hooks/use-risks", () => ({
   useRisks: () => ({ data: { data: mocks.dbRisks }, isLoading: false }),
   useDeleteRisk: () => mutation(mocks.deleteMutate),
+  useUpdateRisk: () => mutation(mocks.updateRiskMutate),
   useImportSrmdHazards: () => mutation(mocks.importMutate),
   useConfirmResidualAssessment: () => mutation(mocks.confirmMutate),
   useDismissResidualAssessment: () => mutation(),
@@ -241,6 +243,87 @@ describe("RiskListView initial risk, residual risk and mitigations", () => {
     expect(row.getByText("• Cover loads in transit")).toBeInTheDocument();
     expect(row.getByText("• Sweep haul route daily")).toBeInTheDocument();
     expect(row.queryByText("Edit mitigations")).not.toBeInTheDocument();
+    expect(
+      row.queryByRole("button", { name: "Edit initial risk" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("saves an edited initial and residual risk from the row editor", async () => {
+    renderView();
+    await screen.findAllByText("Foreign Object Debris (FOD)");
+
+    await userEvent.click(
+      within(rowFor("Runway incursion at hold short line")).getByRole("button", {
+        name: "Edit initial risk",
+      }),
+    );
+    const save = screen.getByRole("button", { name: "Save rating" });
+    expect(save).toBeDisabled();
+
+    await userEvent.selectOptions(
+      screen.getByLabelText("Initial risk likelihood"),
+      "D",
+    );
+    await userEvent.selectOptions(
+      screen.getByLabelText("Residual risk likelihood"),
+      "E",
+    );
+    // A residual likelihood without a severity is half a cell.
+    expect(save).toBeDisabled();
+    await userEvent.selectOptions(
+      screen.getByLabelText("Residual risk severity"),
+      "2",
+    );
+    await userEvent.click(save);
+
+    expect(mocks.updateRiskMutate).toHaveBeenCalledWith(
+      {
+        riskId: "db-1",
+        payload: {
+          likelihood: "D",
+          severity: 4,
+          residual_likelihood: "E",
+          residual_severity: 2,
+        },
+      },
+      expect.anything(),
+    );
+  });
+
+  it("sends only the residual cell when only the residual changes", async () => {
+    mocks.dbRisks = [
+      {
+        ...dbRisk,
+        residual_likelihood: "D",
+        residual_severity: 3,
+        residual_risk_level: "medium",
+      },
+    ];
+    renderView();
+    await screen.findAllByText("Foreign Object Debris (FOD)");
+
+    await userEvent.click(
+      within(rowFor("Runway incursion at hold short line")).getByRole("button", {
+        name: "Edit residual risk",
+      }),
+    );
+    await userEvent.selectOptions(
+      screen.getByLabelText("Residual risk likelihood"),
+      "",
+    );
+    await userEvent.selectOptions(
+      screen.getByLabelText("Residual risk severity"),
+      "",
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Save rating" }));
+
+    expect(mocks.updateRiskMutate).toHaveBeenCalledWith(
+      {
+        riskId: "db-1",
+        payload: { residual_likelihood: null, residual_severity: null },
+      },
+      expect.anything(),
+    );
   });
 
   it("adds the SRMD hazards still read from the scan to the register by itself", async () => {
@@ -343,6 +426,12 @@ describe("RiskListView initial risk, residual risk and mitigations", () => {
       screen.queryByRole("button", { name: "Confirm" }),
     ).not.toBeInTheDocument();
     expect(screen.queryByText("Edit mitigations")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Edit initial risk" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Edit residual risk" }),
+    ).not.toBeInTheDocument();
     expect(mocks.importMutate).not.toHaveBeenCalled();
   });
 });

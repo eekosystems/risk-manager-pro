@@ -246,14 +246,15 @@ async def update_risk_entry(
         risk_id, organization.id, payload, user_id=current_user.id
     )
     await threshold_service.evaluate(organization.id, current_user, entry.risk_level)
+    changes = payload.model_dump(exclude_unset=True)
     await audit.log(
         action="risk.updated",
         user=current_user,
         resource_type="risk_entry",
         resource_id=str(risk_id),
         organization_id=organization.id,
+        metadata={"updated_fields": sorted(changes)},
     )
-    changes = payload.model_dump(exclude_unset=True)
     change_summary = (
         ", ".join(f"{k}={v}" for k, v in changes.items() if v is not None) or "(no fields)"
     )

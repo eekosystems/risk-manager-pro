@@ -193,6 +193,10 @@ class RiskEntry(Base):
     __table_args__ = (
         UniqueConstraint("organization_id", "srmd_ref", name="uq_risk_entries_org_srmd_ref"),
     )
+    # `updated_at` is set by the database on UPDATE. Fetch it with the UPDATE
+    # itself so an edited entry can be serialized without a lazy load, which
+    # an async session cannot do.
+    __mapper_args__ = {"eager_defaults": True}
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"), index=True)

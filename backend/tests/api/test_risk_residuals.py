@@ -222,3 +222,84 @@ async def test_deleted_srmd_hazard_stays_off_the_register_and_the_summary(
     assert (scan["status"], scan["scanned"], scan["total"]) == ("ready", 1, 1)
     assert scan["last_scan_completed_at"] == 1.0
     assert "risk.deleted" in _actions(mock_audit_logger)
+
+
+async def test_editing_the_initial_and_residual_cells_recomputes_both_bands(
+    client: AsyncClient,
+    test_app: FastAPI,
+    db_session: AsyncSession,
+    test_organization: Organization,
+    test_user: User,
+    mock_audit_logger: AsyncMock,
+) -> None:
+    _use_queued_runs(test_app, db_session)
+    entry = await _entry(db_session, test_organization, test_user)
+
+    response = await client.patch(
+        f"/api/v1/risks/{entry.id}",
+        json={
+            "severity": 3,
+            "likelihood": "D",
+            "residual_severity": 2,
+            "residual_likelihood": "E",
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert (data["likelihood"], data["severity"], data["risk_level"]) == ("D", 3, "medium")
+    assert (data["residual_likelihood"], data["residual_severity"]) == ("E", 2)
+    assert data["residual_risk_level"] == "low"
+    [call] = [
+        c for c in mock_audit_logger.log.call_args_list if c.kwargs["action"] == "risk.updated"
+    ]
+    assert call.kwargs["metadata"] == {
+        "updated_fields": ["likelihood", "residual_likelihood", "residual_severity", "severity"]
+    }
+
+
+async def test_clearing_the_residual_cell_clears_its_band(
+    client: AsyncClient,
+    test_app: FastAPI,
+    db_session: AsyncSession,
+    test_organization: Organization,
+    test_user: User,
+) -> None:
+    _use_queued_runs(test_app, db_session)
+    entry = await _entry(db_session, test_organization, test_user)
+    entry.residual_severity = 4
+    entry.residual_likelihood = "E"
+    entry.residual_risk_level = RiskLevel.MEDIUM
+    await db_session.flush()
+
+    response = await client.patch(
+        f"/api/v1/risks/{entry.id}",
+        json={"residual_severity": None, "residual_likelihood": None},
+    )
+
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert (data["residual_likelihood"], data["residual_severity"]) == (None, None)
+    assert data["residual_risk_level"] is None
+    assert (data["likelihood"], data["severity"], data["risk_level"]) == ("C", 4, "high")
+
+
+async def test_half_a_residual_cell_is_rejected(
+    client: AsyncClient,
+    test_app: FastAPI,
+    db_session: AsyncSession,
+    test_organization: Organization,
+    test_user: User,
+) -> None:
+    _use_queued_runs(test_app, db_session)
+    entry = await _entry(db_session, test_organization, test_user)
+
+    only_severity = await client.patch(f"/api/v1/risks/{entry.id}", json={"residual_severity": 2})
+    mismatched = await client.patch(
+        f"/api/v1/risks/{entry.id}",
+        json={"residual_severity": 2, "residual_likelihood": None},
+    )
+
+    assert (only_severity.status_code, mismatched.status_code) == (422, 422)
+    detail = (await client.get(f"/api/v1/risks/{entry.id}")).json()["data"]
+    assert (detail["residual_likelihood"], detail["residual_severity"]) == (None, None)

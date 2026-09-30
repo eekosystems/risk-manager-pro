@@ -1,7 +1,8 @@
 import uuid
 from datetime import datetime
+from typing import Self
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app.models.residual_assessment import ResidualAssessmentStatus
 from app.models.risk import (
@@ -67,9 +68,23 @@ class UpdateRiskEntryRequest(BaseModel):
     risk_matrix_applied: RiskMatrixApplied | None = None
     existing_controls: str | None = None
     residual_risk_level: RiskLevel | None = None
+    residual_severity: Severity | None = None
+    residual_likelihood: Likelihood | None = None
     record_status: RecordStatus | None = None
     validation_status: ValidationStatus | None = None
     acm_cross_reference: str | None = None
+
+    @model_validator(mode="after")
+    def _residual_cell_is_whole(self) -> Self:
+        # A residual is one matrix cell: its severity and likelihood are set,
+        # or cleared, together.
+        touched = {"residual_severity", "residual_likelihood"} & self.model_fields_set
+        if touched and (
+            len(touched) != 2
+            or (self.residual_severity is None) != (self.residual_likelihood is None)
+        ):
+            raise ValueError("residual_severity and residual_likelihood must be set together")
+        return self
 
 
 class MitigationResponse(BaseModel):

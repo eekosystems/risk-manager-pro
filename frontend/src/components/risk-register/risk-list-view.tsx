@@ -5,6 +5,7 @@ import {
   Clock,
   ExternalLink,
   Loader2,
+  Pencil,
   Plus,
   ShieldAlert,
   Trash2,
@@ -39,10 +40,11 @@ import { MitigationInlineEditor } from "./mitigation-inline-editor";
 import { MitigationsCell } from "./mitigations-cell";
 import { ResidualRiskCell } from "./residual-risk-cell";
 import { RiskCellBadge } from "./risk-cell-badge";
+import { RiskRatingEditor } from "./risk-rating-editor";
 
 // Hazard | Initial Risk | Residual Risk | Mitigations | actions
 const ROW_GRID =
-  "grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_110px_170px_minmax(0,240px)_36px] md:items-start md:gap-4";
+  "grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_120px_170px_minmax(0,240px)_36px] md:items-start md:gap-4";
 
 const STATUS_LABELS: Record<RiskStatus, { label: string; className: string }> = {
   open: { label: "Open", className: "text-brand-600 bg-brand-50" },
@@ -116,7 +118,7 @@ export function RiskListView({ onSelectRisk, onCreateNew }: RiskListViewProps) {
   const [pendingDelete, setPendingDelete] = useState<{ id: string; title: string } | null>(
     null,
   );
-  const [editingMitigationsFor, setEditingMitigationsFor] = useState<string | null>(null);
+  const [editingFor, setEditingFor] = useState<string | null>(null);
   // SRMD hazards deleted in this session. The scan keeps listing them until
   // its next fetch, so they are hidden here straight away.
   const [dismissedKeys, setDismissedKeys] = useState<ReadonlySet<string>>(new Set());
@@ -453,11 +455,9 @@ export function RiskListView({ onSelectRisk, onCreateNew }: RiskListViewProps) {
                 isLast={index === listedRisks.length - 1}
                 canEdit={canEdit}
                 importing={isImporting}
-                editingMitigations={editingMitigationsFor === risk.id}
-                onToggleMitigations={() =>
-                  setEditingMitigationsFor((current) =>
-                    current === risk.id ? null : risk.id,
-                  )
+                editing={editingFor === risk.id}
+                onToggleEditor={() =>
+                  setEditingFor((current) => (current === risk.id ? null : risk.id))
                 }
                 onSelect={() => handleSelectRisk(risk.id)}
                 deleteDisabled={deleteMutation.isPending}
@@ -488,8 +488,8 @@ function RiskRow({
   isLast,
   canEdit,
   importing,
-  editingMitigations,
-  onToggleMitigations,
+  editing,
+  onToggleEditor,
   onSelect,
   deleteDisabled,
   onDelete,
@@ -498,8 +498,9 @@ function RiskRow({
   isLast: boolean;
   canEdit: boolean;
   importing: boolean;
-  editingMitigations: boolean;
-  onToggleMitigations: () => void;
+  /** The row's editor: risk rating and mitigations. */
+  editing: boolean;
+  onToggleEditor: () => void;
   onSelect: () => void;
   deleteDisabled: boolean;
   onDelete: (e: React.MouseEvent) => void;
@@ -507,7 +508,7 @@ function RiskRow({
   const statusCfg = STATUS_LABELS[risk.status] ?? STATUS_LABELS.open;
   const isImported = !risk.id.startsWith("sp:");
   const isSrmd = risk.source === "sharepoint_srmd";
-  const canEditMitigations = canEdit && isImported;
+  const canEditRow = canEdit && isImported;
 
   return (
     <div className={isLast ? "" : "border-b border-gray-100"}>
@@ -560,17 +561,31 @@ function RiskRow({
             severity={risk.severity}
             level={risk.risk_level}
           />
+          {canEditRow && (
+            <EditRatingButton
+              label="Edit initial risk"
+              editing={editing}
+              onClick={onToggleEditor}
+            />
+          )}
         </div>
         <div>
           <ColumnLabel>Residual Risk</ColumnLabel>
           <ResidualRiskCell risk={risk} canEdit={canEdit} isImported={isImported} />
+          {canEditRow && (
+            <EditRatingButton
+              label="Edit residual risk"
+              editing={editing}
+              onClick={onToggleEditor}
+            />
+          )}
         </div>
         <div className="min-w-0">
           <ColumnLabel>Mitigations</ColumnLabel>
           <MitigationsCell
             mitigations={risk.mitigations}
-            onEdit={canEditMitigations ? onToggleMitigations : null}
-            editing={editingMitigations}
+            onEdit={canEditRow ? onToggleEditor : null}
+            editing={editing}
             hint={canEdit && !isImported && importing ? "Adding to the register…" : null}
           />
         </div>
@@ -588,8 +603,41 @@ function RiskRow({
           )}
         </div>
       </div>
-      {editingMitigations && <MitigationInlineEditor riskId={risk.id} />}
+      {editing && (
+        <>
+          {/* Remount when the saved rating changes so the pickers never show a stale cell. */}
+          <RiskRatingEditor
+            key={`${risk.likelihood}${risk.severity}:${risk.residual_likelihood}${risk.residual_severity}`}
+            risk={risk}
+          />
+          <MitigationInlineEditor riskId={risk.id} />
+        </>
+      )}
     </div>
+  );
+}
+
+function EditRatingButton({
+  label,
+  editing,
+  onClick,
+}: {
+  label: string;
+  editing: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      aria-label={label}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      className="mt-1 flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-semibold text-brand-600 hover:bg-brand-50"
+    >
+      <Pencil size={10} />
+      {editing ? "Close editor" : "Edit"}
+    </button>
   );
 }
 
