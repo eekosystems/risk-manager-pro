@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { RiskOutcomeSummary, SharePointRiskRow } from "@/api/sharepoint";
 import type {
@@ -186,10 +186,6 @@ beforeEach(() => {
   mocks.canEdit = true;
 });
 
-afterEach(() => {
-  vi.useRealTimers();
-});
-
 describe("RiskListView filters", () => {
   it("applies the risk-level filter to SharePoint and DB rows alike", async () => {
     renderView();
@@ -327,23 +323,49 @@ describe("RiskListView delete", () => {
   };
 
   function deleteButton(title: string): HTMLElement {
-    return within(rowFor(title)).getByTitle(/delete/i);
+    return within(rowFor(title)).getByRole("button", { name: "Delete hazard" });
   }
 
-  it("keeps a second row armed after the first row's arm window expires", async () => {
+  it("asks for confirmation before deleting a hazard", async () => {
     mocks.dbRisks = [dbRisk, secondDbRisk];
     renderView();
     await screen.findAllByText("Wildlife strike on approach");
-    vi.useFakeTimers();
 
-    fireEvent.click(deleteButton("Runway incursion at hold short line"));
-    act(() => vi.advanceTimersByTime(2000));
-    fireEvent.click(deleteButton("Wildlife strike on approach"));
-    act(() => vi.advanceTimersByTime(1500));
-    fireEvent.click(deleteButton("Wildlife strike on approach"));
+    await userEvent.click(deleteButton("Wildlife strike on approach"));
+
+    const dialog = screen.getByRole("alertdialog", { name: "Delete this hazard?" });
+    expect(within(dialog).getByText(/"Wildlife strike on approach"/)).toBeInTheDocument();
+    expect(mocks.deleteMutate).not.toHaveBeenCalled();
+
+    await userEvent.click(within(dialog).getByRole("button", { name: "Delete" }));
 
     expect(mocks.deleteMutate).toHaveBeenCalledTimes(1);
     expect(mocks.deleteMutate.mock.calls[0]?.[0]).toBe("db-2");
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+  });
+
+  it("keeps the hazard when the confirmation is cancelled", async () => {
+    renderView();
+    await screen.findAllByText("Runway incursion at hold short line");
+
+    await userEvent.click(deleteButton("Runway incursion at hold short line"));
+    await userEvent.click(
+      within(screen.getByRole("alertdialog")).getByRole("button", { name: "Cancel" }),
+    );
+
+    expect(mocks.deleteMutate).not.toHaveBeenCalled();
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+  });
+
+  it("closes the confirmation on Escape without deleting", async () => {
+    renderView();
+    await screen.findAllByText("Runway incursion at hold short line");
+
+    await userEvent.click(deleteButton("Runway incursion at hold short line"));
+    await userEvent.keyboard("{Escape}");
+
+    expect(mocks.deleteMutate).not.toHaveBeenCalled();
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
   });
 
   it("shows an error toast when the delete request fails", async () => {
@@ -351,7 +373,9 @@ describe("RiskListView delete", () => {
     await screen.findAllByText("Runway incursion at hold short line");
 
     await userEvent.click(deleteButton("Runway incursion at hold short line"));
-    await userEvent.click(deleteButton("Runway incursion at hold short line"));
+    await userEvent.click(
+      within(screen.getByRole("alertdialog")).getByRole("button", { name: "Delete" }),
+    );
 
     const options = mocks.deleteMutate.mock.calls[0]?.[1] as {
       onError: () => void;
