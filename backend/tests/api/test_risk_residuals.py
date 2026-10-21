@@ -86,6 +86,8 @@ async def test_adding_a_mitigation_queues_a_reassessment(
     listed = (await client.get("/api/v1/risks")).json()["data"]
     [row] = [r for r in listed if r["id"] == str(entry.id)]
     assert [m["title"] for m in row["mitigations"]] == ["Escort haul vehicles"]
+    # The list badge reads `status`, the detail view `record_status`.
+    assert (row["status"], row["record_status"]) == ("mitigating", "in_progress")
     assert row["latest_assessment"]["status"] == "pending"
     assert row["latest_assessment"]["trigger"] == "mitigation.created"
     assert runs.queued == [uuid.UUID(row["latest_assessment"]["id"])]
@@ -162,7 +164,15 @@ async def test_import_srmd_creates_entries_once(
     assert row["validation_status"] == "rmp_validated"
     assert [m["title"] for m in row["mitigations"]] == ["Sweep haul route daily"]
     assert _actions(mock_audit_logger).count("risk.created") == 1
-    assert _actions(mock_audit_logger).count("risk.srmd_imported") == 2
+    # The register re-runs the import on its own; only the run that saved
+    # something is a state change.
+    assert _actions(mock_audit_logger).count("risk.srmd_imported") == 1
+    [batch] = [
+        c.kwargs
+        for c in mock_audit_logger.log.call_args_list
+        if c.kwargs["action"] == "risk.srmd_imported"
+    ]
+    assert batch["metadata"]["risk_ids"] == [row["id"]]
 
 
 async def test_deleted_srmd_hazard_stays_off_the_register_and_the_summary(

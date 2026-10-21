@@ -229,9 +229,11 @@ class RiskService:
             verification_method=payload.verification_method,
         )
 
-        # Transition risk to mitigating if it was open
+        # Transition risk to mitigating if it was open. Both status fields
+        # move together: the register list shows one and the detail view the other.
         if entry.status == RiskStatus.OPEN:
             entry.status = RiskStatus.MITIGATING
+            entry.record_status = record_status_from_legacy(entry.status)
             await self._repo.update(entry)
 
         logger.info(

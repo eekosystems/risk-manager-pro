@@ -146,8 +146,9 @@ async def risk_outcome_summary(
     """Parse every airport's `/risk-outcome/` folder and return aggregated risks.
 
     Result is cached in-memory for 5 minutes to keep the Risk Register page
-    responsive — pass `?refresh=true` to force a re-scan. Hazards the
-    organization deleted from its Risk Register are left out.
+    responsive — pass `?refresh=true` to force a re-scan. A client
+    organization sees only its own airport, and hazards the organization
+    deleted from its Risk Register are left out.
     """
     importer = request.app.state.services.risk_outcome_importer
     try:
@@ -158,7 +159,9 @@ async def risk_outcome_summary(
             data=RiskOutcomeSummary(airports=[], risks=[], notes=[], generated_at=0.0),
             meta=MetaResponse(request_id=""),
         )
-    risks = await SrmdImportService(db).without_dismissed(summary.risks, organization)
+    import_service = SrmdImportService(db)
+    risks = await import_service.for_register(summary.risks, organization)
+    flagged = await import_service.for_register(summary.risks_flagged_for_review, organization)
     return DataResponse(
         data=RiskOutcomeSummary(
             airports=summary.airports,
@@ -169,9 +172,7 @@ async def risk_outcome_summary(
             scanned=summary.scanned,
             total=summary.total,
             last_scan_completed_at=summary.last_scan_completed_at,
-            risks_flagged_for_review=[
-                SharePointRiskRow(**r.__dict__) for r in summary.risks_flagged_for_review
-            ],
+            risks_flagged_for_review=[SharePointRiskRow(**r.__dict__) for r in flagged],
         ),
         meta=MetaResponse(request_id=""),
     )

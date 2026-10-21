@@ -37,6 +37,8 @@ from app.schemas.risk import (
 if TYPE_CHECKING:
     import uuid
 
+    from app.models.user import User
+    from app.services.audit import AuditLogger
     from app.services.risk import RiskService
     from app.services.sharepoint_crawler import SharePointCrawler
 
@@ -246,7 +248,8 @@ async def execute_tool_call(
     tool_call: dict[str, Any],
     risk_service: RiskService,
     sharepoint: SharePointCrawler,
-    user_id: uuid.UUID,
+    audit: AuditLogger | None,
+    user: User,
     organization_id: uuid.UUID,
     conversation_id: uuid.UUID,
 ) -> str:
@@ -270,7 +273,8 @@ async def execute_tool_call(
         return await _save_risk_register_record(
             args=args,
             risk_service=risk_service,
-            user_id=user_id,
+            audit=audit,
+            user=user,
             organization_id=organization_id,
             conversation_id=conversation_id,
         )
@@ -360,11 +364,41 @@ def _display_severity_to_stored(value: object) -> int:
     return 6 - severity
 
 
+async def _audit_saved(
+    audit: AuditLogger | None,
+    *,
+    action: str,
+    user: User,
+    resource_type: str,
+    resource_id: uuid.UUID,
+    organization_id: uuid.UUID,
+    conversation_id: uuid.UUID,
+) -> None:
+    """Leave the trail the register endpoints leave, naming the chat it came from."""
+    if audit is None:
+        logger.warning(
+            "rr_tool_audit_unavailable",
+            action=action,
+            resource_id=str(resource_id),
+            conversation_id=str(conversation_id),
+        )
+        return
+    await audit.log(
+        action=action,
+        user=user,
+        resource_type=resource_type,
+        resource_id=str(resource_id),
+        organization_id=organization_id,
+        metadata={"source": RecordSource.RMP_SP4.value, "conversation_id": str(conversation_id)},
+    )
+
+
 async def _save_risk_register_record(
     *,
     args: dict[str, Any],
     risk_service: RiskService,
-    user_id: uuid.UUID,
+    audit: AuditLogger | None,
+    user: User,
     organization_id: uuid.UUID,
     conversation_id: uuid.UUID,
 ) -> str:
@@ -427,12 +461,21 @@ async def _save_risk_register_record(
     try:
         entry = await risk_service.create_risk_entry(
             payload=create_payload,
-            user_id=user_id,
+            user_id=user.id,
             organization_id=organization_id,
         )
     except Exception as exc:  # noqa: BLE001 — surface to LLM
         logger.error("rr_tool_create_failed", exc_info=True)
         return json.dumps({"ok": False, "error": f"Database error while saving: {exc}"})
+    await _audit_saved(
+        audit,
+        action="risk.created",
+        user=user,
+        resource_type="risk_entry",
+        resource_id=entry.id,
+        organization_id=organization_id,
+        conversation_id=conversation_id,
+    )
 
     created_mitigations: list[dict[str, Any]] = []
     for m in mitigations_payload:
@@ -448,6 +491,15 @@ async def _save_risk_register_record(
                 payload=mit_payload,
             )
             created_mitigations.append({"id": str(mit.id), "title": mit.title})
+            await _audit_saved(
+                audit,
+                action="mitigation.created",
+                user=user,
+                resource_type="mitigation",
+                resource_id=mit.id,
+                organization_id=organization_id,
+                conversation_id=conversation_id,
+            )
         except Exception as exc:  # noqa: BLE001 — partial failure shouldn't drop the record
             logger.error("rr_tool_mitigation_create_failed", exc_info=True)
             created_mitigations.append({"title": m.get("title"), "error": str(exc)})

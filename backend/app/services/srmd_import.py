@@ -22,11 +22,11 @@ import structlog
 
 from app.models.risk import (
     RecordSource,
-    RecordStatus,
     RiskMatrixApplied,
     RiskStatus,
     ValidationStatus,
     compute_risk_level,
+    record_status_from_legacy,
 )
 from app.repositories.risk import RiskRepository
 
@@ -100,6 +100,18 @@ class SrmdImportService:
         )
         return created, len(existing)
 
+    async def for_register(
+        self, hazards: list[SharePointRisk], organization: Organization
+    ) -> list[SharePointRisk]:
+        """The scan hazards the organization's Risk Register shows.
+
+        The same hazards the import accepts: the organization's own airport
+        (every airport for the platform) minus the ones it deleted. Showing a
+        hazard the import would refuse leaves the register trying to import it
+        on every visit.
+        """
+        return await self.without_dismissed(hazards_visible_to(organization, hazards), organization)
+
     async def without_dismissed(
         self, hazards: list[SharePointRisk], organization: Organization
     ) -> list[SharePointRisk]:
@@ -121,6 +133,7 @@ class SrmdImportService:
             if hazard.residual_severity is not None and hazard.residual_likelihood is not None
             else None
         )
+        status = RiskStatus.MITIGATING if hazard.mitigations else RiskStatus.OPEN
         entry = await self._repo.create(
             organization_id=organization_id,
             created_by=user_id,
@@ -130,14 +143,14 @@ class SrmdImportService:
             severity=hazard.severity,
             likelihood=hazard.likelihood,
             risk_level=compute_risk_level(hazard.severity, hazard.likelihood),
-            status=RiskStatus.MITIGATING if hazard.mitigations else RiskStatus.OPEN,
+            status=status,
             function_type="risk_register",
             airport_identifier=hazard.airport_identifier,
             risk_matrix_applied=RiskMatrixApplied.FAA_5X5,
             residual_severity=hazard.residual_severity if residual_level else None,
             residual_likelihood=hazard.residual_likelihood if residual_level else None,
             residual_risk_level=residual_level,
-            record_status=RecordStatus.OPEN,
+            record_status=record_status_from_legacy(status),
             validation_status=ValidationStatus.RMP_VALIDATED,
             source=RecordSource.SHAREPOINT_SRMD,
             srmd_ref=ref,

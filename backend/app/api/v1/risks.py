@@ -202,14 +202,22 @@ async def import_srmd_hazards(
             organization_id=organization.id,
             metadata={"source": "sharepoint_srmd"},
         )
-    await audit.log(
-        action="risk.srmd_imported",
-        user=current_user,
-        resource_type="risk_register",
-        resource_id=str(organization.id),
-        organization_id=organization.id,
-        metadata={"imported": len(created), "already_imported": already_imported},
-    )
+    # The register calls this on its own whenever the scan holds hazards it
+    # has not saved yet, so a run that saved nothing is not a state change
+    # and leaves no trail.
+    if created:
+        await audit.log(
+            action="risk.srmd_imported",
+            user=current_user,
+            resource_type="risk_register",
+            resource_id=str(organization.id),
+            organization_id=organization.id,
+            metadata={
+                "imported": len(created),
+                "already_imported": already_imported,
+                "risk_ids": [str(entry.id) for entry in created],
+            },
+        )
     result = SrmdImportResult(
         imported=len(created),
         already_imported=already_imported,

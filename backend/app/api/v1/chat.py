@@ -54,8 +54,9 @@ def _get_chat_service(
     db: AsyncSession = Depends(get_db),
     openai_client: AzureOpenAIClient = Depends(get_openai_client),
     rag_service: RAGService = Depends(get_rag_service),
+    audit: AuditLogger = Depends(get_audit_logger),
 ) -> ChatService:
-    return ChatService(db=db, openai_client=openai_client, rag_service=rag_service)
+    return ChatService(db=db, openai_client=openai_client, rag_service=rag_service, audit=audit)
 
 
 @router.post("", response_model=DataResponse[ChatResponse], status_code=201)

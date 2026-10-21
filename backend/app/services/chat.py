@@ -16,6 +16,7 @@ from app.repositories.conversation import ConversationRepository
 from app.repositories.document import DocumentRepository
 from app.schemas.chat import ChatRequest, ChatResponse, CitationSchema, MessageResponse
 from app.schemas.settings import PromptsPayload
+from app.services.audit import AuditLogger
 from app.services.feedback import GuidanceService
 from app.services.openai_client import AzureOpenAIClient
 from app.services.output_compliance import (
@@ -1069,8 +1070,12 @@ class ChatService:
         openai_client: AzureOpenAIClient,
         rag_service: RAGService,
         settings_service: SettingsService | None = None,
+        audit: AuditLogger | None = None,
     ) -> None:
         self._db = db
+        # Risk Register chat saves records through tool calls, which must
+        # leave the same audit trail as the register's own endpoints.
+        self._audit = audit
         self._openai = openai_client
         self._rag = rag_service
         self._settings = settings_service or SettingsService(db)
@@ -1514,7 +1519,7 @@ class ChatService:
         temperature: float,
         max_tokens: int,
         conversation_id: uuid.UUID,
-        user_id: uuid.UUID,
+        user: User,
         organization_id: uuid.UUID,
         max_iterations: int = 5,
     ) -> str:
@@ -1566,7 +1571,8 @@ class ChatService:
                         tool_call=tc,
                         risk_service=risk_service,
                         sharepoint=sharepoint,
-                        user_id=user_id,
+                        audit=self._audit,
+                        user=user,
                         organization_id=organization_id,
                         conversation_id=conversation_id,
                     )
@@ -1785,7 +1791,7 @@ class ChatService:
                 temperature=model_config.temperature,
                 max_tokens=model_config.max_output_tokens,
                 conversation_id=conversation.id,
-                user_id=user.id,
+                user=user,
                 organization_id=organization_id,
             )
         else:
@@ -1958,7 +1964,7 @@ class ChatService:
                     temperature=model_config.temperature,
                     max_tokens=model_config.max_output_tokens,
                     conversation_id=conversation.id,
-                    user_id=user.id,
+                    user=user,
                     organization_id=organization_id,
                 )
                 buffered.append(tool_content)

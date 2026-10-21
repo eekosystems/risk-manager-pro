@@ -16,6 +16,7 @@ from app.models.organization import Organization
 from app.models.risk import (
     Mitigation,
     RecordSource,
+    RecordStatus,
     RiskEntry,
     RiskLevel,
     RiskStatus,
@@ -78,6 +79,11 @@ async def test_import_creates_validated_entry_with_cells_and_mitigations(
     assert entry.residual_risk_level == RiskLevel.MEDIUM
     assert entry.validation_status == ValidationStatus.RMP_VALIDATED
     assert entry.source == RecordSource.SHAREPOINT_SRMD
+    # The list shows one status field and the detail view the other.
+    assert (entry.status, entry.record_status) == (
+        RiskStatus.MITIGATING,
+        RecordStatus.IN_PROGRESS,
+    )
     assert entry.status == RiskStatus.MITIGATING
     assert entry.source_document_name == "DEN SRMD 2024.pdf"
     assert entry.source_document_url == "https://sharepoint.example/den-srmd.pdf"
@@ -101,7 +107,7 @@ async def test_reimport_skips_existing_and_keeps_edits(db_session: AsyncSession)
 
     assert already == 1
     assert [c.hazard for c in created] == ["Construction site entry"]
-    assert created[0].status == RiskStatus.OPEN
+    assert (created[0].status, created[0].record_status) == (RiskStatus.OPEN, RecordStatus.OPEN)
     entries = await _entries(db_session, org.id)
     assert len(entries) == 2
     assert entry.residual_likelihood == "D"
@@ -125,6 +131,21 @@ async def test_client_org_receives_only_its_airport(db_session: AsyncSession) ->
     )
 
     assert [c.airport_identifier for c in created] == ["DEN"]
+
+
+async def test_register_scan_shows_a_client_only_its_airport_minus_deletions(
+    db_session: AsyncSession,
+) -> None:
+    org, user = await _seed(db_session, is_platform=False, slug="den")
+    service = SrmdImportService(db_session)
+    deleted = _hazard(airport="DEN")
+    kept = _hazard(hazard="Construction site entry", airport="DEN")
+    [entry], _ = await service.import_hazards([deleted], org, user.id)
+    await RiskService(db_session).delete_risk_entry(entry.id, org.id, user.id)
+
+    shown = await service.for_register([deleted, kept, _hazard(airport="SEA")], org)
+
+    assert shown == [kept]
 
 
 async def test_deleted_srmd_hazard_is_not_imported_again(db_session: AsyncSession) -> None:
