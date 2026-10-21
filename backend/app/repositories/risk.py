@@ -40,6 +40,7 @@ class RiskRepository:
         status: str | None = None,
         risk_level: str | None = None,
         airport_identifier: str | None = None,
+        ae_review_required: bool | None = None,
     ) -> tuple[list[RiskEntry], int]:
         base = (
             select(RiskEntry)
@@ -61,6 +62,9 @@ class RiskRepository:
         if airport_identifier:
             base = base.where(RiskEntry.airport_identifier == airport_identifier)
             count_base = count_base.where(RiskEntry.airport_identifier == airport_identifier)
+        if ae_review_required is not None:
+            base = base.where(RiskEntry.ae_review_required.is_(ae_review_required))
+            count_base = count_base.where(RiskEntry.ae_review_required.is_(ae_review_required))
 
         count_result = await self._db.execute(count_base)
         total = count_result.scalar_one()

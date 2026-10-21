@@ -142,6 +142,7 @@ async def list_risk_entries(
     status: str | None = Query(None),
     risk_level: str | None = Query(None),
     airport_identifier: str | None = Query(None),
+    ae_review_required: bool | None = Query(None),
     current_user: User = Depends(require_any_member),
     organization: Organization = Depends(get_current_organization),
     service: RiskService = Depends(_get_risk_service),
@@ -154,6 +155,7 @@ async def list_risk_entries(
         status=status,
         risk_level=risk_level,
         airport_identifier=airport_identifier,
+        ae_review_required=ae_review_required,
     )
     latest = await residual_service.latest_for_entries([e.id for e in entries], organization.id)
     items = [
@@ -232,12 +234,20 @@ async def get_risk_entry(
     current_user: User = Depends(require_any_member),
     organization: Organization = Depends(get_current_organization),
     service: RiskService = Depends(_get_risk_service),
+    residual_service: ResidualAssessmentService = Depends(_get_residual_assessment_service),
 ) -> DataResponse[RiskEntryDetailResponse]:
     entry = await service.get_risk_entry(risk_id, organization.id)
-    return DataResponse(
-        data=RiskEntryDetailResponse.model_validate(entry),
-        meta=MetaResponse(request_id=str(risk_id)),
+    latest = await residual_service.latest_for_entries([entry.id], organization.id)
+    detail = RiskEntryDetailResponse.model_validate(entry).model_copy(
+        update={
+            "latest_assessment": (
+                ResidualAssessmentResponse.model_validate(latest[entry.id])
+                if entry.id in latest
+                else None
+            )
+        }
     )
+    return DataResponse(data=detail, meta=MetaResponse(request_id=str(risk_id)))
 
 
 @router.patch("/{risk_id}", response_model=DataResponse[RiskEntryResponse])

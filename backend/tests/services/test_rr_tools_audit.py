@@ -41,6 +41,10 @@ def _risk_service(entry_id: uuid.UUID, mitigation_id: uuid.UUID) -> AsyncMock:
         severity=4,
         likelihood="C",
         risk_level=RiskLevel.HIGH,
+        residual_severity=None,
+        residual_likelihood=None,
+        residual_risk_level=None,
+        ae_review_required=True,
         airport_identifier="SUS",
     )
     service.create_mitigation.return_value = SimpleNamespace(

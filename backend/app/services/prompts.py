@@ -984,8 +984,13 @@ Environmental. Auto-suggested from 5M selection; user confirms or overrides.
 - [M] Mitigation Actions -- Table: action description (what), assigned owner \
 (who), due date (when), verification method, status. All three accountability \
 fields mandatory per action.
-- [M] Residual Risk Level -- Post-mitigation risk level. Updated only after RMP \
+- [M] Residual Risk Level -- Post-mitigation matrix cell (likelihood letter and \
+severity number, e.g., D2); the band follows the cell. Updated only after RMP \
 SP3 recalculation.
+- [O] Disposition -- Accept / Accept with conditions / Reject / Further \
+mitigation or AE acceptance required. Recorded as a field, not in Notes.
+- [M][A] AE Review Required -- Set when the initial or residual risk is High; \
+the record stays flagged until the Accountable Executive reviews it.
 - [M] Record Status -- Open / In Progress / Pending-Assessment Required / Closed / \
 Monitoring.
 - [M] Validation Status -- RMP-Validated / User-Reported (Not RMP-Validated) / \
@@ -1925,8 +1930,11 @@ and current status. No mitigation action shall be saved without all three \
 accountability fields -- what, who, and when -- defined. If any field is \
 unknown at time of entry, the RR shall prompt the user to assign it before \
 saving or flag the action as Incomplete -- Accountability Required.
-- [M] Residual Risk Level -- Post-mitigation risk level. Initially blank; \
-updated by user after RMP recalculation (Sub-Prompt 3).
+- [M] Residual Risk Level -- Post-mitigation matrix cell (e.g., D2); the band \
+follows the cell. Initially blank; updated after RMP recalculation (Sub-Prompt 3).
+- [O] Disposition -- Accept / Accept with conditions / Reject / Further \
+mitigation or AE acceptance required.
+- [M][A] AE Review Required -- Set when the initial or residual risk is High.
 - [M] Record Status -- Open / In Progress / Pending-Assessment Required / \
 Closed / Monitoring.
 - [M] Validation Status -- RMP-Validated / User-Reported (Not RMP-Validated) / \

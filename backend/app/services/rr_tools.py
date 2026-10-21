@@ -18,13 +18,13 @@ from typing import TYPE_CHECKING, Any
 import structlog
 
 from app.models.risk import (
+    Disposition,
     HazardCategory5M,
     HazardCategoryICAO,
     Likelihood,
     OperationalDomain,
     RecordSource,
     RecordStatus,
-    RiskLevel,
     RiskMatrixApplied,
     Severity,
     ValidationStatus,
@@ -180,10 +180,38 @@ RR_TOOLS: list[dict[str, Any]] = [
                             "Narrative of controls already in place. 'None' if no controls exist."
                         ),
                     },
-                    "residual_risk_level": {
+                    "residual_severity": {
+                        "type": "integer",
+                        "enum": [s.value for s in Severity],
+                        "description": (
+                            "Post-mitigation severity, same column numbering as "
+                            "`severity` (1=Catastrophic … 5=Minimal). Give both residual "
+                            "fields or neither; the band is computed from the cell."
+                        ),
+                    },
+                    "residual_likelihood": {
                         "type": "string",
-                        "enum": [lv.value for lv in RiskLevel],
-                        "description": "Post-mitigation risk level (blank if not yet assessed).",
+                        "enum": [lv.value for lv in Likelihood],
+                        "description": (
+                            "Post-mitigation likelihood letter, same rows as `likelihood`."
+                        ),
+                    },
+                    "disposition": {
+                        "type": "string",
+                        "enum": [d.value for d in Disposition],
+                        "description": (
+                            "The SRA disposition: accept, accept_with_conditions, reject, "
+                            "or further_mitigation_required ('Further mitigation or AE "
+                            "acceptance required'). Omit if no SRA has been run."
+                        ),
+                    },
+                    "source_document_name": {
+                        "type": "string",
+                        "description": (
+                            "The indexed document the hazard was drawn from, named exactly "
+                            "as cited (e.g. the airport's CSPP). Omit if the hazard came "
+                            "only from the user."
+                        ),
                     },
                     "record_status": {
                         "type": "string",
@@ -404,6 +432,8 @@ async def _save_risk_register_record(
 ) -> str:
     """Validate and persist a risk record via RiskService."""
     mitigations_payload = args.pop("mitigations", None) or []
+    # The band is never taken from the model; a residual is a cell or nothing.
+    args.pop("residual_risk_level", None)
 
     # The model reports severity in matrix-column terms (1=Catastrophic … 5=Minimal),
     # which is what the Risk Register chart displays and what the SRA cell label
@@ -422,6 +452,31 @@ async def _save_risk_register_record(
                 ),
             }
         )
+    residual_severity = args.get("residual_severity")
+    residual_likelihood = args.get("residual_likelihood")
+    if (residual_severity is None) != (residual_likelihood is None):
+        return json.dumps(
+            {
+                "ok": False,
+                "error": (
+                    "residual_severity and residual_likelihood go together: give the "
+                    "whole residual cell (e.g. D and 2) or neither."
+                ),
+            }
+        )
+    if residual_severity is not None:
+        try:
+            residual_severity = _display_severity_to_stored(residual_severity)
+        except (TypeError, ValueError):
+            return json.dumps(
+                {
+                    "ok": False,
+                    "error": (
+                        "residual_severity must be an integer 1-5 as shown on the risk "
+                        "matrix (1=Catastrophic … 5=Minimal)."
+                    ),
+                }
+            )
 
     # Map LLM args to CreateRiskEntryRequest. Pydantic handles enum coercion
     # from string values; missing optional fields default in the schema.
@@ -443,11 +498,14 @@ async def _save_risk_register_record(
             hazard_category_icao=args.get("hazard_category_icao"),
             risk_matrix_applied=args.get("risk_matrix_applied", "faa_5x5"),
             existing_controls=args.get("existing_controls"),
-            residual_risk_level=args.get("residual_risk_level"),
+            residual_severity=residual_severity,
+            residual_likelihood=residual_likelihood,
+            disposition=args.get("disposition"),
             record_status=args.get("record_status", "open"),
             validation_status=args.get("validation_status", "pending"),
             source=RecordSource.RMP_SP4,
             acm_cross_reference=args.get("acm_cross_reference"),
+            source_document_name=args.get("source_document_name"),
         )
     except (KeyError, ValueError) as exc:
         logger.warning("rr_tool_validation_failed", error=str(exc))
@@ -512,11 +570,21 @@ async def _save_risk_register_record(
         risk_level=entry.risk_level.value,
     )
 
+    residual_cell = (
+        f"{entry.residual_likelihood}{_display_severity_to_stored(int(entry.residual_severity))}"
+        if entry.residual_likelihood is not None and entry.residual_severity is not None
+        else None
+    )
     return json.dumps(
         {
             "ok": True,
             "record_id": str(entry.id),
             "risk_level": entry.risk_level.value,
+            "residual_cell": residual_cell,
+            "residual_risk_level": (
+                entry.residual_risk_level.value if entry.residual_risk_level else None
+            ),
+            "ae_review_required": entry.ae_review_required,
             # Echoed back in matrix-column terms so the model confirms the same
             # cell label it reported, not the inverted stored value.
             "severity": _display_severity_to_stored(int(entry.severity)),

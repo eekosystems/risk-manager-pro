@@ -19,6 +19,7 @@ export interface GetRisksParams {
   status?: string;
   risk_level?: string;
   airport_identifier?: string;
+  ae_review_required?: boolean;
 }
 
 export async function getRisks(

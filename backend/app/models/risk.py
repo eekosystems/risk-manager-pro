@@ -85,6 +85,15 @@ class RiskMatrixApplied(enum.StrEnum):
     CONSERVATIVE_DEFAULT = "conservative_default"
 
 
+class Disposition(enum.StrEnum):
+    """The SRA's call on a hazard, as the SRA prompt words it."""
+
+    ACCEPT = "accept"
+    ACCEPT_WITH_CONDITIONS = "accept_with_conditions"
+    REJECT = "reject"
+    FURTHER_MITIGATION_REQUIRED = "further_mitigation_required"
+
+
 class RecordStatus(enum.StrEnum):
     OPEN = "open"
     IN_PROGRESS = "in_progress"
@@ -171,6 +180,11 @@ def compute_risk_level(severity: int, likelihood: str) -> RiskLevel:
     return RISK_MATRIX[likelihood][severity]
 
 
+def requires_ae_review(risk_level: RiskLevel, residual_risk_level: RiskLevel | None) -> bool:
+    """A High initial or residual risk goes to the Accountable Executive."""
+    return RiskLevel.HIGH in (risk_level, residual_risk_level)
+
+
 def default_icao_for_5m(category: HazardCategory5M) -> HazardCategoryICAO:
     """Suggested ICAO category for a given 5M selection, per Sub-Prompt 4."""
     return CATEGORY_5M_TO_ICAO_DEFAULT[category]
@@ -248,6 +262,12 @@ class RiskEntry(Base):
     # Residual cell on the FG 5x5, same storage convention as severity/likelihood.
     residual_severity: Mapped[int | None] = mapped_column(default=None)
     residual_likelihood: Mapped[str | None] = mapped_column(String(1), default=None)
+    disposition: Mapped[Disposition | None] = mapped_column(
+        Enum(Disposition, values_callable=lambda e: [x.value for x in e]),
+        default=None,
+    )
+    # Set from the bands unless a user overrides it; the register filters on it.
+    ae_review_required: Mapped[bool] = mapped_column(default=False)
     # SharePoint SRMD provenance: a stable key per (airport, hazard) so a
     # re-import never duplicates, plus the report the hazard came from.
     srmd_ref: Mapped[str | None] = mapped_column(String(64), default=None)

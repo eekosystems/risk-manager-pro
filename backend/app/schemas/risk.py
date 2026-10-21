@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field, model_validator
 
 from app.models.residual_assessment import ResidualAssessmentStatus
 from app.models.risk import (
+    Disposition,
     HazardCategory5M,
     HazardCategoryICAO,
     Likelihood,
@@ -43,11 +44,24 @@ class CreateRiskEntryRequest(BaseModel):
     hazard_category_icao: HazardCategoryICAO | None = None
     risk_matrix_applied: RiskMatrixApplied = RiskMatrixApplied.FAA_5X5
     existing_controls: str | None = None
-    residual_risk_level: RiskLevel | None = None
+    # The residual band is computed from the cell; a band alone is not accepted.
+    residual_severity: Severity | None = None
+    residual_likelihood: Likelihood | None = None
+    disposition: Disposition | None = None
+    # None lets the service derive it from the bands.
+    ae_review_required: bool | None = None
     record_status: RecordStatus = RecordStatus.OPEN
     validation_status: ValidationStatus = ValidationStatus.PENDING
     source: RecordSource = RecordSource.MANUAL_ENTRY
     acm_cross_reference: str | None = None
+    source_document_name: str | None = Field(default=None, max_length=500)
+    source_document_url: str | None = None
+
+    @model_validator(mode="after")
+    def _residual_cell_is_whole(self) -> Self:
+        if (self.residual_severity is None) != (self.residual_likelihood is None):
+            raise ValueError("residual_severity and residual_likelihood must be set together")
+        return self
 
 
 class UpdateRiskEntryRequest(BaseModel):
@@ -70,6 +84,8 @@ class UpdateRiskEntryRequest(BaseModel):
     residual_risk_level: RiskLevel | None = None
     residual_severity: Severity | None = None
     residual_likelihood: Likelihood | None = None
+    disposition: Disposition | None = None
+    ae_review_required: bool | None = None
     record_status: RecordStatus | None = None
     validation_status: ValidationStatus | None = None
     acm_cross_reference: str | None = None
@@ -129,6 +145,8 @@ class RiskEntryResponse(BaseModel):
     residual_risk_level: RiskLevel | None
     residual_severity: int | None
     residual_likelihood: str | None
+    disposition: Disposition | None
+    ae_review_required: bool
     record_status: RecordStatus
     validation_status: ValidationStatus
     source: RecordSource
@@ -145,6 +163,7 @@ class RiskEntryResponse(BaseModel):
 
 class RiskEntryDetailResponse(RiskEntryResponse):
     mitigations: list[MitigationResponse]
+    latest_assessment: "ResidualAssessmentResponse | None" = None
 
 
 class MitigationSummary(BaseModel):
@@ -208,6 +227,9 @@ class RiskEntryListItem(BaseModel):
     residual_severity: int | None
     residual_likelihood: str | None
     residual_risk_level: RiskLevel | None
+    disposition: Disposition | None
+    ae_review_required: bool
+    source_document_name: str | None
     source_document_url: str | None
     mitigations: list[MitigationSummary]
     latest_assessment: ResidualAssessmentResponse | None = None

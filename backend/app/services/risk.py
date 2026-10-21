@@ -14,6 +14,7 @@ from app.models.risk import (
     compute_risk_level,
     default_icao_for_5m,
     record_status_from_legacy,
+    requires_ae_review,
 )
 from app.repositories.risk import RiskRepository
 from app.schemas.risk import (
@@ -42,6 +43,17 @@ class RiskService:
         organization_id: uuid.UUID,
     ) -> RiskEntry:
         risk_level = compute_risk_level(payload.severity, payload.likelihood)
+        # The residual band always follows the residual cell on the FG 5x5.
+        residual_risk_level = (
+            compute_risk_level(payload.residual_severity, payload.residual_likelihood)
+            if payload.residual_severity is not None and payload.residual_likelihood is not None
+            else None
+        )
+        ae_review_required = (
+            payload.ae_review_required
+            if payload.ae_review_required is not None
+            else requires_ae_review(risk_level, residual_risk_level)
+        )
 
         # If 5M category is supplied without ICAO, fill in the default mapping.
         icao = payload.hazard_category_icao
@@ -68,11 +80,17 @@ class RiskService:
             hazard_category_icao=icao,
             risk_matrix_applied=payload.risk_matrix_applied,
             existing_controls=payload.existing_controls,
-            residual_risk_level=payload.residual_risk_level,
+            residual_severity=payload.residual_severity,
+            residual_likelihood=payload.residual_likelihood,
+            residual_risk_level=residual_risk_level,
+            disposition=payload.disposition,
+            ae_review_required=ae_review_required,
             record_status=payload.record_status,
             validation_status=payload.validation_status,
             source=payload.source,
             acm_cross_reference=payload.acm_cross_reference,
+            source_document_name=payload.source_document_name,
+            source_document_url=payload.source_document_url,
         )
 
         # Persist the sub-location into the airport's library for future suggestions.
@@ -109,6 +127,7 @@ class RiskService:
         status: str | None = None,
         risk_level: str | None = None,
         airport_identifier: str | None = None,
+        ae_review_required: bool | None = None,
     ) -> tuple[list[RiskEntry], int]:
         return await self._repo.list_for_organization(
             organization_id,
@@ -117,6 +136,7 @@ class RiskService:
             status=status,
             risk_level=risk_level,
             airport_identifier=airport_identifier,
+            ae_review_required=ae_review_required,
         )
 
     async def update_risk_entry(
@@ -153,6 +173,13 @@ class RiskService:
                 compute_risk_level(entry.residual_severity, entry.residual_likelihood)
                 if entry.residual_severity is not None and entry.residual_likelihood is not None
                 else None
+            )
+
+        # A band change re-derives the AE flag unless this request set it.
+        cells = {"severity", "likelihood", "residual_severity", "residual_likelihood"}
+        if cells & updates.keys() and "ae_review_required" not in updates:
+            entry.ae_review_required = requires_ae_review(
+                entry.risk_level, entry.residual_risk_level
             )
 
         # Fill in ICAO mapping from 5M when 5M was set without ICAO.

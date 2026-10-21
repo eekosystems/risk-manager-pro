@@ -65,6 +65,8 @@ SYNCABLE_FIELDS: tuple[str, ...] = (
     "residual_risk_level",
     "residual_severity",
     "residual_likelihood",
+    "disposition",
+    "ae_review_required",
     "validation_status",
     "acm_cross_reference",
 )

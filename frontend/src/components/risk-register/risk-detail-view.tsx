@@ -7,7 +7,9 @@ import { Button } from "@/components/ui/button";
 import { RiskMatrix } from "@/components/ui/risk-matrix";
 import { useRisk } from "@/hooks/use-risks";
 import { useToast } from "@/hooks/use-toast";
+import { useUserRole } from "@/hooks/use-user-role";
 import type {
+  Disposition,
   HazardCategory5M,
   HazardCategoryICAO,
   OperationalDomain,
@@ -27,7 +29,7 @@ import {
 } from "@/types/risk-matrix";
 
 import { MitigationList } from "./mitigation-list";
-import { RiskCellBadge } from "./risk-cell-badge";
+import { ResidualRiskCell } from "./residual-risk-cell";
 
 const STATUS_LABELS: Record<RiskStatus, { label: string; className: string }> = {
   open: { label: "Open", className: "text-brand-600 bg-brand-50" },
@@ -74,6 +76,13 @@ const VALIDATION_LABELS: Record<ValidationStatus, { label: string; className: st
   pending: { label: "Pending", className: "bg-gray-100 text-gray-600" },
 };
 
+const DISPOSITION_LABELS: Record<Disposition, string> = {
+  accept: "Accept",
+  accept_with_conditions: "Accept with conditions",
+  reject: "Reject",
+  further_mitigation_required: "Further mitigation or AE acceptance required",
+};
+
 const SOURCE_LABELS: Record<RecordSource, string> = {
   rmp_sp1: "RMP — System Analysis (SP1)",
   rmp_sp2: "RMP — PHL (SP2)",
@@ -94,6 +103,7 @@ interface RiskDetailViewProps {
 export function RiskDetailView({ riskId, onBack, onEdit }: RiskDetailViewProps) {
   const { data: risk, isLoading } = useRisk(riskId);
   const { addToast } = useToast();
+  const { canEdit } = useUserRole();
   const [closureNote, setClosureNote] = useState("");
   const [showClosureForm, setShowClosureForm] = useState(false);
   const closureMut = useMutation({
@@ -119,7 +129,12 @@ export function RiskDetailView({ riskId, onBack, onEdit }: RiskDetailViewProps) 
     );
   }
 
-  const requiresAEApproval = risk.risk_level === "high";
+  const requiresAEApproval = risk.ae_review_required;
+  // L-5: only link http(s) URLs — never a server-supplied javascript:/data: URI.
+  const sourceDocumentUrl =
+    risk.source_document_url && /^https?:\/\//i.test(risk.source_document_url)
+      ? risk.source_document_url
+      : null;
 
   const riskLevelCfg =
     RISK_LEVEL_CONFIG[risk.risk_level as RiskLevel] ?? RISK_LEVEL_CONFIG.low;
@@ -302,20 +317,42 @@ export function RiskDetailView({ riskId, onBack, onEdit }: RiskDetailViewProps) 
                 </div>
               </div>
             )}
-            {risk.residual_risk_level && (
+            {(risk.residual_risk_level || risk.latest_assessment) && (
               <div>
                 <div className="text-[11px] font-medium uppercase tracking-wider text-slate-400">
                   Residual Risk
                 </div>
                 <div className="mt-1">
-                  <RiskCellBadge
-                    likelihood={risk.residual_likelihood}
-                    severity={risk.residual_severity}
-                    level={risk.residual_risk_level}
-                  />
+                  <ResidualRiskCell risk={risk} canEdit={canEdit} isImported />
                 </div>
               </div>
             )}
+            {risk.disposition && (
+              <div>
+                <div className="text-[11px] font-medium uppercase tracking-wider text-slate-400">
+                  Disposition
+                </div>
+                <div className="mt-1 text-sm text-slate-700">
+                  {DISPOSITION_LABELS[risk.disposition]}
+                </div>
+              </div>
+            )}
+            <div>
+              <div className="text-[11px] font-medium uppercase tracking-wider text-slate-400">
+                AE Review
+              </div>
+              <div className="mt-1">
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                    risk.ae_review_required
+                      ? "bg-amber-50 text-amber-700"
+                      : "bg-gray-100 text-gray-600"
+                  }`}
+                >
+                  {risk.ae_review_required ? "Required" : "Not required"}
+                </span>
+              </div>
+            </div>
             <div>
               <div className="text-[11px] font-medium uppercase tracking-wider text-slate-400">
                 Record Status
@@ -344,6 +381,27 @@ export function RiskDetailView({ riskId, onBack, onEdit }: RiskDetailViewProps) 
                 {SOURCE_LABELS[risk.source]}
               </div>
             </div>
+            {risk.source_document_name && (
+              <div>
+                <div className="text-[11px] font-medium uppercase tracking-wider text-slate-400">
+                  Source Document
+                </div>
+                <div className="mt-1 text-sm text-slate-700">
+                  {sourceDocumentUrl ? (
+                    <a
+                      href={sourceDocumentUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-brand-600 hover:underline"
+                    >
+                      {risk.source_document_name}
+                    </a>
+                  ) : (
+                    risk.source_document_name
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

@@ -258,6 +258,11 @@ export type OperationalDomain =
 export type HazardCategory5M = "human" | "machine" | "medium" | "mission" | "management";
 export type HazardCategoryICAO = "technical" | "human" | "organizational" | "environmental";
 export type RiskMatrixApplied = "airport_specific" | "faa_5x5" | "conservative_default";
+export type Disposition =
+  | "accept"
+  | "accept_with_conditions"
+  | "reject"
+  | "further_mitigation_required";
 export type RecordStatus =
   | "open"
   | "in_progress"
@@ -294,6 +299,9 @@ export interface RiskEntryListItem {
   residual_severity: number | null;
   residual_likelihood: string | null;
   residual_risk_level: string | null;
+  disposition: Disposition | null;
+  ae_review_required: boolean;
+  source_document_name: string | null;
   source_document_url: string | null;
   mitigations: MitigationSummary[];
   latest_assessment: ResidualAssessment | null;
@@ -391,6 +399,8 @@ export interface RiskEntryDetail {
   residual_risk_level: string | null;
   residual_severity: number | null;
   residual_likelihood: string | null;
+  disposition: Disposition | null;
+  ae_review_required: boolean;
   record_status: RecordStatus;
   validation_status: ValidationStatus;
   source: RecordSource;
@@ -398,6 +408,7 @@ export interface RiskEntryDetail {
   acm_cross_reference: string | null;
   source_document_name: string | null;
   source_document_url: string | null;
+  latest_assessment: ResidualAssessment | null;
   created_at: string;
   updated_at: string;
   mitigations: MitigationItem[];
@@ -420,7 +431,10 @@ export interface CreateRiskEntryRequest {
   hazard_category_icao?: HazardCategoryICAO | null;
   risk_matrix_applied?: RiskMatrixApplied;
   existing_controls?: string | null;
-  residual_risk_level?: string | null;
+  residual_severity?: number | null;
+  residual_likelihood?: string | null;
+  disposition?: Disposition | null;
+  ae_review_required?: boolean | null;
   record_status?: RecordStatus;
   validation_status?: ValidationStatus;
   source?: RecordSource;
@@ -446,6 +460,8 @@ export interface UpdateRiskEntryRequest {
   residual_risk_level?: string | null;
   residual_severity?: number | null;
   residual_likelihood?: string | null;
+  disposition?: Disposition | null;
+  ae_review_required?: boolean | null;
   record_status?: RecordStatus | null;
   validation_status?: ValidationStatus | null;
   acm_cross_reference?: string | null;

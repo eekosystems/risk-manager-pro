@@ -18,7 +18,14 @@ const FAILURE_MESSAGES: Record<string, string> = {
 };
 
 interface ResidualRiskCellProps {
-  risk: RiskEntryListItem;
+  risk: Pick<
+    RiskEntryListItem,
+    | "id"
+    | "residual_likelihood"
+    | "residual_severity"
+    | "residual_risk_level"
+    | "latest_assessment"
+  >;
   canEdit: boolean;
   /** SharePoint rows not yet imported have no record to re-assess. */
   isImported: boolean;

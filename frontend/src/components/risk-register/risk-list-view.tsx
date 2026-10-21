@@ -93,6 +93,9 @@ function spToListItem(r: SharePointRiskRow, idx: number): RiskEntryListItem {
     residual_severity: r.residual_severity,
     residual_likelihood: r.residual_likelihood,
     residual_risk_level: r.residual_risk_level,
+    disposition: null,
+    ae_review_required: r.risk_level === "high" || r.residual_risk_level === "high",
+    source_document_name: r.source_file,
     source_document_url: r.source_url,
     mitigations: (r.mitigations ?? []).map((title, i) => ({
       id: `${id}:m${i}`,
@@ -113,6 +116,7 @@ interface RiskListViewProps {
 export function RiskListView({ onSelectRisk, onCreateNew }: RiskListViewProps) {
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [riskLevelFilter, setRiskLevelFilter] = useState<string>("");
+  const [aeReviewOnly, setAeReviewOnly] = useState(false);
   const [airportFilter, setAirportFilter] = useState<string>(ALL_AIRPORTS);
   const [selectedCell, setSelectedCell] = useState<RiskMatrixSelection | null>(null);
   const [pendingDelete, setPendingDelete] = useState<{ id: string; title: string } | null>(
@@ -236,9 +240,10 @@ export function RiskListView({ onSelectRisk, onCreateNew }: RiskListViewProps) {
       risks.filter(
         (r) =>
           (!statusFilter || r.status === statusFilter) &&
-          (!riskLevelFilter || r.risk_level === riskLevelFilter),
+          (!riskLevelFilter || r.risk_level === riskLevelFilter) &&
+          (!aeReviewOnly || r.ae_review_required),
       ),
-    [risks, statusFilter, riskLevelFilter],
+    [risks, statusFilter, riskLevelFilter, aeReviewOnly],
   );
 
   // Apply the matrix-cell drill-down filter — final list shown in right panel.
@@ -417,6 +422,15 @@ export function RiskListView({ onSelectRisk, onCreateNew }: RiskListViewProps) {
           <option value="medium">Medium</option>
           <option value="low">Low</option>
         </select>
+        <label className="flex items-center gap-2 text-sm text-slate-700">
+          <input
+            type="checkbox"
+            checked={aeReviewOnly}
+            onChange={(e) => setAeReviewOnly(e.target.checked)}
+            className="h-4 w-4 rounded border-gray-300 text-brand-500 focus:ring-brand-500/20"
+          />
+          Awaiting AE review
+        </label>
       </div>
 
       {/* Risk table */}
@@ -536,6 +550,14 @@ function RiskRow({
                   className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${statusCfg.className}`}
                 >
                   {statusCfg.label}
+                </span>
+              )}
+              {risk.ae_review_required && (
+                <span
+                  className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700"
+                  title="Accountable Executive review required"
+                >
+                  AE review
                 </span>
               )}
             </div>

@@ -30,6 +30,9 @@ const dbRisk: RiskEntryListItem = {
   residual_severity: null,
   residual_likelihood: null,
   residual_risk_level: null,
+  disposition: null,
+  ae_review_required: true,
+  source_document_name: null,
   source_document_url: null,
   mitigations: [{ id: "m-1", title: "Hold-short signage", status: "pending" }],
   latest_assessment: null,
@@ -211,6 +214,15 @@ describe("RiskListView filters", () => {
       screen.getByDisplayValue("All Statuses"),
       "mitigating",
     );
+
+    expect(listedTitles()).toEqual(["Runway incursion at hold short line"]);
+  });
+
+  it("narrows to records awaiting AE review", async () => {
+    renderView();
+    await screen.findAllByText("Foreign Object Debris (FOD)");
+
+    await userEvent.click(screen.getByLabelText("Awaiting AE review"));
 
     expect(listedTitles()).toEqual(["Runway incursion at hold short line"]);
   });
@@ -402,6 +414,14 @@ describe("RiskListView initial risk, residual risk and mitigations", () => {
     const field = screen.getByLabelText("Mitigation: Hold-short signage");
     await userEvent.clear(field);
     await userEvent.type(field, "Hold-short signage with flashing beacons");
+    await userEvent.type(
+      screen.getByLabelText("Mitigation: Hold-short signage owner"),
+      "Airfield Ops",
+    );
+    await userEvent.type(
+      screen.getByLabelText("Mitigation: Hold-short signage due date"),
+      "2026-12-31",
+    );
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
 
     expect(mocks.updateMutate).toHaveBeenCalledWith(
@@ -410,6 +430,8 @@ describe("RiskListView initial risk, residual risk and mitigations", () => {
         payload: {
           title: "Hold-short signage with flashing beacons",
           description: "Hold-short signage with flashing beacons",
+          assignee: "Airfield Ops",
+          due_date: "2026-12-31",
         },
       },
       expect.anything(),
