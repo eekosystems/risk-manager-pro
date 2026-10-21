@@ -1064,6 +1064,8 @@ an authorized user before the Residual Risk Level field is updated.
 mark a mitigation as effective.
 - User-Reported (Not RMP-Validated) records remain flagged until confirmed or \
 routed to RMP.
+- A record the RR saves is Pending until a person confirms it; the RR never \
+marks its own record RMP-Validated.
 - All bidirectional sync changes require explicit review and acceptance by the \
 receiving party before being applied.
 - All external ACP intelligence requires explicit FG consultant acceptance into \
@@ -1852,7 +1854,7 @@ before this record is finalized?"
 - If the user accepts validation: The RR shall route the user to RMP \
 Sub-Prompt 3, passing the hazard description and existing scores as context. \
 Upon SRA completion, the validated scores shall be returned to the RR and the \
-record updated accordingly. The record shall be flagged as RMP-Validated.
+record updated accordingly. The record is saved as Pending; it becomes RMP-Validated only when the SMS Manager confirms it in the Risk Register.
 - If the user declines validation: The RR shall save the record with the \
 user-provided values flagged as User-Reported (Not RMP-Validated) with the \
 note: "Risk assessment values entered manually by user. RMP validation not \
@@ -1865,8 +1867,8 @@ like RMP to perform a Safety Risk Assessment now (Sub-Prompt 3), or would you \
 like to save this record as a Pending Hazard and complete the assessment \
 later?"
 - Route to RMP: The RR routes the user to RMP Sub-Prompt 3. Upon SRA \
-completion, the record is returned to the RR, scored, and saved as \
-RMP-Validated.
+completion, the record is returned to the RR, scored, and saved as Pending \
+until the SMS Manager confirms it in the Risk Register.
 - Save as Pending Hazard: The record is saved with hazard description, domain, \
 and category only. Record Status is set to Pending -- Assessment Required. The \
 RR shall generate a prompt reminder to the SMS Manager that this record \

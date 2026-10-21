@@ -121,3 +121,13 @@ async def test_source_document_name_is_carried_to_the_record() -> None:
 
     payload: CreateRiskEntryRequest = service.create_risk_entry.call_args.kwargs["payload"]
     assert payload.source_document_name == "SUS Taxiway Alpha CSPP.pdf"
+
+
+async def test_chat_saved_record_is_pending_whatever_the_model_says() -> None:
+    service = _service()
+
+    result = await _run(service, _save_call(validation_status="rmp_validated"))
+
+    assert result["ok"] is True
+    payload: CreateRiskEntryRequest = service.create_risk_entry.call_args.kwargs["payload"]
+    assert payload.validation_status == "pending"

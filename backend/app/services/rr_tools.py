@@ -218,11 +218,6 @@ RR_TOOLS: list[dict[str, Any]] = [
                         "enum": [s.value for s in RecordStatus],
                         "default": "open",
                     },
-                    "validation_status": {
-                        "type": "string",
-                        "enum": [s.value for s in ValidationStatus],
-                        "default": "pending",
-                    },
                     "acm_cross_reference": {
                         "type": "string",
                         "description": "ACM section + amendment status (Part 139 only).",
@@ -434,6 +429,10 @@ async def _save_risk_register_record(
     mitigations_payload = args.pop("mitigations", None) or []
     # The band is never taken from the model; a residual is a cell or nothing.
     args.pop("residual_risk_level", None)
+    # Validation is a person's call: a chat-saved record waits for the SMS
+    # Manager however the model describes it. SharePoint SRMD imports are the
+    # one source that arrives validated.
+    args.pop("validation_status", None)
 
     # The model reports severity in matrix-column terms (1=Catastrophic … 5=Minimal),
     # which is what the Risk Register chart displays and what the SRA cell label
@@ -502,7 +501,7 @@ async def _save_risk_register_record(
             residual_likelihood=residual_likelihood,
             disposition=args.get("disposition"),
             record_status=args.get("record_status", "open"),
-            validation_status=args.get("validation_status", "pending"),
+            validation_status=ValidationStatus.PENDING,
             source=RecordSource.RMP_SP4,
             acm_cross_reference=args.get("acm_cross_reference"),
             source_document_name=args.get("source_document_name"),
