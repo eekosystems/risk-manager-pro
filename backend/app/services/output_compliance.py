@@ -438,6 +438,268 @@ def find_reversed_cell_labels(content: str) -> list[str]:
     return sorted(found)
 
 
+# --- Score consistency across tiers (Sub-Prompt 3) ----------------------------
+
+# Likelihood letters in matrix order: A is the most likely. A residual that
+# moves toward A after a control is applied says the control made the hazard
+# more likely, which no control does.
+_LIKELIHOOD_ORDER = "ABCDE"
+
+
+@dataclass(frozen=True)
+class HazardScores:
+    """The cells a hazard section states, in reading order."""
+
+    initial: str | None
+    residuals: list[str]
+
+    @property
+    def final_residual(self) -> str | None:
+        return self.residuals[-1] if self.residuals else None
+
+
+def _residual_cells(block_body: str) -> list[str]:
+    """Cells on a tier's lines that are not introduced as the initial score."""
+    cells: list[str] = []
+    for match in MATRIX_CELL_RE.finditer(block_body):
+        if not is_matrix_cell_label(block_body, match):
+            continue
+        line_start = block_body.rfind("\n", 0, match.start()) + 1
+        if _INITIAL_LEAD_IN_RE.search(block_body[line_start : match.start()]):
+            continue
+        cells.append(match.group(0))
+    return cells
+
+
+def hazard_scores(section: HazardSection) -> HazardScores:
+    """Read a hazard's initial cell and the residual after each applied tier.
+
+    The initial cell is the first cell label before the first tier line. Each
+    applied tier contributes the last cell on its own lines, in hierarchy
+    order, so a tier that restates the running residual counts once.
+    """
+    blocks = _tier_blocks(section.body)
+    head = section.body[: blocks[0].start] if blocks else section.body
+    initial = next(
+        (m.group(0) for m in MATRIX_CELL_RE.finditer(head) if is_matrix_cell_label(head, m)),
+        None,
+    )
+    last_by_tier: dict[str, str] = {}
+    for block in blocks:
+        cells = _residual_cells(block.body)
+        if cells:
+            last_by_tier[block.tier] = cells[-1]
+    residuals = [last_by_tier[name] for name in HIERARCHY_ORDER if name in last_by_tier]
+    return HazardScores(initial=initial, residuals=residuals)
+
+
+def find_severity_drift(sections: list[HazardSection]) -> list[str]:
+    """Hazards whose cells do not all share one severity, e.g. "H2 (C2, D3)".
+
+    Controls lower likelihood; the worst credible outcome, and so the severity
+    column, is fixed for the hazard.
+    """
+    drifted: list[str] = []
+    for section in sections:
+        scores = hazard_scores(section)
+        cells = ([scores.initial] if scores.initial else []) + scores.residuals
+        if len({cell[1] for cell in cells}) > 1:
+            drifted.append(f"{section.label} ({', '.join(cells)})")
+    return drifted
+
+
+def find_likelihood_increases(sections: list[HazardSection]) -> list[str]:
+    """Hazards where a residual is more likely than the cell before it."""
+    increases: list[str] = []
+    for section in sections:
+        scores = hazard_scores(section)
+        cells = ([scores.initial] if scores.initial else []) + scores.residuals
+        for earlier, later in zip(cells, cells[1:], strict=False):
+            if _LIKELIHOOD_ORDER.index(later[0]) < _LIKELIHOOD_ORDER.index(earlier[0]):
+                increases.append(f"{section.label} ({earlier} to {later})")
+                break
+    return increases
+
+
+# The disposition a High residual must carry, and the AE routing a High
+# initial must carry, as the SRA prompt words them.
+_FURTHER_MITIGATION_RE = re.compile(
+    r"\bfurther mitigation\b|\bAE acceptance\b|\baccountable executive acceptance\b",
+    re.IGNORECASE,
+)
+_AE_REVIEW_RE = re.compile(
+    r"\baccountable executive\b|\bAE (?:review|approval|acceptance|sign-?off)\b",
+    re.IGNORECASE,
+)
+
+
+def find_high_residuals_without_further_mitigation(sections: list[HazardSection]) -> list[str]:
+    """Hazards whose final residual is High with no 'further mitigation or AE acceptance' line."""
+    return [
+        f"{section.label} ({scores.final_residual})"
+        for section in sections
+        for scores in [hazard_scores(section)]
+        if scores.final_residual
+        and matrix_bands(scores.final_residual) == frozenset({RiskLevel.HIGH})
+        and not _FURTHER_MITIGATION_RE.search(section.body)
+    ]
+
+
+# The closing subsection's body runs to the next lettered subsection ("G. ...").
+_AE_SECTION_RE = re.compile(
+    r"accountable executive review[^\n]*\n"
+    r"(?P<body>(?:(?![ \t]*(?:#{1,6}[ \t]*)?[A-Z]\.[ \t]).*\n?)*)",
+    re.IGNORECASE,
+)
+
+
+def _routed_in_closing_section(label: str, content: str) -> bool:
+    """True when the closing AE Review subsection names the hazard."""
+    return any(
+        re.search(rf"\b{re.escape(label)}\b", m.group("body"))
+        for m in _AE_SECTION_RE.finditer(content)
+    )
+
+
+def find_high_initials_without_ae_review(
+    sections: list[HazardSection], content: str = ""
+) -> list[str]:
+    """Hazards whose initial cell is High with no Accountable Executive routing.
+
+    The routing may sit in the hazard's own section or in the report's closing
+    "Accountable Executive Review" subsection, as long as that names the hazard.
+    """
+    return [
+        f"{section.label} ({scores.initial})"
+        for section in sections
+        for scores in [hazard_scores(section)]
+        if scores.initial
+        and matrix_bands(scores.initial) == frozenset({RiskLevel.HIGH})
+        and not _AE_REVIEW_RE.search(section.body)
+        and not _routed_in_closing_section(section.label, content)
+    ]
+
+
+# --- FG precedent claims -------------------------------------------------------
+
+# A sentence that credits Faith Group material: a precedent, the corpus, prior
+# or similar FG projects, or a non-zero FG weighting. The negated forms the
+# prompts require when nothing was retrieved ("No FG precedent", "FG weighting:
+# 0%") are not claims.
+_SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+|\n+")
+_FG_CLAIM_RE = re.compile(
+    r"\b(?:FG|Faith Group)\b[^.\n]{0,80}?"
+    r"(?:\bprecedents?\b|\bcorpus\b|\bprior (?:SRMs?|SRAs?|PHLs?|CSPPs?|projects?)\b"
+    r"|\bsimilar (?:projects?|CSPPs?|SRAs?|SRMs?|airports?)\b|\bweight(?:ed|ing)?\b)",
+    re.IGNORECASE,
+)
+_FG_NEGATION_RE = re.compile(
+    r"\bno\b|\bnot\b|\bnone\b|\bwithout\b|\babsent\b|\bunavailable\b|\b0\s*%",
+    re.IGNORECASE,
+)
+_NONZERO_PERCENT_RE = re.compile(r"\b(?:[1-9]\d?|100)\s*%")
+
+
+def find_unsupported_fg_claims(content: str) -> list[str]:
+    """Sentences that credit an FG precedent or weighting, for an output with no FG source.
+
+    Returned trimmed so the notice can quote them.
+    """
+    claims: list[str] = []
+    for sentence in _SENTENCE_SPLIT_RE.split(content):
+        if not _FG_CLAIM_RE.search(sentence):
+            continue
+        if _FG_NEGATION_RE.search(sentence) and not _NONZERO_PERCENT_RE.search(sentence):
+            continue
+        text = " ".join(sentence.split())
+        claims.append(text if len(text) <= 120 else text[:117] + "...")
+    return claims
+
+
+# --- Owners and due dates ------------------------------------------------------
+
+# Mitigation owners and due dates belong to the airport. An analysis names the
+# role or date only when the user supplied it; otherwise the field is left for
+# the airport to assign. A value that is one of these placeholders is fine.
+_OWNER_WORDS = r"owner|assigned owner|assignee|responsible(?: party)?"
+_DUE_WORDS = r"due(?: date)?|deadline|target date|timeline|when"
+_OWNER_LABEL_RE = re.compile(
+    r"(?:^|\|)[ \t]*(?:[-*•·][ \t]*)?(?:\*\*)?[ \t]*"
+    rf"(?:{_OWNER_WORDS})[ \t]*(?:\*\*)?[ \t]*[:\-–—][ \t]*([^|\n]{{1,80}})",
+    re.IGNORECASE | re.MULTILINE,
+)
+_DUE_LABEL_RE = re.compile(
+    r"(?:^|\|)[ \t]*(?:[-*•·][ \t]*)?(?:\*\*)?[ \t]*"
+    rf"(?:{_DUE_WORDS})[ \t]*(?:\*\*)?[ \t]*[:\-–—][ \t]*([^|\n]{{1,80}})",
+    re.IGNORECASE | re.MULTILINE,
+)
+_OWNER_HEADER_RE = re.compile(rf"^(?:{_OWNER_WORDS})$", re.IGNORECASE)
+_DUE_HEADER_RE = re.compile(rf"^(?:{_DUE_WORDS})$", re.IGNORECASE)
+_TABLE_RULE_RE = re.compile(r"^[\s|:\-]+$")
+
+
+def _table_column_values(content: str, header: re.Pattern[str]) -> list[str]:
+    """Cell values under a markdown table column whose header matches."""
+    values: list[str] = []
+    column: int | None = None
+    for line in content.splitlines():
+        stripped = line.strip()
+        if not stripped.startswith("|"):
+            column = None
+            continue
+        if _TABLE_RULE_RE.match(stripped):
+            continue
+        cells = [c.strip().strip("*").strip() for c in stripped.strip("|").split("|")]
+        heading = next((i for i, c in enumerate(cells) if header.match(c)), None)
+        if heading is not None:
+            column = heading
+            continue
+        if column is not None and column < len(cells):
+            values.append(cells[column])
+    return values
+
+
+_PLACEHOLDER_RE = re.compile(
+    r"\bTBD\b|\bTBA\b|\bTBC\b|\bto be (?:assigned|determined|set|confirmed)\b"
+    r"|\bairport to (?:assign|set|determine)\b|\bnot (?:yet )?(?:assigned|set)\b"
+    r"|\bpending\b|\bunassigned\b|\bnone\b|\bn/a\b|^[-–—\s]*$",
+    re.IGNORECASE,
+)
+_CONCRETE_DATE_RE = re.compile(
+    r"\b\d{1,2}/\d{1,2}/\d{2,4}\b|\b\d{4}-\d{2}-\d{2}\b"
+    r"|\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?\s+\d{1,2}(?:,?\s+\d{4})?\b"
+    r"|\b\d{1,2}\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?\s+\d{4}\b"
+    r"|\bQ[1-4]\s*(?:FY)?\s*\d{2,4}\b",
+    re.IGNORECASE,
+)
+
+
+def find_invented_owners(content: str) -> list[str]:
+    """Owner values that name a role or person instead of leaving it to the airport."""
+    found: list[str] = []
+    labelled = (m.group(1) for m in _OWNER_LABEL_RE.finditer(content))
+    for raw in [*labelled, *_table_column_values(content, _OWNER_HEADER_RE)]:
+        value = raw.strip().strip("*").strip()
+        if not value or _PLACEHOLDER_RE.search(value):
+            continue
+        if value not in found:
+            found.append(value)
+    return found
+
+
+def find_invented_due_dates(content: str) -> list[str]:
+    """Due-date values that are a concrete date instead of left to the airport."""
+    found: list[str] = []
+    labelled = (m.group(1) for m in _DUE_LABEL_RE.finditer(content))
+    for raw in [*labelled, *_table_column_values(content, _DUE_HEADER_RE)]:
+        value = raw.strip().strip("*").strip()
+        if _PLACEHOLDER_RE.search(value) or not _CONCRETE_DATE_RE.search(value):
+            continue
+        if value not in found:
+            found.append(value)
+    return found
+
+
 # --- Named infrastructure grounding ------------------------------------------
 
 # Matches "Taxiway V", "Taxiways E, M, T and V", "TW A1", "Runway 13R-31L".
@@ -663,13 +925,55 @@ def check_analysis_output(
     is_phl: bool,
     is_analysis: bool = False,
     retrieved_text: str = "",
+    has_fg_source: bool = True,
 ) -> list[ComplianceIssue]:
     """Run every applicable output requirement check and collect what failed.
 
     `is_analysis` covers every formal RMP analysis (System Analysis included),
-    for checks that apply to any output that cites regulation.
+    for checks that apply to any output that cites regulation. `has_fg_source`
+    says whether retrieval returned any Faith Group SRM document this turn; an
+    output with none may not credit an FG precedent or weighting.
     """
     issues: list[ComplianceIssue] = []
+
+    if (is_sra or is_phl or is_analysis) and not has_fg_source:
+        claims = find_unsupported_fg_claims(content)
+        if claims:
+            issues.append(
+                ComplianceIssue(
+                    label="FG Precedent Claimed Without an FG Source",
+                    detail=(
+                        "No Faith Group SRM document was retrieved for this output, so "
+                        "it may not credit an FG precedent, the FG corpus, or a non-zero "
+                        "FG weighting. Claims found: "
+                        + " | ".join(f'"{c}"' for c in claims)
+                        + ". State that no FG precedent was found and set FG weighting "
+                        "to 0%."
+                    ),
+                )
+            )
+
+    if is_sra or is_phl or is_analysis:
+        owners = find_invented_owners(content)
+        due_dates = find_invented_due_dates(content)
+        if owners or due_dates:
+            parts: list[str] = []
+            if owners:
+                parts.append("owners " + ", ".join(f'"{o}"' for o in owners))
+            if due_dates:
+                parts.append("due dates " + ", ".join(f'"{d}"' for d in due_dates))
+            issues.append(
+                ComplianceIssue(
+                    label="Owners and Due Dates Assigned by RMP",
+                    detail=(
+                        "Mitigation owners and due dates are assigned by the airport, "
+                        "not by RMP. This output assigns "
+                        + "; ".join(parts)
+                        + ". Unless the user supplied these, leave them as "
+                        "'To be assigned by the airport'."
+                    ),
+                )
+            )
 
     if is_sra or is_phl or is_analysis:
         mistitled = find_mistitled_citations(content)
@@ -731,6 +1035,61 @@ def check_analysis_output(
                             "its own line, in that order, applied or ruled out with a "
                             "stated reason. A one-line summary that names the tiers "
                             f"does not satisfy this. Gaps — {'; '.join(gaps)}."
+                        ),
+                    )
+                )
+
+            drifted = find_severity_drift(sections)
+            if drifted:
+                issues.append(
+                    ComplianceIssue(
+                        label="Severity Changed Between Tiers",
+                        detail=(
+                            "Severity is fixed per hazard: controls lower the likelihood "
+                            "of the worst credible outcome, not how bad it is, so every "
+                            "cell for a hazard shares one severity column. Cells with "
+                            "more than one severity — " + "; ".join(drifted) + "."
+                        ),
+                    )
+                )
+
+            increases = find_likelihood_increases(sections)
+            if increases:
+                issues.append(
+                    ComplianceIssue(
+                        label="Likelihood Increased After a Control",
+                        detail=(
+                            "Likelihood can only stay the same or decrease from one tier "
+                            "to the next; a residual more likely than the cell before it "
+                            "says the control made the hazard worse. Found in — "
+                            + "; ".join(increases)
+                            + "."
+                        ),
+                    )
+                )
+
+            high_residuals = find_high_residuals_without_further_mitigation(sections)
+            if high_residuals:
+                issues.append(
+                    ComplianceIssue(
+                        label="High Residual Without Further Mitigation Line",
+                        detail=(
+                            "A hazard whose final residual is High must read 'Further "
+                            "mitigation or AE acceptance required' as its disposition. "
+                            "Missing for — " + ", ".join(high_residuals) + "."
+                        ),
+                    )
+                )
+
+            high_initials = find_high_initials_without_ae_review(sections, content)
+            if high_initials:
+                issues.append(
+                    ComplianceIssue(
+                        label="High Initial Risk Without AE Review",
+                        detail=(
+                            "A hazard whose initial risk is High goes to the Accountable "
+                            "Executive for review; say so in the hazard's own section. "
+                            "Missing for — " + ", ".join(high_initials) + "."
                         ),
                     )
                 )

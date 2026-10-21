@@ -27,7 +27,7 @@ COMPLIANT_HAZARD = """
 H1 – Vehicle Incursion Into Active Movement Area
 Primary Worst Credible Outcome A construction vehicle enters an active taxiway.
 Initial Risk
-• Initial cell: C2 – High.
+• Initial cell: C2 – High. Accountable Executive review required.
 Controls (Hierarchy of Controls)
 • Avoid/Eliminate: not feasible; the work cannot be relocated off the airfield.
 • Substitute: ruled out; no lower-hazard construction method available.
@@ -684,8 +684,8 @@ def test_compliant_output_produces_no_issues() -> None:
         + "\nH3 – Second Hazard\n"
         + "- Avoid/Eliminate: not feasible.\n- Substitute: none.\n"
         + "- Engineer: barrier. Residual after this tier: D2 – Medium.\n"
-        + "- Administrative: briefing. Residual after this tier: D3 – Medium.\n"
-        + "- PPE: vests. Residual after this tier: D3 – Medium.\nDisposition: Accept.\n"
+        + "- Administrative: briefing. Residual after this tier: E2 – Medium.\n"
+        + "- PPE: vests. Residual after this tier: E2 – Medium.\nDisposition: Accept.\n"
     )
 
     assert check_analysis_output(content, is_sra=True, is_phl=False) == []

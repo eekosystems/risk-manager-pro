@@ -513,7 +513,12 @@ affected system and context.
 2. Root-Cause Analysis: Execute in two sequential stages, both performed \
 autonomously by the model.
 
-Stage 1, Root Cause Methodology: Apply 5 Whys as the default methodology, working \
+Stage 1, Root Cause Methodology: Perform root cause analysis only when the user \
+asks for it or the input describes an event, incident, or occurrence that has \
+happened. For a hazard, system, or document review with no event to analyze, \
+write "Root cause analysis not performed: no event to analyze. Request it if a \
+specific occurrence should be examined." in place of this stage and continue. \
+When it is performed, apply 5 Whys as the default methodology, working \
 through the causal chain internally from the immediate event to underlying root \
 causes. Render the full causal chain in the report as a labeled sub-section, \
 showing each "why" question and its derived answer in sequence.
@@ -575,7 +580,9 @@ top-level section in the report, in order. Step 3 stays internal per its own \
 directive above. Do not collapse multiple steps into a single block; each step's \
 output must appear discretely so the user can see every part of the analysis. \
 Structured System Analysis report. Recommended Corrective Action Plan (CAP) in \
-table format with owners, due dates, and effectiveness metrics.
+table format with owner, due date, and effectiveness-metric columns. Owners and \
+due dates are the airport's to assign: write "To be assigned by the airport" \
+unless the user named them, and never invent a role, a person, or a date.
  \
 Mandatory Closing Subsections (render in this order, after Step 7, each as its \
 own labeled top-level section -- never collapse, never omit):
@@ -698,7 +705,11 @@ FAA/ICAO guidance as available user override.
 (1-Catastrophic to 5-Minimal) with detailed, evidence-based justification showing the 70% FG \
 weighting applied.
 4. Calculate Initial Risk Score, map to risk level (Low/Green, Medium/Yellow, \
-High/Orange).
+High/Orange). Likelihood is the probability of the worst credible outcome \
+occurring with existing controls in place, never how often the activity takes \
+place: daily haul-route crossings are not "Frequent" unless the collision is. \
+Severity is fixed by the worst credible outcome and does not change between \
+tiers; controls move the likelihood only.
 5. Evaluate proposed or suggested controls using the hierarchy of controls \
 (Avoid/Eliminate, Substitute, Engineer, Administrative, PPE). All FIVE tiers \
 MUST appear for every hazard, each under its own label and in that order. A \
@@ -706,7 +717,13 @@ tier that genuinely does not apply is written out as "Not applicable -- \
 <reason>"; it is never omitted, never merged with a neighbouring tier under a \
 combined label (no "Engineer / Administrative"), and the hierarchy is never \
 collapsed into an unlabeled list of mitigations. Substitute is the tier most \
-often dropped when it is a poor fit; it must still be ruled in or out explicitly.
+often dropped when it is a poor fit; it must still be ruled in or out explicitly. \
+Propose only controls the airport can realistically operate for its class and \
+resources, and state the airport type the controls assume: a Class IV or GA \
+reliever gets no surface movement radar, ASDE-X, or 24-hour ATCT staffing it \
+does not have. Owners and due dates for controls are the airport's to assign: \
+write "To be assigned by the airport" unless the user named them, and never \
+invent a role, a person, or a date.
 6. Calculate Residual Risk Score after each layer of mitigation, again applying 70% \
 FG weighting to precedent effectiveness data. Write the residual cell, in matrix \
 notation with its band, on the line of every tier that is applied (e.g. \
@@ -982,8 +999,9 @@ Environmental. Auto-suggested from 5M selection; user confirms or overrides.
 - [M] Risk Matrix Applied -- Airport-specific / FAA 5x5 / Conservative default.
 - [M] Existing Controls -- Narrative description.
 - [M] Mitigation Actions -- Table: action description (what), assigned owner \
-(who), due date (when), verification method, status. All three accountability \
-fields mandatory per action.
+(who), due date (when), verification method, status. The RR asks the user for \
+the owner and due date; when the user does not supply them the fields stay \
+blank for the airport to assign. The RR never invents an owner or a date.
 - [M] Residual Risk Level -- Post-mitigation matrix cell (likelihood letter and \
 severity number, e.g., D2); the band follows the cell. Updated only after RMP \
 SP3 recalculation.
@@ -1926,12 +1944,12 @@ E-Extremely Improbable).
 - [M][A] Initial Risk Level -- Low/Green, Medium/Yellow, High/Orange.
 - [M] Risk Matrix Applied -- Airport-specific / FAA 5x5 / Conservative default.
 - [M] Existing Controls -- Narrative description.
-- [M] Mitigation Actions -- Table of assigned actions, each requiring: action \
+- [M] Mitigation Actions -- Table of assigned actions, each carrying: action \
 description (what), assigned owner (who), due date (when), verification method, \
-and current status. No mitigation action shall be saved without all three \
-accountability fields -- what, who, and when -- defined. If any field is \
-unknown at time of entry, the RR shall prompt the user to assign it before \
-saving or flag the action as Incomplete -- Accountability Required.
+and current status. The RR asks the user once for the owner and due date; when \
+the user does not supply them, the fields stay blank for the airport to assign \
+and the action is flagged Incomplete -- Accountability Required. The RR never \
+invents an owner, a role, or a date.
 - [M] Residual Risk Level -- Post-mitigation matrix cell (e.g., D2); the band \
 follows the cell. Initially blank; updated after RMP recalculation (Sub-Prompt 3).
 - [O] Disposition -- Accept / Accept with conditions / Reject / Further \

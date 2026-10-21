@@ -539,6 +539,41 @@ def _build_grounding_directive(grounding: RagGrounding) -> str:
     )
 
 
+def _stops_for_grounding(function_type: FunctionType, grounding: RagGrounding) -> bool:
+    """True when a formal analysis targeted documents and retrieved none of them.
+
+    A partial miss still runs, under the grounding directive, because the model
+    has real material for the documents that were found. A total miss leaves it
+    nothing but other documents and its own knowledge, and an analysis written
+    from those reads as an analysis of the missing files. So RMP says what it
+    could not retrieve and stops, instead of producing one.
+    """
+    return (
+        function_type in _ANALYSIS_FUNCTIONS and grounding.is_miss and not grounding.matched_sources
+    )
+
+
+def _build_grounding_stop(grounding: RagGrounding) -> str:
+    """The whole reply when a formal analysis stops on a total grounding miss."""
+    unindexed = set(grounding.unindexed_sources)
+    bullet_list = "\n".join(
+        f"- {name} — not yet indexed (still processing or indexing failed)"
+        if name in unindexed
+        else f"- {name}"
+        for name in grounding.missing_sources
+    )
+    return (
+        "### Analysis Not Run — Requested Documents Not Retrieved\n\n"
+        "RMP could not retrieve indexed content from any of the documents this "
+        "request targeted, so it has not produced an analysis. An analysis written "
+        "without them would describe files RMP has not seen.\n\n"
+        f"{bullet_list}\n\n"
+        "Common causes: the document is still processing, indexing failed, or the "
+        "active organization does not contain it. Confirm the document appears as "
+        "indexed for the organization shown in the header, then re-run."
+    )
+
+
 def _build_grounding_notice(grounding: RagGrounding) -> str:
     """Visible in-body notice appended when targeted documents were missed."""
     unindexed = set(grounding.unindexed_sources)
@@ -1030,6 +1065,7 @@ def _run_compliance_checks(
         is_phl=function_type == FunctionType.PHL,
         is_analysis=function_type in _ANALYSIS_FUNCTIONS,
         retrieved_text="\n".join(r.content for r in search_results),
+        has_fg_source=_has_fg_precedent(search_results),
     )
     if not issues:
         return ""
@@ -1785,6 +1821,28 @@ class ChatService:
             total_indexed=docs.total_indexed,
         )
 
+        if _stops_for_grounding(routed_function, grounding):
+            logger.warning(
+                "analysis_stopped_grounding_miss",
+                conversation_id=str(conversation.id),
+                function_type=routed_function.value,
+                missing=grounding.missing_sources,
+            )
+            stop_msg = await self._repo.add_message(
+                conversation_id=conversation.id,
+                organization_id=organization_id,
+                role=MessageRole.ASSISTANT,
+                content=_build_grounding_stop(grounding),
+                citations=None,
+                metadata=_build_message_metadata(routed_function, None),
+            )
+            return ChatResponse(
+                conversation_id=conversation.id,
+                message=MessageResponse.model_validate(stop_msg),
+                title=conversation.title,
+                routed_function_type=routed_function,
+            )
+
         if routed_function == FunctionType.RISK_REGISTER:
             assistant_content = await self._run_tool_loop(
                 messages=messages,
@@ -1946,6 +2004,26 @@ class ChatService:
             "title": conversation.title,
             "routed_function_type": routed_function.value,
         }
+
+        if _stops_for_grounding(routed_function, grounding):
+            logger.warning(
+                "analysis_stopped_grounding_miss",
+                conversation_id=str(conversation.id),
+                function_type=routed_function.value,
+                missing=grounding.missing_sources,
+            )
+            stop_content = _build_grounding_stop(grounding)
+            yield {"event": "delta", "content": stop_content}
+            stop_msg = await self._repo.add_message(
+                conversation_id=conversation.id,
+                organization_id=organization_id,
+                role=MessageRole.ASSISTANT,
+                content=stop_content,
+                citations=None,
+                metadata=_build_message_metadata(routed_function, None),
+            )
+            yield {"event": "done", "message_id": str(stop_msg.id), "citations": None}
+            return
 
         # The precedent banner belongs above the analysis, so it goes out
         # before the first model token and is persisted as part of the message.

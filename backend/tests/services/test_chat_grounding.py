@@ -11,13 +11,16 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from app.models.conversation import FunctionType
 from app.services.chat import (
     ChatService,
     _build_context_block,
     _build_grounding_notice,
+    _build_grounding_stop,
     _extract_citations,
     _merge_document_chunks,
     _resolve_grounding,
+    _stops_for_grounding,
 )
 from app.services.rag import SearchResult
 from tests.conftest import ORGANIZATION_ID
@@ -333,3 +336,40 @@ async def test_conversational_turns_still_use_relevance_search(chat_service: Cha
     )
 
     chat_service._rag.fetch_documents.assert_not_called()
+
+
+# --- Stopping on a total miss ---------------------------------------------------
+
+
+def test_formal_analysis_stops_when_no_requested_document_was_retrieved() -> None:
+    grounding = _resolve_grounding(["SUS CSPP.pdf", "FAA conditions.pdf"], [_result("other.pdf")])
+
+    assert _stops_for_grounding(FunctionType.SRA, grounding)
+    assert _stops_for_grounding(FunctionType.PHL, grounding)
+    assert _stops_for_grounding(FunctionType.SYSTEM_ANALYSIS, grounding)
+
+
+def test_partial_miss_still_runs_under_the_directive() -> None:
+    grounding = _resolve_grounding(
+        ["SUS CSPP.pdf", "FAA conditions.pdf"], [_result("sus cspp.pdf")]
+    )
+
+    assert grounding.is_miss
+    assert not _stops_for_grounding(FunctionType.SRA, grounding)
+
+
+def test_general_chat_never_stops_on_a_miss() -> None:
+    grounding = _resolve_grounding(["SUS CSPP.pdf"], [_result("other.pdf")])
+
+    assert not _stops_for_grounding(FunctionType.GENERAL, grounding)
+
+
+def test_stop_reply_names_the_missing_documents_and_runs_no_analysis() -> None:
+    grounding = _resolve_grounding(["SUS CSPP.pdf"], [], unindexed_sources=["FAA conditions.pdf"])
+
+    reply = _build_grounding_stop(grounding)
+
+    assert reply.startswith("### Analysis Not Run")
+    assert "- SUS CSPP.pdf" in reply
+    assert "- FAA conditions.pdf — not yet indexed" in reply
+    assert "has not produced an analysis" in reply

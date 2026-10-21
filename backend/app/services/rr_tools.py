@@ -229,8 +229,9 @@ RR_TOOLS: list[dict[str, Any]] = [
                     "mitigations": {
                         "type": "array",
                         "description": (
-                            "Optional mitigation actions. Each requires what/who/when "
-                            "(description/assignee/due_date) per Sub-Prompt 4 §Step 7."
+                            "Optional mitigation actions. Give assignee and due_date "
+                            "only as the user stated them; omit them otherwise so the "
+                            "airport can assign them. Never invent an owner or a date."
                         ),
                         "items": {
                             "type": "object",
