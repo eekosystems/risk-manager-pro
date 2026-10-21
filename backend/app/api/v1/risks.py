@@ -15,6 +15,7 @@ from app.core.deps import (
 from app.core.exceptions import ExternalServiceError
 from app.models.notification import NotificationType
 from app.models.organization import Organization
+from app.models.risk import RiskEntry
 from app.models.user import User
 from app.schemas.common import DataResponse, MetaResponse, PaginatedMeta, PaginatedResponse
 from app.schemas.risk import (
@@ -42,6 +43,13 @@ from app.services.srmd_import import SrmdImportService
 _notification_dispatcher = NotificationDispatcher()
 
 router = APIRouter(prefix="/risks", tags=["risks"])
+
+
+def _chat_link(entry: RiskEntry) -> dict[str, str]:
+    """The conversation a chat-created record came from, for the audit row."""
+    if entry.conversation_id is None:
+        return {}
+    return {"conversation_id": str(entry.conversation_id)}
 
 
 def _get_risk_service(db: AsyncSession = Depends(get_db)) -> RiskService:
@@ -117,6 +125,7 @@ async def create_risk_entry(
         resource_type="risk_entry",
         resource_id=str(entry.id),
         organization_id=organization.id,
+        metadata={"source": entry.source.value, **_chat_link(entry)},
     )
     _notification_dispatcher.dispatch(
         organization_id=organization.id,
@@ -260,9 +269,10 @@ async def update_risk_entry(
     threshold_service: RiskThresholdService = Depends(_get_threshold_service),
     audit: AuditLogger = Depends(get_audit_logger),
 ) -> DataResponse[RiskEntryResponse]:
-    entry = await service.update_risk_entry(
+    change = await service.update_risk_entry(
         risk_id, organization.id, payload, user_id=current_user.id
     )
+    entry = change.entry
     await threshold_service.evaluate(organization.id, current_user, entry.risk_level)
     changes = payload.model_dump(exclude_unset=True)
     await audit.log(
@@ -271,7 +281,11 @@ async def update_risk_entry(
         resource_type="risk_entry",
         resource_id=str(risk_id),
         organization_id=organization.id,
-        metadata={"updated_fields": sorted(changes)},
+        metadata={
+            "updated_fields": sorted(changes),
+            "changes": change.changes,
+            **_chat_link(entry),
+        },
     )
     change_summary = (
         ", ".join(f"{k}={v}" for k, v in changes.items() if v is not None) or "(no fields)"
@@ -299,13 +313,19 @@ async def delete_risk_entry(
     service: RiskService = Depends(_get_risk_service),
     audit: AuditLogger = Depends(get_audit_logger),
 ) -> None:
-    await service.delete_risk_entry(risk_id, organization.id, current_user.id)
+    entry = await service.delete_risk_entry(risk_id, organization.id, current_user.id)
     await audit.log(
         action="risk.deleted",
         user=current_user,
         resource_type="risk_entry",
         resource_id=str(risk_id),
         organization_id=organization.id,
+        metadata={
+            "title": entry.title,
+            "source": entry.source.value,
+            "airport_identifier": entry.airport_identifier,
+            **_chat_link(entry),
+        },
     )
 
 
@@ -333,6 +353,7 @@ async def create_mitigation(
         resource_type="mitigation",
         resource_id=str(mitigation.id),
         organization_id=organization.id,
+        metadata={"risk_id": str(risk_id), "title": mitigation.title},
     )
     await _request_reassessment(
         risk_id, "mitigation.created", current_user, organization, residual_service, audit
@@ -382,13 +403,15 @@ async def update_mitigation(
     residual_service: ResidualAssessmentService = Depends(_get_residual_assessment_service),
     audit: AuditLogger = Depends(get_audit_logger),
 ) -> DataResponse[MitigationResponse]:
-    mitigation = await service.update_mitigation(risk_id, mitigation_id, organization.id, payload)
+    change = await service.update_mitigation(risk_id, mitigation_id, organization.id, payload)
+    mitigation = change.mitigation
     await audit.log(
         action="mitigation.updated",
         user=current_user,
         resource_type="mitigation",
         resource_id=str(mitigation_id),
         organization_id=organization.id,
+        metadata={"risk_id": str(risk_id), "changes": change.changes},
     )
     await _request_reassessment(
         risk_id, "mitigation.updated", current_user, organization, residual_service, audit
@@ -416,6 +439,7 @@ async def delete_mitigation(
         resource_type="mitigation",
         resource_id=str(mitigation_id),
         organization_id=organization.id,
+        metadata={"risk_id": str(risk_id)},
     )
     await _request_reassessment(
         risk_id, "mitigation.deleted", current_user, organization, residual_service, audit

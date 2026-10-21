@@ -1,5 +1,6 @@
 import csv
 import io
+import json
 import uuid
 from datetime import datetime
 
@@ -72,6 +73,7 @@ class AuditQueryService:
                 "outcome",
                 "ip_address",
                 "correlation_id",
+                "metadata",
             ]
         )
 
@@ -92,6 +94,9 @@ class AuditQueryService:
                     entry.outcome,
                     _csv_safe(entry.ip_address),
                     str(entry.correlation_id),
+                    _csv_safe(json.dumps(entry.metadata_json, sort_keys=True))
+                    if entry.metadata_json
+                    else "",
                 ]
             )
         return output.getvalue()

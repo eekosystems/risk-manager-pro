@@ -263,8 +263,19 @@ async def test_editing_the_initial_and_residual_cells_recomputes_both_bands(
     [call] = [
         c for c in mock_audit_logger.log.call_args_list if c.kwargs["action"] == "risk.updated"
     ]
-    assert call.kwargs["metadata"] == {
-        "updated_fields": ["likelihood", "residual_likelihood", "residual_severity", "severity"]
+    assert call.kwargs["metadata"]["updated_fields"] == [
+        "likelihood",
+        "residual_likelihood",
+        "residual_severity",
+        "severity",
+    ]
+    assert call.kwargs["metadata"]["changes"] == {
+        "severity": {"old": 4, "new": 3},
+        "likelihood": {"old": "C", "new": "D"},
+        "risk_level": {"old": "high", "new": "medium"},
+        "residual_severity": {"old": None, "new": 2},
+        "residual_likelihood": {"old": None, "new": "E"},
+        "residual_risk_level": {"old": None, "new": "low"},
     }
 
 

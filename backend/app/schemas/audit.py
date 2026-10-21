@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class AuditEntryResponse(BaseModel):
@@ -15,8 +15,10 @@ class AuditEntryResponse(BaseModel):
     correlation_id: uuid.UUID
     outcome: str
     organization_id: uuid.UUID | None
+    # What changed: before/after values, the originating chat, and the like.
+    metadata: dict[str, object] | None = Field(default=None, validation_alias="metadata_json")
 
-    model_config = {"from_attributes": True}
+    model_config = {"from_attributes": True, "populate_by_name": True}
 
 
 class AuditFilterParams(BaseModel):

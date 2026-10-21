@@ -16,8 +16,25 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { useAuditEntries, useAuditFilterOptions } from "@/hooks/use-audit";
 import { useToast } from "@/hooks/use-toast";
 import { useUserRole } from "@/hooks/use-user-role";
+import type { AuditEntry } from "@/types/api";
 
+import { AuditEntryDetail } from "./audit-entry-detail";
 import { ConversationTranscriptModal } from "./conversation-transcript-modal";
+
+/** The reader's zone, as a short label ("CDT"), so a timestamp says which clock it is on. */
+const ZONE_LABEL =
+  new Intl.DateTimeFormat(undefined, { timeZoneName: "short" })
+    .formatToParts(new Date())
+    .find((part) => part.type === "timeZoneName")?.value ?? "local";
+
+/** The conversation an audit row leads to: its own, or the chat a record came from. */
+function conversationIdFor(entry: AuditEntry): string | null {
+  if (entry.resource_type === "conversation" && entry.resource_id) {
+    return entry.resource_id;
+  }
+  const fromMetadata = entry.metadata?.conversation_id;
+  return typeof fromMetadata === "string" && fromMetadata ? fromMetadata : null;
+}
 
 // Keys must match the action strings the backend writes exactly. Several were
 // previously unprefixed ("message_sent" rather than "chat.message_sent"), so
@@ -270,16 +287,14 @@ export function AuditLogPage() {
                     OUTCOME_STYLES[entry.outcome] ?? OUTCOME_STYLES.success;
                   // Only org admins can read another user's conversation, so
                   // don't offer the affordance to anyone else.
-                  const canOpenTranscript =
-                    isAdmin &&
-                    entry.resource_type === "conversation" &&
-                    Boolean(entry.resource_id);
+                  const conversationId = conversationIdFor(entry);
+                  const canOpenTranscript = isAdmin && conversationId !== null;
                   return (
                     <tr
                       key={entry.id}
                       onClick={
                         canOpenTranscript
-                          ? () => setOpenTranscriptId(entry.resource_id)
+                          ? () => setOpenTranscriptId(conversationId)
                           : undefined
                       }
                       onKeyDown={
@@ -287,7 +302,7 @@ export function AuditLogPage() {
                           ? (e) => {
                               if (e.key === "Enter" || e.key === " ") {
                                 e.preventDefault();
-                                setOpenTranscriptId(entry.resource_id);
+                                setOpenTranscriptId(conversationId);
                               }
                             }
                           : undefined
@@ -302,10 +317,12 @@ export function AuditLogPage() {
                       } ${canOpenTranscript ? "cursor-pointer" : ""}`}
                     >
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-600">
-                        {format(new Date(entry.timestamp), "MMM d, yyyy HH:mm:ss")}
+                        {format(new Date(entry.timestamp), "MMM d, yyyy HH:mm:ss")}{" "}
+                        <span className="text-slate-400">{ZONE_LABEL}</span>
                       </td>
                       <td className="px-4 py-3 text-sm font-medium text-slate-800">
                         {ACTION_LABELS[entry.action] ?? entry.action}
+                        <AuditEntryDetail metadata={entry.metadata} />
                       </td>
                       <td className="px-4 py-3">
                         <span className="text-xs text-slate-500">

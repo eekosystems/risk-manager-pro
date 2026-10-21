@@ -6,7 +6,15 @@ residual risk flags the record for Accountable Executive review unless a
 user says otherwise.
 """
 
+import uuid
+from unittest.mock import AsyncMock
+
 from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.conversation import Conversation, FunctionType
+from app.models.organization import Organization
+from app.models.user import User
 
 
 def _payload(**overrides: object) -> dict[str, object]:
@@ -90,3 +98,83 @@ async def test_detail_carries_the_latest_assessment_slot(client: AsyncClient) ->
 
     assert detail["latest_assessment"] is None
     assert detail["ae_review_required"] is True
+
+
+def _metadata(mock_audit_logger: AsyncMock, action: str) -> dict[str, object]:
+    [call] = [c for c in mock_audit_logger.log.call_args_list if c.kwargs["action"] == action]
+    metadata: dict[str, object] = call.kwargs["metadata"]
+    return metadata
+
+
+async def test_update_audit_row_carries_before_and_after_values(
+    client: AsyncClient, mock_audit_logger: AsyncMock
+) -> None:
+    risk_id = (await client.post("/api/v1/risks", json=_payload())).json()["data"]["id"]
+
+    await client.patch(
+        f"/api/v1/risks/{risk_id}",
+        json={"likelihood": "E", "residual_severity": 4, "residual_likelihood": "E"},
+    )
+
+    metadata = _metadata(mock_audit_logger, "risk.updated")
+    assert metadata["changes"] == {
+        "likelihood": {"old": "C", "new": "E"},
+        "risk_level": {"old": "high", "new": "medium"},
+        "residual_severity": {"old": None, "new": 4},
+        "residual_likelihood": {"old": None, "new": "E"},
+        "residual_risk_level": {"old": None, "new": "medium"},
+        "ae_review_required": {"old": True, "new": False},
+    }
+
+
+async def test_risk_audit_rows_name_the_originating_chat(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    test_organization: Organization,
+    test_user: User,
+    mock_audit_logger: AsyncMock,
+) -> None:
+    conversation = Conversation(
+        id=uuid.uuid4(),
+        user_id=test_user.id,
+        organization_id=test_organization.id,
+        title="Hazard entry",
+        function_type=FunctionType.RISK_REGISTER,
+    )
+    db_session.add(conversation)
+    await db_session.flush()
+    conversation_id = str(conversation.id)
+    created = await client.post(
+        "/api/v1/risks", json=_payload(conversation_id=conversation_id, source="rmp_sp4")
+    )
+    assert created.status_code == 201
+    risk_id = created.json()["data"]["id"]
+    await client.patch(f"/api/v1/risks/{risk_id}", json={"title": "Renamed"})
+    await client.delete(f"/api/v1/risks/{risk_id}")
+
+    for action in ("risk.created", "risk.updated", "risk.deleted"):
+        assert _metadata(mock_audit_logger, action)["conversation_id"] == conversation_id
+    assert _metadata(mock_audit_logger, "risk.deleted")["title"] == "Renamed"
+
+
+async def test_mitigation_update_audit_row_carries_before_and_after_values(
+    client: AsyncClient, mock_audit_logger: AsyncMock
+) -> None:
+    risk_id = (await client.post("/api/v1/risks", json=_payload())).json()["data"]["id"]
+    mitigation = await client.post(
+        f"/api/v1/risks/{risk_id}/mitigations",
+        json={"title": "Escort", "description": "Escort", "assignee": "Chief Pilot Liaison"},
+    )
+    mitigation_id = mitigation.json()["data"]["id"]
+
+    await client.patch(
+        f"/api/v1/risks/{risk_id}/mitigations/{mitigation_id}",
+        json={"assignee": None, "due_date": "2026-12-31T00:00:00"},
+    )
+
+    metadata = _metadata(mock_audit_logger, "mitigation.updated")
+    assert metadata["risk_id"] == risk_id
+    assert metadata["changes"] == {
+        "assignee": {"old": "Chief Pilot Liaison", "new": None},
+        "due_date": {"old": None, "new": "2026-12-31T00:00:00"},
+    }

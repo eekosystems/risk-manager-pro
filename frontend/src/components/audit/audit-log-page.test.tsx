@@ -44,6 +44,7 @@ function makeEntry(overrides: Partial<AuditEntry> = {}): AuditEntry {
     correlation_id: "corr-1",
     outcome: "success",
     organization_id: "org-1",
+    metadata: null,
     ...overrides,
   };
 }
@@ -86,6 +87,41 @@ describe("AuditLogPage conversation links", () => {
     render(<AuditLogPage />);
 
     expect(screen.queryByText("View chat")).not.toBeInTheDocument();
+  });
+
+  it("links a register row to the chat the record came from", async () => {
+    setEntries([
+      makeEntry({
+        action: "risk.created",
+        resource_type: "risk_entry",
+        resource_id: "risk-1",
+        metadata: { source: "rmp_sp4", conversation_id: "chat-9" },
+      }),
+    ]);
+    render(<AuditLogPage />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Open conversation transcript" }));
+
+    expect(transcriptModal).toHaveBeenCalledWith("chat-9");
+  });
+
+  it("shows before and after values on an update row", () => {
+    setEntries([
+      makeEntry({
+        action: "risk.updated",
+        resource_type: "risk_entry",
+        resource_id: "risk-1",
+        metadata: {
+          updated_fields: ["likelihood"],
+          changes: { likelihood: { old: "C", new: "E" } },
+        },
+      }),
+    ]);
+    render(<AuditLogPage />);
+
+    expect(screen.getByText("likelihood:")).toBeInTheDocument();
+    expect(screen.getByText("C")).toBeInTheDocument();
+    expect(screen.getByText("E")).toBeInTheDocument();
   });
 
   it("does not offer the link on non-conversation entries", () => {

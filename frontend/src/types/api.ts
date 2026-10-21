@@ -564,6 +564,8 @@ export interface AuditEntry {
   correlation_id: string;
   outcome: string;
   organization_id: string | null;
+  /** Before/after values, the originating chat, and other action detail. */
+  metadata: Record<string, unknown> | null;
 }
 
 export interface AuditFilterOptions {

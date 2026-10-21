@@ -1,4 +1,6 @@
 import uuid
+from dataclasses import dataclass, field
+from typing import Any
 
 import structlog
 from sqlalchemy import select
@@ -26,6 +28,38 @@ from app.schemas.risk import (
 from app.services.rr_sync import RRSyncService, _snapshot_entry, compute_entry_diff
 
 logger = structlog.get_logger(__name__)
+
+# Mitigation fields a user can change, in the order the audit trail lists them.
+_MITIGATION_FIELDS: tuple[str, ...] = (
+    "title",
+    "description",
+    "assignee",
+    "due_date",
+    "verification_method",
+    "status",
+)
+
+
+@dataclass
+class RiskEntryChange:
+    """An updated entry with the {field: {old, new}} it took to get there."""
+
+    entry: RiskEntry
+    changes: dict[str, dict[str, Any]] = field(default_factory=dict)
+
+
+@dataclass
+class MitigationChange:
+    mitigation: Mitigation
+    changes: dict[str, dict[str, Any]] = field(default_factory=dict)
+
+
+def _json_value(value: object) -> object:
+    if hasattr(value, "value"):  # enums
+        return value.value
+    if hasattr(value, "isoformat"):  # datetimes
+        return value.isoformat()
+    return value
 
 
 class RiskService:
@@ -145,7 +179,7 @@ class RiskService:
         organization_id: uuid.UUID,
         payload: UpdateRiskEntryRequest,
         user_id: uuid.UUID | None = None,
-    ) -> RiskEntry:
+    ) -> RiskEntryChange:
         entry = await self._repo.get_by_id(risk_id, organization_id)
         if not entry:
             raise NotFoundError("RiskEntry", str(risk_id))
@@ -160,8 +194,8 @@ class RiskService:
         if moving_to_closed:
             await self._sync.assert_closure_allowed(entry.id)
 
-        for field, value in updates.items():
-            setattr(entry, field, value)
+        for name, value in updates.items():
+            setattr(entry, name, value)
 
         # Recompute risk level if severity or likelihood changed
         if "severity" in updates or "likelihood" in updates:
@@ -203,24 +237,23 @@ class RiskService:
 
         await self._repo.update(entry)
 
-        # Enqueue a sync diff on the counterpart instance (if this is a dual record).
-        if user_id is not None:
-            diff = compute_entry_diff(before, entry)
-            if diff:
-                await self._sync.enqueue_update_push(
-                    entry=entry, diff=diff, initiator_user_id=user_id
-                )
+        # The same before/after diff feeds the audit trail and, for a dual
+        # record, the sync push to the counterpart instance.
+        diff = compute_entry_diff(before, entry)
+        if user_id is not None and diff:
+            await self._sync.enqueue_update_push(entry=entry, diff=diff, initiator_user_id=user_id)
 
         logger.info(
             "risk_entry_updated",
             risk_id=str(risk_id),
             updated_fields=list(updates.keys()),
         )
-        return entry
+        return RiskEntryChange(entry=entry, changes=diff)
 
     async def delete_risk_entry(
         self, risk_id: uuid.UUID, organization_id: uuid.UUID, user_id: uuid.UUID
-    ) -> None:
+    ) -> RiskEntry:
+        """Delete the entry and return it, so the caller can audit what went."""
         entry = await self._repo.get_by_id(risk_id, organization_id)
         if not entry:
             raise NotFoundError("RiskEntry", str(risk_id))
@@ -233,6 +266,7 @@ class RiskService:
 
         await self._repo.delete(risk_id, organization_id)
         logger.info("risk_entry_deleted", risk_id=str(risk_id), srmd_dismissed=srmd_dismissed)
+        return entry
 
     # --- Mitigations ---
 
@@ -276,7 +310,7 @@ class RiskService:
         mitigation_id: uuid.UUID,
         organization_id: uuid.UUID,
         payload: UpdateMitigationRequest,
-    ) -> Mitigation:
+    ) -> MitigationChange:
         # Verify risk entry belongs to org
         entry = await self._repo.get_by_id(risk_id, organization_id)
         if not entry:
@@ -287,21 +321,27 @@ class RiskService:
             raise NotFoundError("Mitigation", str(mitigation_id))
 
         updates = payload.model_dump(exclude_unset=True)
+        before = {name: _json_value(getattr(mitigation, name)) for name in _MITIGATION_FIELDS}
 
         if "status" in updates:
             await self._repo.update_mitigation_status(mitigation, updates.pop("status"))
 
-        for field, value in updates.items():
-            setattr(mitigation, field, value)
+        for name, value in updates.items():
+            setattr(mitigation, name, value)
 
         await self._repo.update_mitigation(mitigation)
 
+        changes = {
+            name: {"old": before[name], "new": _json_value(getattr(mitigation, name))}
+            for name in _MITIGATION_FIELDS
+            if before[name] != _json_value(getattr(mitigation, name))
+        }
         logger.info(
             "mitigation_updated",
             mitigation_id=str(mitigation_id),
             risk_id=str(risk_id),
         )
-        return mitigation
+        return MitigationChange(mitigation=mitigation, changes=changes)
 
     async def delete_mitigation(
         self,
